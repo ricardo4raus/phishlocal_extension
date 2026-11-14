@@ -487,6 +487,38 @@ export function findApiKeys(text: string): string[] {
 }
 
 /* ------------------------------------------------------------------------------------------------
+ * .env files
+ * --------------------------------------------------------------------------------------------- */
+
+/** dotenv-style value: strips an inline ` # comment` and one pair of surrounding quotes. */
+function envValue(raw: string): string {
+  const trimmed = raw.trim();
+  const quoted = /^(["'])(.*)\1(?:\s+#.*)?$/.exec(trimmed);
+  if (quoted) return quoted[2] ?? '';
+  return trimmed.replace(/(?:^|\s+)#.*$/, '').trim();
+}
+
+export interface EnvEntry {
+  key: string;
+  /** `undefined` for a line without `=`. */
+  value: string | undefined;
+}
+
+/** Entries of a `.env` file (CRLF-safe; empty lines and `#` comment lines are skipped). */
+export function parseEnv(text: string): EnvEntry[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.startsWith('#'))
+    .map((line) => {
+      const eq = line.indexOf('=');
+      return eq === -1
+        ? { key: line, value: undefined }
+        : { key: line.slice(0, eq).trim(), value: envValue(line.slice(eq + 1)) };
+    });
+}
+
+/* ------------------------------------------------------------------------------------------------
  * Manifest
  * --------------------------------------------------------------------------------------------- */
 

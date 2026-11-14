@@ -10,6 +10,7 @@ import {
   htmlResources,
   isNonLocalUrl,
   normalizeInside,
+  parseEnv,
 } from './helpers';
 
 describe('findRemoteCodeLoads', () => {
@@ -273,5 +274,18 @@ describe('findApiKeys', () => {
 
   it('ignores the variable name alone', () => {
     expect(findApiKeys('VITE_FIREBASE_API_KEY=')).toEqual([]);
+  });
+});
+
+describe('parseEnv', () => {
+  it('reads keys and values, skipping comments and empty lines (CRLF-safe)', () => {
+    const text = '# comment\r\nA=1\r\n\r\nB = two words # note\r\nC="quoted # kept"\r\nD=\r\nE\r\n';
+    expect(parseEnv(text)).toEqual([
+      { key: 'A', value: '1' },
+      { key: 'B', value: 'two words' },
+      { key: 'C', value: 'quoted # kept' },
+      { key: 'D', value: '' },
+      { key: 'E', value: undefined },
+    ]);
   });
 });
