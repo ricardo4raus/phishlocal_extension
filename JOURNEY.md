@@ -33,7 +33,10 @@ _Draft based on Ricardo's planning notes. Ricardo: review, and add your own expe
 _Current state, updated as features land._
 
 - Chrome extension (Manifest V3) with a side panel. Clicking the toolbar icon opens it.
-- No phishing check yet.
+- The side panel sends a test prompt through Firebase AI Logic hybrid inference
+  (`InferenceMode.PREFER_ON_DEVICE`): Gemini Nano answers on-device; the cloud is the fallback.
+  The panel shows where the prompt ran and how long it took.
+- No check of real emails yet.
 
 ## How we built it
 
@@ -65,6 +68,14 @@ _Current state, updated as features land._
 - **Windows tooling:** Node 25 (non-LTS, end of life) blocked Vitest 5; PowerShell's execution
   policy blocked `npm.ps1` after reinstalling Node; Vitest fails in Git Bash when the drive
   letter is lowercase (`/c/...`).
+- **A secret that the bundler wants to publish:** the App Check debug token must reach the code,
+  but Vite copies every `VITE_*` value into the bundle. The code reads the token only in dev
+  builds (`import.meta.env.DEV`), and a test fails if a production build contains it.
+- **The cloud path could not be tested:** with Gemini Nano available, `PREFER_ON_DEVICE` never
+  uses the cloud. A development-only "Force cloud" switch (`ONLY_IN_CLOUD`) made App Check
+  testable.
+- **Cold start through the SDK:** the first on-device prompt from the side panel took 314 s; the
+  same prompt in the cloud took 1.6 s. The demo needs a warmed-up model.
 
 ## What we learned
 
@@ -80,12 +91,25 @@ _Current state, updated as features land._
 - Pinning GitHub Actions to commit SHAs protects CI from moved tags; Dependabot keeps them
   current.
 - Use LTS (even-numbered) Node versions; odd versions reach end of life after a few months.
+- Firebase App Check and AI Logic: `initializeAppCheck()` must run before `getAI()`, because the
+  AI instance looks up App Check only once, when it is created.
+- App Check debug mode: the SDK reads the global `FIREBASE_APPCHECK_DEBUG_TOKEN` and exchanges
+  the token itself. The `CustomProvider` is required but its `getToken()` is never called. The
+  debug token works even though the web app is shown as "Unregistered" in the console.
+- If only `CustomProvider` is imported, the bundler removes the reCAPTCHA script loader from the
+  App Check SDK, so the build stays free of remote code.
+- `PREFER_ON_DEVICE` falls back to the cloud only when the on-device model is not available, and
+  it does so silently. For real emails that needs a design with explicit consent.
+- Read the installed SDK types instead of trusting memory: the hybrid API and the default cloud
+  model (`gemini-3.5-flash-lite`) were taken from `node_modules`.
 
 ## Accomplishments we're proud of
 
 _To fill in as the project progresses._
 
 - Go/no-go passed on day 1: Gemini Nano runs on the dev machine, warm prompts answer in about 1 s.
+- First hybrid prompt: the same phishing sample was answered on-device and in the cloud, and both
+  flagged the lookalike domain.
 
 ## What's next
 
@@ -124,3 +148,21 @@ _To fill in near the submission._
   remote-code check.
 - Moved from Node 25 to Node 26 LTS, fixed the PowerShell execution policy, upgraded Vitest to 5.
 - Started this journey file.
+
+### Sun 15 Nov 2026
+
+**Before coding (Ricardo):**
+
+- Created an App Check debug token in the Firebase console and put it into `.env.local`.
+
+**Session with Claude Code (started late on Sat 14 Nov):**
+
+- Planned the first hybrid prompt from the installed SDK types (firebase 13.3.0), then built it
+  in four small commits on `feat/hybrid-prompt`.
+- App Check with a `CustomProvider` and the debug token, used in dev builds only.
+- `runPrompt()` with `InferenceMode.PREFER_ON_DEVICE` and the languages en, de, fr, es.
+- Side panel: prompt field, run button, result with inference source and duration, and a
+  development-only "Force cloud" switch.
+- New test: the production build must not contain the debug token (checked with a planted token).
+- Tested in Chrome with a phishing sample: on-device (Gemini Nano) answered in 314.1 s on the
+  first run, the cloud answered in 1.6 s. App Check accepted the debug token.

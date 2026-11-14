@@ -14,7 +14,7 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 - [x] Sat 14.11. – First test prompt in DevTools console (warm prompt ~1 s, first cold run ~4 min)
 - [x] Sun 15.11. – Create Firebase project, enable AI Logic (Gemini Developer API); App Check enforced
 - [x] Sun 15.11. – Extension skeleton: Vite + Manifest V3 + side panel (side panel tested in Chrome)
-- [ ] Sun 15.11. – First hybrid prompt from the side panel (`InferenceMode.PREFER_ON_DEVICE`)
+- [x] Sun 15.11. – First hybrid prompt from the side panel (`InferenceMode.PREFER_ON_DEVICE`)
       incl. App Check debug token so the cloud fallback works
 - [ ] Sun 15.11. – Create public GitHub repo, Apache-2.0 license visible in the About section
 
