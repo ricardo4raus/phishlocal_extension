@@ -1,8 +1,7 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "types": ["node"],
-    "lib": ["ES2022"]
+    "types": ["node", "chrome", "vite/client"]
   },
-  "include": [".", "../vitest.config.ts"]
+  "include": [".", "../src/vite-env.d.ts", "../vite.config.ts", "../vitest.config.ts"]
 }

@@ -31,13 +31,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26
+          node-version-file: .nvmrc
           cache: npm
 
+      # --ignore-scripts: no install scripts are needed, so none get to run.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
-      # format:check -> lint -> build -> test
+      # format:check -> lint -> typecheck -> build -> test
       # No secrets needed: the build works with empty VITE_FIREBASE_* values.
       - name: Run checks
         run: npm run check

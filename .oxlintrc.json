@@ -5,13 +5,8 @@
     "correctness": "error",
     "suspicious": "warn"
   },
-  "env": {
-    "builtin": true,
-    "es2024": true,
-    "browser": true,
-    "webextensions": true
-  },
   "rules": {
+    "typescript/no-explicit-any": "error",
     "import/no-unassigned-import": [
       "warn",
       {
@@ -35,15 +30,5 @@
     "denyWarnings": true,
     "reportUnusedDisableDirectives": "error"
   },
-  "ignorePatterns": ["dist/**", "node_modules/**", "coverage/**", ".vite/**"],
-  "overrides": [
-    {
-      "files": ["vite.config.ts", "vitest.config.ts", "tests/**"],
-      "env": {
-        "browser": false,
-        "webextensions": false,
-        "node": true
-      }
-    }
-  ]
+  "ignorePatterns": ["dist/**", "node_modules/**", "coverage/**", ".vite/**"]
 }
