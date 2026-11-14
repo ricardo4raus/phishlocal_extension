@@ -1,0 +1,13 @@
+# Build output and dependencies
+dist
+coverage
+.vite
+node_modules
+
+# Generated / third-party files that must stay byte-identical
+package-lock.json
+LICENSE
+
+# Local secrets (never parsed, but keep them out of tooling)
+.env
+.env.*
