@@ -14,11 +14,19 @@ It is the raw material for the Devpost story and the demo video.
 
 ## Inspiration
 
-_To fill in by Ricardo: why phishing, why on-device, personal experiences._
+_Draft based on Ricardo's planning notes. Ricardo: review, and add your own experiences with phishing._
 
-Starting point from the project brief: email is private, so sending every email to a cloud AI
-to check it for phishing defeats the purpose. Chrome now ships Gemini Nano on-device, and
-Firebase AI Logic can run a prompt on-device first and use the cloud only as a fallback.
+- I was looking for real problems that people have and that an app could solve, and came across
+  the Firebase #BuildHybridAI hackathon.
+- I'm an IT apprentice (application development) in Zurich and work mostly in IT security, where
+  phishing is one of the most common threats. A phishing checker was a natural fit.
+- Most phishing checkers send your email or its links to a server. But email is private: sending
+  every email to a cloud AI to check it defeats the purpose. Chrome now ships Gemini Nano
+  on-device, and Firebase AI Logic can run a prompt on-device first and use the cloud only as a
+  fallback.
+- Switzerland is multilingual, so a checker that only understands English is not enough.
+- The goal: a tool that shows instantly that you can check for phishing securely, offline and
+  without sharing your data. That's where the name PhishLocal comes from.
 
 ## What it does
 
@@ -48,6 +56,12 @@ _Current state, updated as features land._
 - **Firebase in an extension:** the browser builds of Firebase Auth and the reCAPTCHA App Check
   provider load scripts from Google servers, which MV3 does not allow. Use
   `firebase/auth/web-extension` and an App Check `CustomProvider` with a debug token.
+- **Outdated setup guides:** most guides list two Chrome flags, but in Chrome 157
+  `#optimization-guide-on-device-model` no longer exists; only `#prompt-api-for-gemini-nano` is
+  needed. `chrome://on-device-internals` is disabled by default and has to be enabled via
+  `chrome://chrome-urls`.
+- **The first prompt seemed to hang:** right after the model download, the first prompt took about
+  4 minutes with no output, which looked like a failure. It was only the one-time warm-up.
 - **Windows tooling:** Node 25 (non-LTS, end of life) blocked Vitest 5; PowerShell's execution
   policy blocked `npm.ps1` after reinstalling Node; Vitest fails in Git Bash when the drive
   letter is lowercase (`/c/...`).
@@ -71,6 +85,8 @@ _Current state, updated as features land._
 
 _To fill in as the project progresses._
 
+- Go/no-go passed on day 1: Gemini Nano runs on the dev machine, warm prompts answer in about 1 s.
+
 ## What's next
 
 _To fill in near the submission._
@@ -81,6 +97,16 @@ _To fill in near the submission._
 
 **Before coding (Ricardo):**
 
+- Looked for app ideas, found the #BuildHybridAI hackathon and chose a phishing-checker Chrome
+  extension. Made a 16-day plan with a feature freeze on 22 Nov.
+- Created the Devpost draft: name "PhishLocal – Private & Offline Phishing Check with AI" and the
+  elevator pitch "Your emails never leave your browser. PhishLocal uses on-device AI to spot
+  phishing, explain every red flag, and work offline, with a cloud only as fallback."
+  "PhishFinder" was rejected: several phishing extensions and an older Devpost project already
+  use that name.
+- Defined what makes PhishLocal different: on-device by default; personal data removed on-device
+  before an optional cloud check; every red flag explained; en/de/fr/es on-device, other
+  languages (e.g. Italian) through the cloud.
 - Updated Chrome to version 157 and checked the hardware requirements for Gemini Nano.
 - Enabled `#prompt-api-for-gemini-nano` (Enabled Multilingual), downloaded the model and ran a
   first prompt in the DevTools console (cold start about 4 min, warm prompt about 1 s).
