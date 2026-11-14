@@ -66,8 +66,18 @@ explain every red flag, and work offline, with a cloud only as fallback."
   `main`, e.g. `feat/hybrid-prompt`, `fix/side-panel-error`, `docs/readme`.
 - Commit in small steps on that branch: one commit per logical step that builds
   (e.g. "Add rule check for lookalike domains", then "Show rule results in side panel"),
-  not one big commit at the end. Run `npm run build` before each commit.
+  not one big commit at the end. Run `npm run check` before each commit; it must pass.
 - Push the branch and open a pull request into `main` (`gh pr create`).
 - PRs are merged with a **merge commit** only (`gh pr merge --merge`), never squash or rebase.
 - Do not merge a PR without my OK. After the merge, switch back to `main`, pull, and delete
   the branch.
+
+## Checks
+
+- `npm run check` runs everything in this order: `format:check` → `lint` (Oxlint) → `build`
+  (`typecheck` + `vite build`) → `test` (Vitest). CI runs the same command on every PR.
+- `npm run format` fixes formatting (Prettier).
+- Linter is Oxlint, not ESLint, because typescript-eslint does not support TypeScript 7.
+- `tests/` holds structure tests for the source, the manifest and the `dist` build output
+  (e.g. no remote code). When adding a manifest permission or host permission, update the
+  allow-list in `tests/manifest.test.ts` on purpose.
