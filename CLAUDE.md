@@ -52,13 +52,16 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - When a task is done and tested, tick it (`[x]`) in `TIMETABLE.md`.
 - If a task takes much longer than planned or the schedule is at risk, tell me early and
   suggest what to cut. Feature freeze is Sun 22 Nov.
-- Before implementing a task, briefly tell me your plan; keep changes small and commit after
-  each finished task.
+- Before implementing a task, briefly tell me your plan; keep changes small and follow the
+  git workflow below.
 
 ## Git workflow (always)
 - Never commit directly to `main`. Every feature or change gets its own branch from the latest
   `main`, e.g. `feat/hybrid-prompt`, `fix/side-panel-error`, `docs/readme`.
-- Commit on that branch, push it, and open a pull request into `main` (`gh pr create`).
+- Commit in small steps on that branch: one commit per logical step that builds
+  (e.g. "Add rule check for lookalike domains", then "Show rule results in side panel"),
+  not one big commit at the end. Run `npm run build` before each commit.
+- Push the branch and open a pull request into `main` (`gh pr create`).
 - PRs are merged with a **merge commit** only (`gh pr merge --merge`), never squash or rebase.
 - Do not merge a PR without my OK. After the merge, switch back to `main`, pull, and delete
   the branch.
