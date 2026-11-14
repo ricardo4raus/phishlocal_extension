@@ -4,9 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PhishLocal</title>
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <div id="app"></div>
+    <main id="app">
+      <h1>PhishLocal</h1>
+
+      <label for="prompt">Test prompt</label>
+      <textarea id="prompt" rows="6">
+Is this email suspicious? Answer in two sentences.
+
+"Your account is locked. Confirm your password within 24 hours: http://paypa1-secure.com/login"</textarea>
+
+      <label id="force-cloud-row" class="checkbox" hidden>
+        <input id="force-cloud" type="checkbox" />
+        Force cloud (development only)
+      </label>
+
+      <button id="run" type="button">Run prompt</button>
+
+      <p id="status" role="status"></p>
+      <pre id="output"></pre>
+    </main>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
