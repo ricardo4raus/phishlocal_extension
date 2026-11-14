@@ -1,6 +1,7 @@
 # PhishLocal – Project brief for Claude Code
 
 ## What this project is
+
 PhishLocal is a Chrome extension (Manifest V3) for the Firebase #BuildHybridAI hackathon
 (Devpost, deadline Mon 30 Nov 2026, 23:00 Swiss time).
 
@@ -12,6 +13,7 @@ Pitch: "Your emails never leave your browser. PhishLocal uses on-device AI to sp
 explain every red flag, and work offline, with a cloud only as fallback."
 
 ## Fixed decisions (do not change without asking)
+
 - Chrome extension, Manifest V3, UI in a **side panel**.
 - Build: **Vite + TypeScript**. Prefer `@crxjs/vite-plugin` for the extension build.
   If it does not work with the current Vite version, use a plain Vite multi-entry build instead
@@ -27,6 +29,7 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Keep it simple. No frameworks (React etc.) unless I ask. Plain TypeScript + HTML + CSS.
 
 ## Product concept (what makes PhishLocal different)
+
 1. **On-device by default**: Gemini Nano checks the email in Chrome. Nothing leaves the device.
 2. **Privacy filter in front of the cloud**: a cloud "deep check" happens only with explicit
    consent. Before sending, the on-device step removes personal data (names, email addresses,
@@ -38,6 +41,7 @@ explain every red flag, and work offline, with a cloud only as fallback."
 5. Rule checks (plain TypeScript) + AI together: rule results are fed into the prompt.
 
 ## Current status
+
 - Project setup done (commit "Project setup"); side panel opens in Chrome.
 - Firebase project `phishlocal` exists, AI Logic enabled with Gemini Developer API.
 - **App Check is enforced but still "Unregistered"** → cloud requests will fail until we add an
@@ -47,6 +51,7 @@ explain every red flag, and work offline, with a cloud only as fallback."
   On-device needs `expectedInputs` / `expectedOutputs` with languages, otherwise Chrome warns.
 
 ## Timetable and workflow
+
 - The full plan with dates is in **`TIMETABLE.md`**. Read it at the start of every session.
 - Work only on the next open task(s) in `TIMETABLE.md`, unless I say otherwise.
 - When a task is done and tested, tick it (`[x]`) in `TIMETABLE.md`.
@@ -56,6 +61,7 @@ explain every red flag, and work offline, with a cloud only as fallback."
   git workflow below.
 
 ## Git workflow (always)
+
 - Never commit directly to `main`. Every feature or change gets its own branch from the latest
   `main`, e.g. `feat/hybrid-prompt`, `fix/side-panel-error`, `docs/readme`.
 - Commit in small steps on that branch: one commit per logical step that builds
