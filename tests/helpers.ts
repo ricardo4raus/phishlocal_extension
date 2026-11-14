@@ -12,6 +12,9 @@ export const readText = (path: string): string => readFileSync(path, 'utf8');
 
 export const readJson = <T = unknown>(path: string): T => JSON.parse(readText(path)) as T;
 
+/** Sorted copy (`undefined` = empty list), for order-independent comparisons. */
+export const sorted = (list: readonly string[] | undefined): string[] => (list ?? []).toSorted();
+
 /** Path relative to `base`, always with forward slashes (for readable test output). */
 export const toPosixRelative = (base: string, path: string): string =>
   relative(base, path).split(sep).join('/');
@@ -68,7 +71,7 @@ export const isNonLocalUrl = (url: string): boolean =>
   /^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(url.trim());
 
 /** True for network URLs: `http:`, `https:` or protocol-relative `//`. */
-export const isRemoteUrl = (url: string): boolean => /^(?:https?:)?\/\//i.test(url.trim());
+const isRemoteUrl = (url: string): boolean => /^(?:https?:)?\/\//i.test(url.trim());
 
 const isDataUrl = (url: string): boolean => /^data:/i.test(url.trim());
 
@@ -84,19 +87,25 @@ const snippet = (text: string, max = 160): string => {
 
 type Node = ESTree.Node;
 
-/** Calls `visit` for every AST node below `root` (generic walk over all child properties). */
+/**
+ * Calls `visit` for every AST node below `root`, in source order (depth-first walk over all child
+ * properties). Children are pushed in reverse, one by one, so they are popped first-to-last;
+ * `push(...array)` would throw a RangeError for very large arrays (e.g. a big lookup table).
+ */
 function walk(root: unknown, visit: (node: Node) => void): void {
   const stack: unknown[] = [root];
   while (stack.length > 0) {
     const value = stack.pop();
+    if (value === null || typeof value !== 'object') continue;
     if (Array.isArray(value)) {
-      stack.push(...value);
-    } else if (value !== null && typeof value === 'object') {
-      if (typeof (value as { type?: unknown }).type === 'string') visit(value as Node);
-      for (const [key, child] of Object.entries(value)) {
-        if (key !== 'parent' && child !== null && typeof child === 'object') stack.push(child);
-      }
+      for (const item of value.toReversed()) stack.push(item);
+      continue;
     }
+    if (typeof (value as { type?: unknown }).type === 'string') visit(value as Node);
+    const children = Object.entries(value).filter(
+      ([key, child]) => key !== 'parent' && child !== null && typeof child === 'object',
+    );
+    for (const [, child] of children.toReversed()) stack.push(child);
   }
 }
 
@@ -189,9 +198,12 @@ const isRemoteLiteral = (node: Node | null | undefined): boolean => {
   return prefix !== undefined && isRemoteUrl(prefix);
 };
 
-const isLocationObject = (node: Node): boolean =>
-  (node.type === 'Identifier' && node.name === 'location') ||
-  (node.type === 'MemberExpression' && propertyName(node.property) === 'location');
+/**
+ * `` `./locales/${lang}.ts` `` or `'./locales/' + lang`: a relative path pattern. Vite bundles every
+ * matching file, and a URL starting with `./` or `../` always resolves inside the extension origin.
+ */
+const isLocalPathPattern = (node: Node | null | undefined): boolean =>
+  /^\.\.?\//.test(leadingString(node) ?? '');
 
 const langFor = (filename: string): 'js' | 'ts' | 'tsx' | 'jsx' =>
   /\.[cm]?tsx$/i.test(filename)
@@ -209,12 +221,13 @@ const langFor = (filename: string): 'js' | 'ts' | 'tsx' | 'jsx' =>
  *
  * Flagged:
  * - static `import`/`export … from` with a URL source (`https:`, `//`, `data:`, …)
- * - dynamic `import()` whose source is not a local string literal (variables, `${}` templates)
+ * - dynamic `import()` of a variable, or of a template/concatenation not starting with `./` or
+ *   `../` (`` import(`./locales/${lang}.ts`) `` is fine)
  * - `importScripts()`, `new Worker()`, `new SharedWorker()` with a non-local argument
  * - `eval()`, `new Function()` / `Function()` (blocked by the MV3 CSP anyway)
  * - `document.createElement('script')` (extension pages have no reason to inject script tags)
- * - `x.src = 'https://…'` / `x.href = 'https://…'` and `setAttribute('src'|'href', 'https://…')`
- *   with a remote literal (navigation via `location.href` is not code loading and is allowed)
+ * - `x.src = 'https://…'` and `setAttribute('src', 'https://…')` with a remote literal. `href` is
+ *   not checked: links and `location.href` navigate, they do not load code.
  */
 export function findRemoteCodeLoads(code: string, filename = 'input.js'): string[] {
   const result = parseSync(filename, code, {
@@ -240,7 +253,9 @@ export function findRemoteCodeLoads(code: string, filename = 'input.js'): string
         break;
       }
       case 'ImportExpression': {
-        if (!isLocalSource(node.source)) hit('dynamic import() of a non-local source', node);
+        if (!isLocalSource(node.source) && !isLocalPathPattern(node.source)) {
+          hit('dynamic import() of a non-local source', node);
+        }
         break;
       }
       case 'CallExpression':
@@ -267,10 +282,10 @@ export function findRemoteCodeLoads(code: string, filename = 'input.js'): string
             hit('creates a <script> element', node);
           } else if (
             method === 'setAttribute' &&
-            ['src', 'href'].includes(staticString(args[0])?.toLowerCase() ?? '') &&
+            staticString(args[0])?.toLowerCase() === 'src' &&
             isRemoteLiteral(args[1])
           ) {
-            hit('sets a remote src/href attribute', node);
+            hit('sets a remote src attribute', node);
           }
         }
         break;
@@ -279,11 +294,10 @@ export function findRemoteCodeLoads(code: string, filename = 'input.js'): string
         const target = node.left;
         if (
           target.type === 'MemberExpression' &&
-          ['src', 'href'].includes(propertyName(target) ?? '') &&
-          !isLocationObject(target.object) &&
+          propertyName(target) === 'src' &&
           isRemoteLiteral(node.right)
         ) {
-          hit('assigns a remote URL to src/href', node);
+          hit('assigns a remote URL to src', node);
         }
         break;
       }
@@ -301,7 +315,7 @@ export function findRemoteCodeLoads(code: string, filename = 'input.js'): string
  *   build loads gapi + reCAPTCHA).
  * - App Check: reCAPTCHA providers do not work in extensions; use a debug or custom provider.
  */
-export const DENIED_REMOTE_SCRIPT_HOSTS: readonly string[] = [
+const DENIED_REMOTE_SCRIPT_HOSTS: readonly string[] = [
   'apis.google.com/js/api.js',
   'google.com/recaptcha/',
   'gstatic.com/firebasejs',
@@ -331,7 +345,7 @@ export function findCssRemoteUrls(css: string): string[] {
   const text = css.replace(/\/\*[\s\S]*?\*\//g, '');
   const hits: string[] = [];
   const patterns = [
-    /@import\s+(?:url\(\s*)?(["']?)([^"')\s;]+)\1/gi,
+    /@import\s+(["'])([^"']*)\1/gi, // quoted form; `@import url(…)` is matched by the url() rule
     /url\(\s*(["']?)([^"')]*?)\1\s*\)/gi,
   ];
   for (const regex of patterns) {
@@ -382,7 +396,7 @@ function parseAttributes(attrText: string): Map<string, string> {
   return attrs;
 }
 
-export interface HtmlResource {
+interface HtmlResource {
   tag: string;
   attr: string;
   url: string;
@@ -411,31 +425,13 @@ export function htmlResources(html: string): HtmlResource[] {
   return resources;
 }
 
-/** Contents of inline `<script>` (JS only) and `<style>` elements. */
-export function inlineBlocks(html: string): { kind: 'script' | 'style'; code: string }[] {
-  const blocks: { kind: 'script' | 'style'; code: string }[] = [];
-  for (const match of stripHtmlComments(html).matchAll(INLINE_BLOCK_REGEX)) {
-    const kind = (match[1] ?? '').toLowerCase() as 'script' | 'style';
-    const type =
-      parseAttributes(match[2] ?? '')
-        .get('type')
-        ?.toLowerCase() ?? '';
-    const code = match[3] ?? '';
-    if (code.trim() === '') continue;
-    if (
-      kind === 'script' &&
-      !['', 'module', 'text/javascript', 'application/javascript'].includes(type)
-    ) {
-      continue; // JSON data blocks etc. are not executed
-    }
-    blocks.push({ kind, code });
-  }
-  return blocks;
-}
+/** Script types the browser executes; others (e.g. `application/json`) are inert data blocks. */
+const isExecutedScriptType = (type: string): boolean =>
+  ['', 'module', 'importmap'].includes(type) || /(?:java|ecma)script/.test(type);
 
 /**
  * Problems in an HTML page: resources from outside the package (`data:` is fine except for
- * scripts) and remote code in inline `<script>` / `<style>` blocks.
+ * scripts), inline scripts, and remote URLs in inline `<style>` blocks.
  * Existence of local files is checked separately (only meaningful for build output).
  */
 export function findHtmlProblems(html: string): string[] {
@@ -445,10 +441,20 @@ export function findHtmlProblems(html: string): string[] {
       problems.push(`<${tag} ${attr}> loads non-local URL ${snippet(url)}`);
     }
   }
-  for (const { kind, code } of inlineBlocks(html)) {
-    const found =
-      kind === 'script' ? findRemoteCodeLoads(code, 'inline.js') : findCssRemoteUrls(code);
-    problems.push(...found.map((hit) => `inline <${kind}>: ${hit}`));
+  for (const [, kind = '', attrs = '', code = ''] of stripHtmlComments(html).matchAll(
+    INLINE_BLOCK_REGEX,
+  )) {
+    if (code.trim() === '') continue;
+    if (kind.toLowerCase() === 'style') {
+      problems.push(...findCssRemoteUrls(code).map((hit) => `inline <style>: ${hit}`));
+    } else if (
+      isExecutedScriptType(parseAttributes(attrs).get('type')?.trim().toLowerCase() ?? '')
+    ) {
+      problems.push(
+        `inline <script>${snippet(code, 60)}</script>: MV3 extension pages don't run inline ` +
+          'scripts; use <script type="module" src="…">',
+      );
+    }
   }
   return problems;
 }
@@ -470,7 +476,7 @@ export function findRemoteCodeInFile(filename: string, text: string): string[] {
  * --------------------------------------------------------------------------------------------- */
 
 /** Google / Firebase browser API key format. */
-export const GOOGLE_API_KEY_REGEX = /AIza[0-9A-Za-z_-]{35}/g;
+const GOOGLE_API_KEY_REGEX = /AIza[0-9A-Za-z_-]{35}/g;
 
 /** `line N: AIzaSy…` for every API key in `text` (masked, so the failure output leaks nothing). */
 export function findApiKeys(text: string): string[] {
@@ -481,10 +487,10 @@ export function findApiKeys(text: string): string[] {
 }
 
 /* ------------------------------------------------------------------------------------------------
- * Manifest + CSP
+ * Manifest
  * --------------------------------------------------------------------------------------------- */
 
-export interface ContentScript {
+interface ContentScript {
   matches?: string[];
   exclude_matches?: string[];
   js?: string[];
@@ -493,7 +499,7 @@ export interface ContentScript {
   [key: string]: unknown;
 }
 
-export interface WebAccessibleResource {
+interface WebAccessibleResource {
   resources?: string[];
   matches?: string[];
   extension_ids?: string[];
@@ -504,6 +510,7 @@ export interface Manifest {
   manifest_version?: number;
   name?: string;
   version?: string;
+  default_locale?: string;
   action?: Record<string, unknown>;
   side_panel?: { default_path?: string };
   background?: { service_worker?: string; type?: string };
@@ -514,51 +521,12 @@ export interface Manifest {
   content_scripts?: ContentScript[];
   web_accessible_resources?: WebAccessibleResource[];
   externally_connectable?: unknown;
-  content_security_policy?: string | Record<string, string | undefined>;
+  content_security_policy?: unknown;
   [key: string]: unknown;
 }
 
-/** CSP directives that control where code may come from. */
-const CODE_DIRECTIVES = [
-  'default-src',
-  'script-src',
-  'script-src-elem',
-  'worker-src',
-  'child-src',
-  'object-src',
-];
-const ALLOWED_CODE_SOURCES = new Set(["'self'", "'none'", "'wasm-unsafe-eval'"]);
-
-/**
- * Allow-list check for `content_security_policy.extension_pages`: code directives may only use
- * `'self'`, `'none'` and `'wasm-unsafe-eval'`. Like browsers, the FIRST occurrence of a duplicated
- * directive wins.
- */
-export function cspProblems(csp: string): string[] {
-  const directives = new Map<string, string[]>();
-  for (const part of csp.split(';')) {
-    const [name, ...sources] = part.trim().split(/\s+/);
-    const key = name?.toLowerCase();
-    if (key && !directives.has(key)) directives.set(key, sources);
-  }
-  const problems: string[] = [];
-  for (const directive of CODE_DIRECTIVES) {
-    for (const source of directives.get(directive) ?? []) {
-      if (!ALLOWED_CODE_SOURCES.has(source.toLowerCase())) {
-        problems.push(`${directive} allows ${source}`);
-      }
-    }
-  }
-  return problems;
-}
-
 /** Match patterns that expose the extension to every website. */
-export const BROAD_MATCHES: readonly string[] = [
-  '<all_urls>',
-  '*://*/*',
-  'http://*/*',
-  'https://*/*',
-];
+const BROAD_MATCHES: readonly string[] = ['<all_urls>', '*://*/*', 'http://*/*', 'https://*/*'];
 
 export const contentScriptMatches = (m: Manifest): string[] => [
   ...new Set((m.content_scripts ?? []).flatMap((cs) => cs.matches ?? [])),
@@ -572,8 +540,13 @@ export function webAccessibleResourceProblems(m: Manifest, allowed: readonly str
       if (!entry.extension_ids) problems.push(`[${i}] has no matches`);
     }
     for (const match of entry.matches ?? []) {
-      if (BROAD_MATCHES.includes(match)) problems.push(`[${i}] exposed to every site: ${match}`);
-      else if (!allowed.includes(match)) problems.push(`[${i}] match not allow-listed: ${match}`);
+      if (BROAD_MATCHES.includes(match)) {
+        problems.push(
+          `[${i}] exposed to every site: ${match} – declare the Gmail content script in manifest ` +
+            "content_scripts with matches ['https://mail.google.com/*'] instead of crxjs `?script` " +
+            'injection',
+        );
+      } else if (!allowed.includes(match)) problems.push(`[${i}] match not allow-listed: ${match}`);
     }
     if (entry.extension_ids) problems.push(`[${i}] exposed to other extensions`);
     return problems;

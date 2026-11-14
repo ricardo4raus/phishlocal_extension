@@ -1,7 +1,6 @@
 // Self-checks for the detectors in helpers.ts, so the structure tests cannot pass vacuously.
 import { describe, expect, it } from 'vitest';
 import {
-  cspProblems,
   findApiKeys,
   findCssRemoteUrls,
   findDeniedRemoteHosts,
@@ -27,8 +26,10 @@ describe('findRemoteCodeLoads', () => {
     `import(/* @vite-ignore */ 'http://cdn.example/mod.js')`,
     'import(`//cdn.example/mod.js`)',
     'import(`${base}/x.js`)',
+    'import(`https://cdn.example/${lang}.js`)',
+    'import(`${"./"}x.js`)',
     `import(url)`,
-    `import('./' + name)`,
+    `import(name + '.js')`,
     `import(chrome.runtime.getURL(file))`,
     `import(chrome.runtime.getURL('https://evil.example/x.js'))`,
     // importScripts / workers
@@ -48,13 +49,12 @@ describe('findRemoteCodeLoads', () => {
     `const s = document.createElement('script'); s.src = base + '/model.js';`,
     'document.createElement(`SCRIPT`)',
     `document.createElementNS('http://www.w3.org/2000/svg', 'script')`,
-    // remote src/href
+    // remote src
     `img.src = 'https://tracker.example/pixel.gif'`,
     'el.src = `https://${host}/x.js`',
-    `link.href = '//cdn.example/style.css'`,
     `el['src'] = 'https://cdn.example/x.js'`,
     `el.setAttribute('src', 'https://cdn.example/x.js')`,
-    `el.setAttribute('HREF', 'http://cdn.example/x.css')`,
+    `el.setAttribute('SRC', '//cdn.example/x.js')`,
     // TypeScript syntax is parsed as well
     `const url: string = 'https://x'; await import(url as string);`,
   ])('flags %s', (code) => {
@@ -75,6 +75,10 @@ describe('findRemoteCodeLoads', () => {
     `import './assets/background.ts-BJ4N6UWp.js';`,
     `import("./chunk.js")`,
     'import(`./lazy-DT2320O_.js`)',
+    // relative path patterns: Vite bundles every match, `./`/`../` never leaves the package
+    'import(`./locales/${lang}.ts`)',
+    'import(`../prompts/${name}.js`)',
+    `import('./locales/' + lang + '.ts')`,
     `new URL("./worker.js", import.meta.url)`,
     `new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })`,
     `new Worker('' + new URL('assets/worker-abc.js', import.meta.url).href)`,
@@ -88,6 +92,10 @@ describe('findRemoteCodeLoads', () => {
     `img.src = previewUrl`,
     `location.href = 'https://mail.google.com/'`,
     `window.location.href = 'https://mail.google.com/'`,
+    // href navigates (links, help pages); it does not load code
+    `a.href = 'https://support.google.com/mail/answer/8253'`,
+    `link.href = '//cdn.example/style.css'`,
+    `el.setAttribute('HREF', 'http://cdn.example/x.css')`,
     `document.createElement('link')`,
     `el.setAttribute('title', 'https://example.com')`,
     `obj.eval('x')`,
@@ -99,6 +107,20 @@ describe('findRemoteCodeLoads', () => {
 
   it('reports unparseable files instead of silently passing', () => {
     expect(findRemoteCodeLoads('const = ;', 'broken.js')[0]).toMatch(/could not parse/);
+  });
+
+  it('reports hits in source order', () => {
+    const code = `eval(a);\nimport('https://x/b.js');\nnew Function('c');`;
+    expect(findRemoteCodeLoads(code).map((hit) => hit.split(':')[0])).toEqual([
+      'eval() evaluates code from strings',
+      'dynamic import() of a non-local source',
+      'Function() evaluates code from strings',
+    ]);
+  });
+
+  it('handles very large arrays (no spread into push)', () => {
+    const code = `export const TABLE = [${'0,'.repeat(200_000)}];`;
+    expect(findRemoteCodeLoads(code)).toEqual([]);
   });
 
   it('includes the offending code in the message', () => {
@@ -142,6 +164,10 @@ describe('findCssRemoteUrls', () => {
   ])('does not flag %s', (css) => {
     expect(findCssRemoteUrls(css)).toEqual([]);
   });
+
+  it('reports @import url(…) once', () => {
+    expect(findCssRemoteUrls(`@import url("https://fonts.example/a.css");`)).toHaveLength(1);
+  });
 });
 
 describe('htmlResources / findHtmlProblems', () => {
@@ -168,8 +194,14 @@ describe('htmlResources / findHtmlProblems', () => {
     `<embed src="//evil.example/x">`,
     `<img src="https://tracker.example/pixel.gif">`,
     `<img srcset="a.png 1x, https://tracker.example/b.png 2x">`,
-    `<script>import('https://cdn.example/x.js')</script>`,
     `<style>@import url(https://fonts.example/a.css);</style>`,
+    // inline scripts never run on MV3 extension pages, whatever they contain
+    `<script>import('https://cdn.example/x.js')</script>`,
+    `<script>console.log('hi')</script>`,
+    `<script type="module">import './main.js';</script>`,
+    `<script type="text/javascript">1</script>`,
+    `<script type="importmap">{"imports":{"x":"https://cdn.example/x.js"}}</script>`,
+    `<script>const sample = '<script src="https://evil.example/x.js">';</script>`,
   ])('flags %s', (html) => {
     expect(findHtmlProblems(html)).not.toEqual([]);
   });
@@ -182,7 +214,7 @@ describe('htmlResources / findHtmlProblems', () => {
     `<a href="https://support.google.com/mail">Help</a>`,
     `<p title="<script src='https://evil.example/x.js'>">sample</p>`,
     `<script type="application/json">{"url":"https://example.com"}</script>`,
-    `<script>const sample = '<script src="https://evil.example/x.js">';</script>`,
+    `<script type="module" src="./main.ts">  </script>`,
   ])('does not flag %s', (html) => {
     expect(findHtmlProblems(html)).toEqual([]);
   });
@@ -241,35 +273,5 @@ describe('findApiKeys', () => {
 
   it('ignores the variable name alone', () => {
     expect(findApiKeys('VITE_FIREBASE_API_KEY=')).toEqual([]);
-  });
-});
-
-describe('cspProblems', () => {
-  it.each([
-    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
-    "script-src 'self'; object-src 'none'",
-    "default-src 'self'; img-src https: data:; connect-src https://firebasevertexai.googleapis.com",
-  ])('accepts %s', (csp) => {
-    expect(cspProblems(csp)).toEqual([]);
-  });
-
-  it.each([
-    "script-src 'self' 'unsafe-eval'",
-    "script-src 'self' 'unsafe-inline'",
-    "script-src 'self' https://cdn.example",
-    "default-src 'self' https:",
-    "script-src 'self' *",
-    "script-src-elem 'self' blob:",
-    "worker-src 'self' data:",
-    'child-src https://evil.example',
-    'object-src https://evil.example',
-    // the first directive wins, so a stricter duplicate later does not hide the problem
-    "script-src 'self' https://cdn.example; script-src 'self'",
-  ])('flags %s', (csp) => {
-    expect(cspProblems(csp)).not.toEqual([]);
-  });
-
-  it('ignores a later duplicate directive (browsers use the first one)', () => {
-    expect(cspProblems("script-src 'self'; script-src https://cdn.example")).toEqual([]);
   });
 });
