@@ -20,6 +20,7 @@ import {
   normalizeInside,
   readJson,
   readText,
+  sorted,
   toPosixRelative,
   walkFiles,
   webAccessibleResourceProblems,
@@ -28,8 +29,11 @@ import {
 const distDir = fromRoot('dist');
 const distManifestPath = join(distDir, 'manifest.json');
 
-/** Build inputs: if any of these is newer than dist/manifest.json, dist is stale. */
-const BUILD_INPUTS = ['manifest.json', 'vite.config.ts', 'package-lock.json'];
+/**
+ * Build inputs besides src/** and public/**: if any is newer than dist/manifest.json, dist is stale.
+ * (.env.local is not listed: it is optional and not present in CI.)
+ */
+const BUILD_INPUTS = ['manifest.json', 'vite.config.ts', 'tsconfig.json', 'package-lock.json'];
 
 let manifest: Manifest;
 let sourceManifest: Manifest;
@@ -37,10 +41,11 @@ let files: string[];
 /** Exact-case set of dist-relative posix paths, e.g. `assets/index-abc.js`. */
 let relFiles: Set<string>;
 
-/** Newest file among the build inputs (src/** and BUILD_INPUTS). */
+/** Newest file among the build inputs (src/**, public/** and BUILD_INPUTS). */
 function newestBuildInput(): { file: string; mtimeMs: number } {
   const candidates = [
     ...walkFiles(fromRoot('src')),
+    ...walkFiles(fromRoot('public')),
     ...BUILD_INPUTS.map((file) => fromRoot(file)).filter((file) => existsSync(file)),
   ];
   let newest = { file: '', mtimeMs: 0 };
@@ -112,6 +117,7 @@ function referencedPaths(m: Manifest): string[] {
     ...Object.values(overrides),
     ...asArray(m.content_scripts).flatMap((cs) => [...asArray(cs.js), ...asArray(cs.css)]),
     ...asArray(m.web_accessible_resources).flatMap((entry) => asArray(entry.resources)),
+    m.default_locale && `_locales/${m.default_locale}/messages.json`,
   ].filter((p): p is string => typeof p === 'string' && p !== '');
 }
 
@@ -129,8 +135,6 @@ const existsInDist = (path: string): boolean => {
   const normalized = normalizeInside(path);
   return normalized !== undefined && relFiles.has(normalized);
 };
-
-const sorted = (list: readonly string[] | undefined): string[] => [...(list ?? [])].sort();
 
 describe('dist/ build output', () => {
   it('manifest references only files that exist in dist (exact case)', () => {
@@ -165,8 +169,8 @@ describe('dist/ build output', () => {
     );
   });
 
-  it('has the same CSP as the source manifest', () => {
-    expect(manifest.content_security_policy).toEqual(sourceManifest.content_security_policy);
+  it('has no custom content_security_policy (the MV3 default is what we want)', () => {
+    expect(manifest.content_security_policy).toBeUndefined();
   });
 
   it('has the same version as the source manifest', () => {

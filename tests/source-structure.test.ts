@@ -63,9 +63,8 @@ function isGitWorkTree(): boolean {
   }
 }
 
-// CI always has a git checkout, so git-based checks are never skipped there: if git is broken in
-// CI they fail instead of silently passing. Locally (e.g. a source zip without .git) they fall back
-// or are skipped.
+// Git-based checks are skipped only outside a git checkout (e.g. a source zip) and never in CI: if
+// git is broken there, they fail instead of silently passing.
 const useGit = isGitWorkTree() || Boolean(process.env.CI);
 
 describe('required files', () => {
@@ -90,9 +89,16 @@ describe('.env.example', () => {
       : { key: line.slice(0, eq).trim(), value: envValue(line.slice(eq + 1)) };
   });
 
-  it('has exactly the Firebase keys (no duplicates, nothing else)', () => {
-    const keys = entries.map((entry) => entry.key);
-    expect([...keys].sort()).toEqual([...FIREBASE_ENV_KEYS].sort());
+  const keys = entries.map((entry) => entry.key);
+
+  // Extra keys are fine (e.g. VITE_APPCHECK_DEBUG_TOKEN): .env.example is the template for
+  // .env.local and grows with the project. The Firebase config keys must all be there, though.
+  it('has every Firebase config key', () => {
+    expect(FIREBASE_ENV_KEYS.filter((key) => !keys.includes(key))).toEqual([]);
+  });
+
+  it('has no duplicate keys', () => {
+    expect(keys.filter((key, i) => keys.indexOf(key) !== i)).toEqual([]);
   });
 
   it('has only empty values (never commit real config here)', () => {
@@ -101,35 +107,21 @@ describe('.env.example', () => {
   });
 });
 
-/** Whether git ignores `path` (or, without git outside CI, a literal .gitignore entry covers it). */
+/** Whether git ignores `path`. */
 function isIgnored(path: string): boolean {
-  if (useGit) {
-    // Exit code 0 = ignored, 1 = not ignored (works even if the file does not exist). --no-index:
-    // decide by the ignore rules only, even if the file is (wrongly) tracked; tracking is tested
-    // below. Any other failure (git missing in CI, exit 128) is rethrown and fails the test.
-    try {
-      git(['check-ignore', '-q', '--no-index', path]);
-      return true;
-    } catch (error) {
-      if ((error as { status?: number }).status === 1) return false;
-      throw error;
-    }
+  // Exit code 0 = ignored, 1 = not ignored (works even if the file does not exist). --no-index:
+  // decide by the ignore rules only, even if the file is (wrongly) tracked; tracking is tested
+  // below. Any other failure (git missing in CI, exit 128) is rethrown and fails the test.
+  try {
+    git(['check-ignore', '-q', '--no-index', path]);
+    return true;
+  } catch (error) {
+    if ((error as { status?: number }).status === 1) return false;
+    throw error;
   }
-  // Fallback without git: literal entries such as `dist`, `/dist/`, `.env.*.local`.
-  const firstSegment = path.split('/')[0] ?? path;
-  return meaningfulLines(readText(fromRoot('.gitignore'))).some((line) => {
-    const pattern = line.replace(/^\//, '').replace(/\/$/, '');
-    const regex = new RegExp(
-      `^${pattern
-        .split('*')
-        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-        .join('[^/]*')}$`,
-    );
-    return regex.test(path) || regex.test(firstSegment);
-  });
 }
 
-describe('.gitignore', () => {
+describe.skipIf(!useGit)('.gitignore', () => {
   it.each(MUST_BE_IGNORED)('ignores %s', (path) => {
     expect(isIgnored(path), `${path} is not ignored – add it to .gitignore`).toBe(true);
   });

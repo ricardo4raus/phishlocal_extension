@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   type Manifest,
   contentScriptMatches,
-  cspProblems,
   fileExistsExactCase,
   fromRoot,
   readJson,
   repoRoot,
+  sorted,
   webAccessibleResourceProblems,
 } from './helpers';
 
@@ -23,8 +23,6 @@ const ALLOWED_OPTIONAL_HOST_PERMISSIONS: readonly string[] = [];
 /** Pages content scripts may run on. Will become ['https://mail.google.com/*'] for Gmail. */
 const ALLOWED_CONTENT_SCRIPT_MATCHES: readonly string[] = [];
 
-const sorted = (list: readonly string[] | undefined): string[] => [...(list ?? [])].sort();
-
 const manifest = readJson<Manifest>(fromRoot('manifest.json'));
 const pkg = readJson<{ version: string }>(fromRoot('package.json'));
 
@@ -33,8 +31,13 @@ describe('manifest.json (source)', () => {
     expect(manifest.manifest_version).toBe(3);
   });
 
-  it('is named PhishLocal', () => {
-    expect(manifest.name).toBe('PhishLocal');
+  it('is named PhishLocal (or a localized __MSG_…__ placeholder)', () => {
+    expect(manifest.name).toMatch(/^(?:PhishLocal|__MSG_\w+__)$/);
+  });
+
+  it('sets default_locale if it uses __MSG_…__ placeholders', () => {
+    const usesMessages = JSON.stringify(manifest).includes('__MSG_');
+    expect(!usesMessages || manifest.default_locale !== undefined).toBe(true);
   });
 
   it('has the same version as package.json', () => {
@@ -82,11 +85,9 @@ describe('manifest.json (source)', () => {
     expect(manifest.externally_connectable).toBeUndefined();
   });
 
-  it('has no extension_pages CSP that allows remote, inline or eval-ed code', () => {
-    const csp = manifest.content_security_policy;
-    // MV3 requires the object form; `sandbox` pages are isolated and may be looser.
-    expect(typeof csp === 'string', 'content_security_policy must be an object in MV3').toBe(false);
-    const policy = typeof csp === 'object' ? csp.extension_pages : undefined;
-    expect(policy === undefined ? [] : cspProblems(policy)).toEqual([]);
+  it('has no custom content_security_policy', () => {
+    // The MV3 default CSP (no remote code, no eval, no inline scripts) is exactly what we want.
+    // If a custom CSP is ever needed, decide that deliberately and replace this test.
+    expect(manifest.content_security_policy).toBeUndefined();
   });
 });
