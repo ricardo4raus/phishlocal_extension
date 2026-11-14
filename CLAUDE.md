@@ -80,5 +80,19 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - `npm run format` fixes formatting (Prettier).
 - Linter is Oxlint, not ESLint, because typescript-eslint does not support TypeScript 7.
 - `tests/` holds structure tests for the source, the manifest and the `dist` build output
-  (e.g. no remote code). When adding a manifest permission or host permission, update the
-  allow-list in `tests/manifest.test.ts` on purpose.
+  (e.g. no remote code). When adding a manifest permission, host permission or content-script
+  match, update the allow-list in `tests/manifest.test.ts` on purpose.
+- `npm run dev` overwrites `dist` with a dev build; run `npm run build` before `npm test`.
+- If a `dist` test fails, find the pattern in the source; the minified names won't help.
+
+## Conventions (the tests enforce them)
+
+- No remote code: no `<script src="https://…">`, no remote `import()`, no `script.src = 'https://…'`,
+  no `eval`/`new Function`. External links (`<a href>`) and `fetch` to APIs are fine.
+- Open external links with an `<a href>` or `chrome.tabs.create({ url })`.
+- Gmail is read by a content script declared in `manifest.json` `content_scripts` with
+  `matches: ['https://mail.google.com/*']`. Do not use crxjs `?script` injection (it exposes
+  files to every site).
+- Firebase App Check: use a `CustomProvider` with the debug token, never a reCAPTCHA provider
+  (it loads remote scripts). Firebase Auth, if ever needed: only `firebase/auth/web-extension`.
+- No custom `content_security_policy` in the manifest; the MV3 default is what we want.

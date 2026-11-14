@@ -4,4 +4,9 @@ dist
 .env.local
 .env.*.local
 .vite
+coverage
 *.log
+
+# "Pack extension" in chrome://extensions writes a private key and a package
+*.pem
+*.crx
