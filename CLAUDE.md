@@ -59,6 +59,9 @@ explain every red flag, and work offline, with a cloud only as fallback."
   suggest what to cut. Feature freeze is Sun 22 Nov.
 - Before implementing a task, briefly tell me your plan; keep changes small and follow the
   git workflow below.
+- **At the end of every session, update `JOURNEY.md`** (rules at the top of that file): add what
+  we did to today's daily-log entry, plus new challenges and learnings. Commit it in the
+  session's branch, so it goes into the same PR. Never invent content for my personal sections.
 
 ## Git workflow (always)
 
