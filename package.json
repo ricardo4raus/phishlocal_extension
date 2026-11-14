@@ -1,0 +1,26 @@
+{
+  "name": "phishlocal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "On-device phishing checks for emails with Gemini Nano via Firebase AI Logic hybrid inference.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ricardo4raus/phishlocal_extension.git"
+  },
+  "license": "Apache-2.0",
+  "author": "Ricardo Kraus",
+  "dependencies": {
+    "firebase": "^13.3.0"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^3.0.0",
+    "@types/chrome": "^0.3.7",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}
