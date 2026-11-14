@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "PhishLocal",
+  "version": "0.1.0",
+  "description": "Checks emails for phishing on-device with Gemini Nano. Cloud only as fallback.",
+  "action": {
+    "default_title": "PhishLocal"
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+  "background": {
+    "service_worker": "src/background.ts",
+    "type": "module"
+  },
+  "permissions": ["sidePanel"]
+}
