@@ -18,6 +18,7 @@ import {
   htmlResources,
   isNonLocalUrl,
   normalizeInside,
+  parseEnv,
   readJson,
   readText,
   sorted,
@@ -34,6 +35,9 @@ const distManifestPath = join(distDir, 'manifest.json');
  * (.env.local is not listed: it is optional and not present in CI.)
  */
 const BUILD_INPUTS = ['manifest.json', 'vite.config.ts', 'tsconfig.json', 'package-lock.json'];
+
+/** The .env files Vite reads for a production build. */
+const ENV_FILES = ['.env', '.env.local', '.env.production', '.env.production.local'];
 
 let manifest: Manifest;
 let sourceManifest: Manifest;
@@ -203,6 +207,26 @@ describe('dist/ build output', () => {
       );
     });
     expect(problems).toEqual([]);
+  });
+
+  it('does not contain the App Check debug token', () => {
+    // Vite copies every VITE_* value the code reads into the bundle. The debug token is a secret,
+    // so the source reads it only in dev builds. This checks a production build really drops it.
+    // Without a local token (e.g. in CI) there is nothing to look for.
+    const tokens = ENV_FILES.filter((file) => existsSync(fromRoot(file)))
+      .flatMap((file) => parseEnv(readText(fromRoot(file))))
+      .filter((entry) => entry.key === 'VITE_APPCHECK_DEBUG_TOKEN')
+      .map((entry) => entry.value ?? '')
+      .filter((value) => value !== '');
+
+    // Only file names in the output: a failure message must not leak the token.
+    const leaks = files
+      .filter((file) => {
+        const text = readText(file);
+        return tokens.some((token) => text.includes(token));
+      })
+      .map((file) => toPosixRelative(distDir, file));
+    expect(leaks, 'read the token only behind `import.meta.env.DEV`').toEqual([]);
   });
 
   it('contains no .env files', () => {
