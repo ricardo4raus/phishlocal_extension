@@ -26,38 +26,42 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Privacy is the core selling point: never send email content anywhere without explicit user consent.
 - Keep it simple. No frameworks (React etc.) unless I ask. Plain TypeScript + HTML + CSS.
 
-## CURRENT TASK: project setup only
-Only create the prerequisites so development can start immediately later.
-**Do NOT implement any features** (no Gmail reading, no AI calls, no phishing logic, no UI design).
+## Product concept (what makes PhishLocal different)
+1. **On-device by default**: Gemini Nano checks the email in Chrome. Nothing leaves the device.
+2. **Privacy filter in front of the cloud**: a cloud "deep check" happens only with explicit
+   consent. Before sending, the on-device step removes personal data (names, email addresses,
+   phone numbers, IBANs) and shows the user exactly what will be sent.
+3. **Explains every red flag** instead of only "dangerous": e.g. "link text says paypal.com but
+   goes to paypa1-secure.com", "creates time pressure".
+4. **Multilingual**: en, de, fr, es on-device. Other languages (e.g. Italian) go to the cloud,
+   after local clean-up.
+5. Rule checks (plain TypeScript) + AI together: rule results are fed into the prompt.
 
-1. Check that Node.js (>= 20) and npm are installed; tell me if not.
-2. `git init` and create `.gitignore` (node_modules, dist, .env.local, .vite, *.log).
-3. `npm init` + install:
-   - dependencies: `firebase`
-   - devDependencies: `vite`, `typescript`, `@crxjs/vite-plugin`, `@types/chrome`
-4. Create `tsconfig.json` and `vite.config.ts`.
-5. Create `manifest.json` (MV3):
-   - name "PhishLocal", version "0.1.0", short description
-   - `side_panel.default_path` → the side panel HTML
-   - permissions: `["sidePanel"]` only (more will be added later)
-   - background service worker
-6. Create minimal files:
-   - `src/sidepanel/index.html` + `src/sidepanel/main.ts` → only shows the text "PhishLocal – setup OK"
-   - `src/background.ts` → only `chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })`
-     so clicking the extension icon opens the side panel
-   - `src/firebase.ts` → only `initializeApp(...)` with the config read from `import.meta.env`.
-     No AI calls yet.
-7. Create `.env.example` with these empty keys:
-   VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID,
-   VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID
-8. Create `LICENSE` (full Apache-2.0 text, copyright 2026 Ricardo Kraus) and a short `README.md`
-   (name, one-line description, "work in progress").
-9. Add npm scripts: `dev`, `build`.
-10. Run `npm run build` and make sure it succeeds.
-11. Make a first git commit: "Project setup".
-12. At the end, tell me in short steps:
-    - where to paste my Firebase config (`.env.local`)
-    - how to load the `dist` folder in `chrome://extensions` (Developer mode → Load unpacked)
-    - how to check that the side panel opens
+## Current status
+- Project setup done (commit "Project setup"); side panel opens in Chrome.
+- Firebase project `phishlocal` exists, AI Logic enabled with Gemini Developer API.
+- **App Check is enforced but still "Unregistered"** → cloud requests will fail until we add an
+  App Check debug token for development. Handle this when adding the first hybrid prompt.
+- Gemini Nano works on the dev machine (Chrome 157, multilingual flag enabled).
+  First prompt after a cold start can take minutes; warm prompts take ~1 s.
+  On-device needs `expectedInputs` / `expectedOutputs` with languages, otherwise Chrome warns.
 
-Stop after this. Do not start with features.
+## Timetable and workflow
+- The full plan with dates is in **`TIMETABLE.md`**. Read it at the start of every session.
+- Work only on the next open task(s) in `TIMETABLE.md`, unless I say otherwise.
+- When a task is done and tested, tick it (`[x]`) in `TIMETABLE.md`.
+- If a task takes much longer than planned or the schedule is at risk, tell me early and
+  suggest what to cut. Feature freeze is Sun 22 Nov.
+- Before implementing a task, briefly tell me your plan; keep changes small and follow the
+  git workflow below.
+
+## Git workflow (always)
+- Never commit directly to `main`. Every feature or change gets its own branch from the latest
+  `main`, e.g. `feat/hybrid-prompt`, `fix/side-panel-error`, `docs/readme`.
+- Commit in small steps on that branch: one commit per logical step that builds
+  (e.g. "Add rule check for lookalike domains", then "Show rule results in side panel"),
+  not one big commit at the end. Run `npm run build` before each commit.
+- Push the branch and open a pull request into `main` (`gh pr create`).
+- PRs are merged with a **merge commit** only (`gh pr merge --merge`), never squash or rebase.
+- Do not merge a PR without my OK. After the merge, switch back to `main`, pull, and delete
+  the branch.
