@@ -1,7 +1,16 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { findRemoteCodeLoads, fromRoot, readText, toPosixRelative, walkFiles } from './helpers';
+import {
+  fileExistsExactCase,
+  findApiKeys,
+  findRemoteCodeInFile,
+  fromRoot,
+  readText,
+  repoRoot,
+  toPosixRelative,
+  walkFiles,
+} from './helpers';
 
 const REQUIRED_FILES = [
   'manifest.json',
@@ -24,12 +33,23 @@ const FIREBASE_ENV_KEYS = [
   'VITE_FIREBASE_APP_ID',
 ];
 
+/** Paths that must be git-ignored (checked with `git check-ignore`, so any pattern style works). */
+const MUST_BE_IGNORED = ['dist/x', 'node_modules/x', '.env', '.env.local', '.env.production.local'];
+
 /** Non-empty, non-comment lines of a text file (CRLF-safe). */
 const meaningfulLines = (text: string): string[] =>
   text
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line !== '' && !line.startsWith('#'));
+
+/** dotenv-style value: strips an inline ` # comment` and one pair of surrounding quotes. */
+function envValue(raw: string): string {
+  const trimmed = raw.trim();
+  const quoted = /^(["'])(.*)\1(?:\s+#.*)?$/.exec(trimmed);
+  if (quoted) return quoted[2] ?? '';
+  return trimmed.replace(/(?:^|\s+)#.*$/, '').trim();
+}
 
 function git(args: string[]): string {
   return execFileSync('git', args, { cwd: fromRoot(), encoding: 'utf8', stdio: 'pipe' });
@@ -43,9 +63,14 @@ function isGitWorkTree(): boolean {
   }
 }
 
+// CI always has a git checkout, so git-based checks are never skipped there: if git is broken in
+// CI they fail instead of silently passing. Locally (e.g. a source zip without .git) they fall back
+// or are skipped.
+const useGit = isGitWorkTree() || Boolean(process.env.CI);
+
 describe('required files', () => {
-  it.each(REQUIRED_FILES)('%s exists', (file) => {
-    expect(existsSync(fromRoot(file)), `${file} is missing`).toBe(true);
+  it.each(REQUIRED_FILES)('%s exists (exact case)', (file) => {
+    expect(fileExistsExactCase(repoRoot, file), `${file} is missing`).toBe(true);
   });
 });
 
@@ -62,7 +87,7 @@ describe('.env.example', () => {
     const eq = line.indexOf('=');
     return eq === -1
       ? { key: line, value: undefined }
-      : { key: line.slice(0, eq).trim(), value: line.slice(eq + 1).trim() };
+      : { key: line.slice(0, eq).trim(), value: envValue(line.slice(eq + 1)) };
   });
 
   it('has exactly the Firebase keys (no duplicates, nothing else)', () => {
@@ -76,30 +101,55 @@ describe('.env.example', () => {
   });
 });
 
-describe('.gitignore', () => {
-  // Accept `dist`, `dist/`, `/dist` and `/dist/` style entries.
-  const patterns = meaningfulLines(readText(fromRoot('.gitignore'))).map((line) =>
-    line.replace(/^\//, '').replace(/\/$/, ''),
-  );
+/** Whether git ignores `path` (or, without git outside CI, a literal .gitignore entry covers it). */
+function isIgnored(path: string): boolean {
+  if (useGit) {
+    // Exit code 0 = ignored, 1 = not ignored (works even if the file does not exist). --no-index:
+    // decide by the ignore rules only, even if the file is (wrongly) tracked; tracking is tested
+    // below. Any other failure (git missing in CI, exit 128) is rethrown and fails the test.
+    try {
+      git(['check-ignore', '-q', '--no-index', path]);
+      return true;
+    } catch (error) {
+      if ((error as { status?: number }).status === 1) return false;
+      throw error;
+    }
+  }
+  // Fallback without git: literal entries such as `dist`, `/dist/`, `.env.*.local`.
+  const firstSegment = path.split('/')[0] ?? path;
+  return meaningfulLines(readText(fromRoot('.gitignore'))).some((line) => {
+    const pattern = line.replace(/^\//, '').replace(/\/$/, '');
+    const regex = new RegExp(
+      `^${pattern
+        .split('*')
+        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+        .join('[^/]*')}$`,
+    );
+    return regex.test(path) || regex.test(firstSegment);
+  });
+}
 
-  it.each(['.env.local', 'dist', 'node_modules'])('ignores %s', (entry) => {
-    expect(patterns).toContain(entry);
+describe('.gitignore', () => {
+  it.each(MUST_BE_IGNORED)('ignores %s', (path) => {
+    expect(isIgnored(path), `${path} is not ignored – add it to .gitignore`).toBe(true);
   });
 });
 
-// CI always has a git checkout. Locally (e.g. a source zip without .git) the check is skipped,
-// but never in CI, so a broken git setup there cannot hide a committed secret.
-describe.skipIf(!isGitWorkTree() && !process.env.CI)('git tracking of secrets', () => {
+describe.skipIf(!useGit)('git tracking of secrets', () => {
+  const tracked = useGit ? git(['ls-files', '-z']).split('\0').filter(Boolean) : [];
+
   it('does not track .env.local or any other .env file except .env.example', () => {
-    const tracked = git(['ls-files', '-z'])
-      .split('\0')
-      .filter((file) => /(^|\/)\.env(\..*)?$/.test(file) && !file.endsWith('.env.example'));
-    expect(tracked, 'remove with: git rm --cached <file>').toEqual([]);
+    const envFiles = tracked.filter(
+      (file) => /(^|\/)\.env(\..*)?$/.test(file) && !file.endsWith('.env.example'),
+    );
+    expect(envFiles, 'remove with: git rm --cached <file>').toEqual([]);
   });
 
-  it('git actually ignores .env.local', () => {
-    // `check-ignore` exits with 0 when the path is ignored (works even if the file does not exist).
-    expect(() => git(['check-ignore', '-q', '--no-index', '.env.local'])).not.toThrow();
+  it('no tracked file contains a Google/Firebase API key (real keys belong in .env.local)', () => {
+    const problems = tracked
+      .filter((file) => existsSync(fromRoot(file)))
+      .flatMap((file) => findApiKeys(readText(fromRoot(file))).map((hit) => `${file} ${hit}`));
+    expect(problems).toEqual([]);
   });
 });
 
@@ -108,13 +158,13 @@ describe('no remote code in src/', () => {
   const files = walkFiles(srcDir);
 
   it('has source files to check', () => {
-    expect(files.length).toBeGreaterThan(0);
+    expect(files.length, 'src/ is missing or empty').toBeGreaterThan(0);
   });
 
   it.each(files.map((file) => [toPosixRelative(srcDir, file), file]))(
     'src/%s loads no remote scripts or modules',
-    (_name, file) => {
-      expect(findRemoteCodeLoads(readText(file))).toEqual([]);
+    (name, file) => {
+      expect(findRemoteCodeInFile(name, readText(file))).toEqual([]);
     },
   );
 });

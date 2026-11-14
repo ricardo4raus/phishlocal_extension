@@ -1,41 +1,84 @@
 /*
  * Checks the BUILD OUTPUT in dist/. Requires `npm run build` first.
  *
- * If dist/manifest.json is missing, every test here fails with "run `npm run build` first" instead
- * of being skipped: a silent skip would let `npm run check` / CI go green without ever verifying
- * the shipped extension. `npm run check` and CI run build before test, so dist always exists there.
+ * If dist/ is missing, stale or a dev build, every test here fails with a clear message instead of
+ * being skipped: a silent skip would let `npm run check` / CI go green without ever verifying the
+ * shipped extension. `npm run check` and CI run build before test, so dist is fresh there.
  * To run only the fast source tests locally: `npx vitest run tests/manifest.test.ts tests/source-structure.test.ts`.
  */
 import { existsSync, statSync } from 'node:fs';
-import { basename, dirname, extname, join } from 'node:path';
+import { basename, extname, join, posix } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   type Manifest,
-  findRemoteCodeLoads,
+  contentScriptMatches,
+  findDeniedRemoteHosts,
+  findRemoteCodeInFile,
   fromRoot,
-  htmlResourceUrls,
+  htmlResources,
   isNonLocalUrl,
+  normalizeInside,
   readJson,
   readText,
   toPosixRelative,
   walkFiles,
+  webAccessibleResourceProblems,
 } from './helpers';
 
 const distDir = fromRoot('dist');
 const distManifestPath = join(distDir, 'manifest.json');
 
+/** Build inputs: if any of these is newer than dist/manifest.json, dist is stale. */
+const BUILD_INPUTS = ['manifest.json', 'vite.config.ts', 'package-lock.json'];
+
 let manifest: Manifest;
+let sourceManifest: Manifest;
 let files: string[];
-/** dist-relative posix paths, e.g. `assets/index-abc.js`. */
-let relFiles: string[];
+/** Exact-case set of dist-relative posix paths, e.g. `assets/index-abc.js`. */
+let relFiles: Set<string>;
+
+/** Newest file among the build inputs (src/** and BUILD_INPUTS). */
+function newestBuildInput(): { file: string; mtimeMs: number } {
+  const candidates = [
+    ...walkFiles(fromRoot('src')),
+    ...BUILD_INPUTS.map((file) => fromRoot(file)).filter((file) => existsSync(file)),
+  ];
+  let newest = { file: '', mtimeMs: 0 };
+  for (const file of candidates) {
+    const { mtimeMs } = statSync(file);
+    if (mtimeMs > newest.mtimeMs) newest = { file, mtimeMs };
+  }
+  return newest;
+}
 
 beforeAll(() => {
   if (!existsSync(distManifestPath)) {
     throw new Error('dist/manifest.json not found – run `npm run build` first.');
   }
   manifest = readJson<Manifest>(distManifestPath);
+  sourceManifest = readJson<Manifest>(fromRoot('manifest.json'));
   files = walkFiles(distDir);
-  relFiles = files.map((file) => toPosixRelative(distDir, file));
+  relFiles = new Set(files.map((file) => toPosixRelative(distDir, file)));
+
+  // `npm run dev` (crxjs) writes a dist/ that loads code from the Vite dev server.
+  const loaderFiles = [
+    manifest.background?.service_worker,
+    ...[...relFiles].filter((file) => file.endsWith('.html')),
+  ].filter((file): file is string => typeof file === 'string' && relFiles.has(file));
+  for (const file of loaderFiles) {
+    const text = readText(join(distDir, file));
+    if (/localhost|@crx\/client|\/@vite\//.test(text)) {
+      throw new Error(
+        `dist/ is a dev build (dist/${file} loads from the dev server) – run \`npm run build\`.`,
+      );
+    }
+  }
+
+  const newest = newestBuildInput();
+  if (newest.mtimeMs > statSync(distManifestPath).mtimeMs) {
+    const name = toPosixRelative(fromRoot(), newest.file);
+    throw new Error(`dist is older than ${name} – run \`npm run build\`.`);
+  }
 });
 
 const asArray = <T>(value: T | T[] | undefined): T[] =>
@@ -54,8 +97,6 @@ function referencedPaths(m: Manifest): string[] {
   const action = (m.action ?? {}) as { default_popup?: string; default_icon?: unknown };
   const optionsUi = m.options_ui as { page?: string } | undefined;
   const sandbox = m.sandbox as { pages?: string[] } | undefined;
-  const contentScripts = asArray(m.content_scripts as { js?: string[]; css?: string[] }[]);
-  const war = asArray(m.web_accessible_resources as { resources?: string[] }[]);
   const overrides = (m.chrome_url_overrides ?? {}) as Record<string, string>;
 
   return [
@@ -69,8 +110,8 @@ function referencedPaths(m: Manifest): string[] {
     m.devtools_page as string | undefined,
     ...asArray(sandbox?.pages),
     ...Object.values(overrides),
-    ...contentScripts.flatMap((cs) => [...asArray(cs.js), ...asArray(cs.css)]),
-    ...war.flatMap((entry) => asArray(entry.resources)),
+    ...asArray(m.content_scripts).flatMap((cs) => [...asArray(cs.js), ...asArray(cs.css)]),
+    ...asArray(m.web_accessible_resources).flatMap((entry) => asArray(entry.resources)),
   ].filter((p): p is string => typeof p === 'string' && p !== '');
 }
 
@@ -83,18 +124,25 @@ const globToRegExp = (glob: string): RegExp =>
       .join('.*')}$`,
   );
 
+/** Exact-case existence check of a dist-relative path; paths escaping dist/ never exist. */
+const existsInDist = (path: string): boolean => {
+  const normalized = normalizeInside(path);
+  return normalized !== undefined && relFiles.has(normalized);
+};
+
+const sorted = (list: readonly string[] | undefined): string[] => [...(list ?? [])].sort();
+
 describe('dist/ build output', () => {
-  it('manifest references only files that exist in dist', () => {
+  it('manifest references only files that exist in dist (exact case)', () => {
     const missing = referencedPaths(manifest).filter((ref) =>
       ref.includes('*')
-        ? !relFiles.some((file) => globToRegExp(ref).test(file))
-        : !existsSync(join(distDir, ref.replace(/^\//, ''))),
+        ? ![...relFiles].some((file) => globToRegExp(ref).test(file))
+        : !existsInDist(ref),
     );
     expect(missing).toEqual([]);
   });
 
-  it('has the same permissions as the source manifest', () => {
-    const source = readJson<Manifest>(fromRoot('manifest.json'));
+  it('has the same permissions and content-script matches as the source manifest', () => {
     const keys = [
       'permissions',
       'host_permissions',
@@ -102,43 +150,54 @@ describe('dist/ build output', () => {
       'optional_host_permissions',
     ] as const;
     for (const key of keys) {
-      expect([...(manifest[key] ?? [])].sort(), key).toEqual([...(source[key] ?? [])].sort());
+      expect(sorted(manifest[key]), key).toEqual(sorted(sourceManifest[key]));
     }
+    expect(sorted(contentScriptMatches(manifest)), 'content_scripts matches').toEqual(
+      sorted(contentScriptMatches(sourceManifest)),
+    );
+    expect(manifest.externally_connectable, 'externally_connectable').toBeUndefined();
   });
 
-  it('has the same version as the source manifest (detects a stale build)', () => {
-    const source = readJson<Manifest>(fromRoot('manifest.json'));
-    expect(manifest.version).toBe(source.version);
+  it('exposes web_accessible_resources only to content-script pages', () => {
+    // crxjs adds entries for content-script chunks; they must not widen beyond those pages.
+    expect(webAccessibleResourceProblems(manifest, contentScriptMatches(sourceManifest))).toEqual(
+      [],
+    );
   });
 
-  it('HTML files load scripts and stylesheets only from local files that exist', () => {
+  it('has the same CSP as the source manifest', () => {
+    expect(manifest.content_security_policy).toEqual(sourceManifest.content_security_policy);
+  });
+
+  it('has the same version as the source manifest', () => {
+    expect(manifest.version).toBe(sourceManifest.version);
+  });
+
+  it('HTML files load resources only from local files that exist (exact case)', () => {
     const problems: string[] = [];
-    for (const file of files.filter((f) => extname(f) === '.html')) {
-      const name = toPosixRelative(distDir, file);
-      for (const url of htmlResourceUrls(readText(file))) {
-        if (isNonLocalUrl(url)) {
-          problems.push(`${name}: non-local URL ${url}`);
-          continue;
-        }
-        const path = url.split(/[?#]/)[0];
+    for (const file of [...relFiles].filter((f) => f.endsWith('.html'))) {
+      for (const { tag, attr, url } of htmlResources(readText(join(distDir, file)))) {
+        if (isNonLocalUrl(url)) continue; // reported by the remote-code test below
+        const path = decodeURI(url.split(/[?#]/)[0] ?? '');
         // `/assets/x.js` is relative to the extension root, `./x.js` to the HTML file.
-        const target = path.startsWith('/') ? join(distDir, path) : join(dirname(file), path);
-        if (!existsSync(target) || !statSync(target).isFile()) {
-          problems.push(`${name}: ${url} does not exist in dist`);
+        const target = path.startsWith('/') ? path : posix.join(posix.dirname(file), path);
+        if (!existsInDist(target)) {
+          problems.push(`${file}: <${tag} ${attr}="${url}"> does not exist in dist`);
         }
       }
     }
     expect(problems).toEqual([]);
   });
 
-  it('JS files contain no remote code loading', () => {
-    const problems = files
-      .filter((f) => ['.js', '.mjs', '.cjs'].includes(extname(f)))
-      .flatMap((file) =>
-        findRemoteCodeLoads(readText(file)).map(
-          (hit) => `${toPosixRelative(distDir, file)}: ${hit}`,
-        ),
+  it('JS, HTML and CSS files contain no remote code loading', () => {
+    const problems = files.flatMap((file) => {
+      const name = toPosixRelative(distDir, file);
+      if (!['.js', '.mjs', '.cjs', '.html', '.css'].includes(extname(file))) return [];
+      const text = readText(file);
+      return [...findRemoteCodeInFile(name, text), ...findDeniedRemoteHosts(text)].map(
+        (hit) => `${name}: ${hit}`,
       );
+    });
     expect(problems).toEqual([]);
   });
 
