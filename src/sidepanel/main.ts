@@ -1,5 +1,5 @@
 import { InferenceSource } from 'firebase/ai';
-import { runPrompt, warmUpOnDevice } from '../ai';
+import { runPrompt, warmUpOnDevice, type WarmUpResult } from '../ai';
 import { appCheckEnabled } from '../firebase';
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -32,6 +32,28 @@ function sourceLabel(source: InferenceSource | undefined): string {
 
 const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)} s`;
 
+/** On-device model state, set by the warm-up. `failed`: the warm-up threw; a prompt retries it. */
+type ModelState = WarmUpResult['state'] | 'loading' | 'failed';
+let modelState: ModelState = 'loading';
+
+/** Where the next prompt will most likely run (the SDK makes the final decision). */
+function expectedRoute(forceCloud: boolean): 'cloud' | 'on-device' | 'unknown' {
+  if (forceCloud || modelState === 'not-downloaded' || modelState === 'unavailable') return 'cloud';
+  if (modelState === 'ready') return 'on-device';
+  return 'unknown';
+}
+
+function progressText(forceCloud: boolean, elapsedMs: number): string {
+  const elapsed = seconds(elapsedMs);
+  const route = expectedRoute(forceCloud);
+  if (route === 'cloud') return `Running in the cloud… ${elapsed}`;
+  if (route === 'on-device') return `Running on-device… ${elapsed}`;
+  if (modelState === 'loading') {
+    return `Waiting for the on-device model… ${elapsed} (loading can take minutes)`;
+  }
+  return `Running… ${elapsed}`;
+}
+
 async function run(): Promise<void> {
   const prompt = promptInput.value.trim();
   if (!prompt) {
@@ -43,12 +65,9 @@ async function run(): Promise<void> {
   runButton.disabled = true;
   output.textContent = '';
 
-  // The first on-device prompt after a Chrome start can take minutes, so show that it is alive.
+  // Waiting for the model can take minutes, so show that the panel is alive and where it runs.
   const start = performance.now();
-  const showProgress = (): void =>
-    setStatus(
-      `Running… ${seconds(performance.now() - start)} (the first on-device run can take minutes)`,
-    );
+  const showProgress = (): void => setStatus(progressText(forceCloud, performance.now() - start));
   showProgress();
   const timer = setInterval(showProgress, 1000);
 
@@ -58,8 +77,10 @@ async function run(): Promise<void> {
     output.textContent = result.text;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    // Without App Check every cloud request is rejected. The SDK can also choose the cloud on its
+    // own (model not ready), so the hint is shown whenever the prompt may have gone there.
     const hint =
-      forceCloud && !appCheckEnabled
+      !appCheckEnabled && expectedRoute(forceCloud) !== 'on-device'
         ? ' (App Check is off: set VITE_APPCHECK_DEBUG_TOKEN in .env.local and use `npm run dev`.)'
         : '';
     setStatus(`Error: ${message}${hint}`, true);
@@ -82,6 +103,7 @@ async function warmUp(): Promise<void> {
 
   try {
     const result = await warmUpOnDevice();
+    modelState = result.state;
     if (result.state === 'ready') {
       modelStatus.textContent = `On-device model ready (loaded in ${seconds(result.durationMs)})`;
     } else if (result.state === 'not-downloaded') {
@@ -91,6 +113,7 @@ async function warmUp(): Promise<void> {
         'On-device model not available on this device. Prompts use the cloud.';
     }
   } catch (error) {
+    modelState = 'failed';
     const message = error instanceof Error ? error.message : String(error);
     modelStatus.textContent = `On-device model could not load: ${message}`;
   } finally {
