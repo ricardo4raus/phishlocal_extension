@@ -403,16 +403,15 @@ interface HtmlResource {
 /**
  * Every resource URL an HTML document loads (`<script src>`, `<link href>`, `<img src>`, …).
  *
- * HTML comments are deliberately scanned too. A regex cannot remove them the way the browser
- * parses them (`<!-->` is a complete, empty comment; a bogus comment `<!x>` ends at the first
- * `>`), so removing them could hide a script that the browser runs. A commented-out remote script
- * is therefore reported; the fix is to delete the comment.
+ * Deliberately over-inclusive: every tag in the raw text counts, also inside comments and inline
+ * `<script>`/`<style>` blocks. A regex cannot tell those regions apart the way the browser does
+ * (`<!-->` is a complete, empty comment; a `<script>` inside a comment or an attribute value opens
+ * nothing), so skipping them could hide a script that the browser runs. Tag-like text in a comment
+ * or an inline block is therefore reported too; the fix is to remove it.
  */
 export function htmlResources(html: string): HtmlResource[] {
   const resources: HtmlResource[] = [];
-  // Drop inline script/style contents first: tags inside JS strings are data, not elements.
-  const markup = html.replace(INLINE_BLOCK_REGEX, '<$1$2></$1>');
-  for (const match of markup.matchAll(TAG_REGEX)) {
+  for (const match of html.matchAll(TAG_REGEX)) {
     const tag = (match[1] ?? '').toLowerCase();
     const attrs = parseAttributes(match[2] ?? '');
     for (const attr of RESOURCE_ATTRIBUTES[tag] ?? []) {
@@ -438,9 +437,7 @@ const isExecutedScriptType = (type: string): boolean =>
  * Problems in an HTML page: resources from outside the package (`data:` is fine except for
  * scripts), inline scripts, and remote URLs in inline `<style>` blocks.
  * Existence of local files is checked separately (only meaningful for build output).
- * Comments are scanned like everything else (see {@link htmlResources}). An unclosed `<script>`
- * inside a comment can make {@link htmlResources} miss a following remote script; the inline
- * script rule below still reports that span, and a test covers it.
+ * Comments and inline blocks are scanned like everything else (see {@link htmlResources}).
  */
 export function findHtmlProblems(html: string): string[] {
   const problems: string[] = [];

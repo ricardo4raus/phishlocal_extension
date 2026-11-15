@@ -202,13 +202,16 @@ describe('htmlResources / findHtmlProblems', () => {
     `<script type="text/javascript">1</script>`,
     `<script type="importmap">{"imports":{"x":"https://cdn.example/x.js"}}</script>`,
     `<script>const sample = '<script src="https://evil.example/x.js">';</script>`,
-    // HTML comments are scanned too; regex stripping cannot match how browsers end comments
+    // Comments are scanned too: a regex cannot end them the way the browser does.
     `<!-- <script src="https://commented.example/x.js"></script> -->`,
     `<!--> <script src="https://evil.example/x.js"></script> -->`,
     `<!---> <script src="https://evil.example/x.js"></script> -->`,
     `<! <!-- > <script src="https://evil.example/x.js"></script> -->`,
-    // an unclosed <script> in a comment swallows the next script; still reported (inline rule)
+    // A fake opening tag (in a comment or an attribute value) must not hide the next real script.
     `<!-- <script> --><script src="https://evil.example/x.js"></script>`,
+    `<!-- <script type="application/json"> --><script src="https://evil.example/x.js"></script>`,
+    `<!-- <style> --><script src="https://evil.example/x.js"></script><style></style>`,
+    `<p title="<script type=application/json>"></p><script src="https://evil.example/x.js"></script>`,
   ])('flags %s', (html) => {
     expect(findHtmlProblems(html)).not.toEqual([]);
   });

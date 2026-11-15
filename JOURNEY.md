@@ -127,9 +127,12 @@ _Current state, updated as features land._
   read.
 - Read the installed SDK types instead of trusting memory: the hybrid API and the default cloud
   model (`gemini-3.5-flash-lite`) were taken from `node_modules`.
-- A regex cannot remove HTML comments the way a browser does (`<!-->` is already a complete
-  comment), so removing them can hide a script. The safer check scans comments too. CodeQL's
-  usual fix (repeat the removal until nothing changes) would have made it worse.
+- A regex cannot tell comments and inline blocks apart the way a browser does (`<!-->` is
+  already a complete comment; a `<script>` inside a comment opens nothing). Every attempt to
+  skip such regions could hide a real script. The safe check scans every tag in the raw HTML.
+  CodeQL's usual fix (repeat the removal until nothing changes) would have made it worse.
+- Repeated reviews pay off: the first fix for the CodeQL alert opened a new gap, which only the
+  second review found.
 - A security alert needs context: Dependabot flagged `@grpc/grpc-js`, but it is only used by
   Firestore's Node build, which we neither use nor bundle.
 
@@ -223,5 +226,8 @@ _To fill in near the submission._
 - Turned on GitHub's free tools for public repos: a ruleset for `main`, secret scanning with push
   protection, CodeQL and Dependabot. The first scans found three things. CodeQL flagged the HTML
   comment removal in the remote-code test; the real gap was that `<!--> <script src=…>` could
-  hide a script, so the check now scans comments too (4 new test cases, all failing with the old
-  code). Dependabot flagged `@grpc/grpc-js` twice; dismissed as not used, with the reason.
+  hide a script. The first fix (scan comments too) left a second gap: a fake `<script>` or
+  `<style>` opening tag in a comment or attribute value could still swallow a real remote script.
+  Two reviews later the check scans every tag in the raw HTML. 8 new test cases; the old code
+  fails 5 of them, the first fix 3. Dependabot flagged `@grpc/grpc-js` twice; dismissed as not
+  used, with the reason.
