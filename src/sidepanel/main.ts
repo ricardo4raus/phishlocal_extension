@@ -1,6 +1,7 @@
 import { InferenceSource } from 'firebase/ai';
 import { runPrompt, warmUpOnDevice, type WarmUpResult } from '../ai';
 import { appCheckEnabled } from '../firebase';
+import { readOpenEmail, showEmail } from './email-view';
 
 function byId<T extends HTMLElement>(id: string): T {
   const element = document.querySelector<T>(`#${id}`);
@@ -91,6 +92,43 @@ async function run(): Promise<void> {
 }
 
 runButton.addEventListener('click', () => void run());
+
+const readEmailButton = byId<HTMLButtonElement>('read-email');
+const emailStatus = byId<HTMLParagraphElement>('email-status');
+const emailElements = {
+  details: byId<HTMLDListElement>('email-details'),
+  sender: byId<HTMLElement>('email-sender'),
+  subject: byId<HTMLElement>('email-subject'),
+  links: byId<HTMLUListElement>('email-links'),
+  body: byId<HTMLElement>('email-body'),
+};
+
+/** Reads the open Gmail email when the user clicks (never automatically). */
+async function readEmail(): Promise<void> {
+  readEmailButton.disabled = true;
+  emailElements.details.hidden = true;
+  emailStatus.classList.remove('error');
+  emailStatus.textContent = 'Reading the open email…';
+  try {
+    const result = await readOpenEmail();
+    if (result.ok) {
+      showEmail(result.email, emailElements);
+      emailStatus.textContent = result.email.truncated
+        ? 'Email read (long text, cut to the first part).'
+        : 'Email read. Nothing left your browser.';
+    } else {
+      emailStatus.textContent = result.message;
+      emailStatus.classList.add('error');
+    }
+  } catch (error) {
+    emailStatus.textContent = `Could not read the email: ${error instanceof Error ? error.message : String(error)}`;
+    emailStatus.classList.add('error');
+  } finally {
+    readEmailButton.disabled = false;
+  }
+}
+
+readEmailButton.addEventListener('click', () => void readEmail());
 
 /** Loads the on-device model as soon as the panel opens, so the first check does not wait. */
 async function warmUp(): Promise<void> {
