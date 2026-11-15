@@ -110,7 +110,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
 
 - `npm run check` runs everything in this order: `format:check` → `lint` (Oxlint) →
   `typecheck` (src + tests) → `build` → `test` (Vitest). CI runs the same command on every PR.
-- Node version: see `.nvmrc` (CI uses it); `engines` requires Node >= 24.12.
+- Node version: see `.nvmrc` (CI uses it); `engines` requires Node `^24.15.0 || >=26.0.0`
+  (jsdom's requirement).
 - `npm run format` fixes formatting (Prettier).
 - Linter is Oxlint, not ESLint, because typescript-eslint does not support TypeScript 7.
 - `tests/` holds structure tests for the source, the manifest and the `dist` build output
