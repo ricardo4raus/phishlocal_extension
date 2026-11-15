@@ -114,6 +114,11 @@ _Current state, updated as features land._
 - Measure before fixing: a 6-line timing script showed where the time went, and a check of the
   cache files disproved our own theory.
 - Before a demo: exit Chrome completely (also from the tray) and open the side panel once.
+- In debug mode the App Check SDK prints the debug token in the DevTools console. Never show
+  DevTools in screenshots or the demo video.
+- A security test needs a negative test: planting a fake token showed that the leak test works,
+  and also that Windows PowerShell 5.1 writes UTF-8 files with a BOM that `.env` parsers do not
+  read.
 - Read the installed SDK types instead of trusting memory: the hybrid API and the default cloud
   model (`gemini-3.5-flash-lite`) were taken from `node_modules`.
 
@@ -188,3 +193,9 @@ _To fill in near the submission._
   model loaded in 3.8 s, but the cache files were empty again, so the cache was not the cause.
 - Added a warm-up: the side panel loads the model when it opens and shows its state. Result in
   Chrome: model ready in 3.8 s, then the on-device prompt took 1.0 s.
+- Code review of the pull request: 9 findings. Fixed 4 in the same PR: the token leak test now
+  reads every `.env*` file and the OS environment with Vite's own parser; a prompt sent during
+  the warm-up no longer starts a second model load; the panel says where a prompt runs and
+  explains App Check errors also for the automatic cloud fallback. The other findings are
+  planned work (consent before cloud on 21 Nov, model download button, language support check in
+  a fresh profile) or SDK behaviour (the debug token is printed in the DevTools console).
