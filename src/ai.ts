@@ -42,6 +42,11 @@ export interface PromptResult {
 export async function runPrompt(prompt: string, forceCloud = false): Promise<PromptResult> {
   const model = forceCloud ? cloudModel : hybridModel;
   const start = performance.now();
+  if (!forceCloud) {
+    // If the warm-up is still loading the model, wait for it instead of letting the SDK start a
+    // second load. A failed warm-up is not fatal here: the SDK decides on its own.
+    await warmUpOnDevice().catch(() => undefined);
+  }
   const { response } = await model.generateContent(prompt);
   return {
     text: response.text(),
@@ -57,17 +62,18 @@ export type WarmUpResult =
   /** No Prompt API or hardware not supported: prompts go to the cloud. */
   | { state: 'unavailable' };
 
-/** Kept open so Chrome keeps the model in memory while the side panel is open. */
+/**
+ * Kept open so Chrome keeps the model in memory while the side panel is open. Never read: holding
+ * the reference is the whole point (it stops the session from being garbage-collected).
+ */
+// oxlint-disable-next-line no-unused-vars
 let warmSession: LanguageModelSession | undefined;
 
-/**
- * Loads Gemini Nano into memory before the first prompt. Loading can take minutes; afterwards
- * every new session (the SDK creates one per prompt) starts in about 0.1 s. Sends no data and
- * starts no download.
- */
-export async function warmUpOnDevice(): Promise<WarmUpResult> {
+/** The one warm-up run, shared by every caller so the model is never loaded twice in parallel. */
+let warmUp: Promise<WarmUpResult> | undefined;
+
+async function loadOnDeviceModel(): Promise<WarmUpResult> {
   if (typeof LanguageModel === 'undefined') return { state: 'unavailable' };
-  if (warmSession) return { state: 'ready', durationMs: 0 };
 
   const availability = await LanguageModel.availability(createOptions());
   if (availability === 'unavailable') return { state: 'unavailable' };
@@ -76,4 +82,17 @@ export async function warmUpOnDevice(): Promise<WarmUpResult> {
   const start = performance.now();
   warmSession = await LanguageModel.create(createOptions());
   return { state: 'ready', durationMs: performance.now() - start };
+}
+
+/**
+ * Loads Gemini Nano into memory before the first prompt. Loading can take minutes; afterwards
+ * every new session (the SDK creates one per prompt) starts in about 0.1 s. Sends no data and
+ * starts no download. Every call returns the same run; after a failure the next call retries.
+ */
+export function warmUpOnDevice(): Promise<WarmUpResult> {
+  warmUp ??= loadOnDeviceModel().catch((error: unknown) => {
+    warmUp = undefined;
+    throw error;
+  });
+  return warmUp;
 }
