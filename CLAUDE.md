@@ -25,7 +25,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
   git-ignored; `.env.example` with empty values is committed.
 - License: **Apache-2.0** (hackathon requirement: public repo with visible open-source license).
 - Supported email languages on-device: en, de, fr, es.
-- Privacy is the core selling point: never send email content anywhere without explicit user consent.
+- Privacy is the core selling point: never send email content anywhere without explicit user
+  consent.
 - Keep it simple. No frameworks (React etc.) unless I ask. Plain TypeScript + HTML + CSS.
 
 ## Product concept (what makes PhishLocal different)
@@ -51,10 +52,10 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - The side panel warms up the on-device model when it opens. Model load can take seconds or,
   in a long-running Chrome session, many minutes; a full Chrome exit fixed it. Inference on a
   loaded model takes about 1 s for short answers; one run took 39 s, cause unknown. On-device
-  needs `expectedInputs` / `expectedOutputs` with
-  languages, otherwise Chrome warns.
+  needs `expectedInputs` / `expectedOutputs` with languages, otherwise Chrome warns.
 - `PREFER_ON_DEVICE` falls back to the cloud silently; consent before cloud is the 21 Nov task.
-- The GitHub repo is public (contest rule: public with an open-source license until 16 Dec).
+  Until the consent step exists, use only test text in the side panel, never real emails.
+- The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow
 
@@ -65,6 +66,11 @@ explain every red flag, and work offline, with a cloud only as fallback."
   suggest what to cut. Feature freeze is Sun 22 Nov.
 - Before implementing a task, briefly tell me your plan; keep changes small and follow the
   git workflow below.
+- Check APIs in the installed types and sources in `node_modules`, not from memory.
+- When something is slow or broken, measure first and find the cause before changing code.
+- New dependencies: ask me first. Pin the exact version (`--save-exact`) and choose a release
+  that is at least two weeks old; fresh releases are the usual window for supply-chain attacks.
+  Prefer a version that is already in the lockfile.
 - **At the end of every session, update `JOURNEY.md`** (rules at the top of that file): add what
   we did to today's daily-log entry, plus new challenges and learnings. Commit it in the
   session's branch, so it goes into the same PR. Never invent content for my personal sections.
@@ -75,17 +81,30 @@ explain every red flag, and work offline, with a cloud only as fallback."
   `main`, e.g. `feat/hybrid-prompt`, `fix/side-panel-error`, `docs/readme`.
 - Commit in small steps on that branch: one commit per logical step that builds
   (e.g. "Add rule check for lookalike domains", then "Show rule results in side panel"),
-  not one big commit at the end. Run `npm run check` before each commit; it must pass.
-- Push the branch and open a pull request into `main` (`gh pr create`).
+  not one big commit at the end. Run `npm run check` before each commit; it must pass. If the
+  check fails, stop and fix it; never commit anyway.
+- After each commit, check `git show --stat HEAD`: only the intended files, the right message.
+- Push the branch and open a pull request into `main` (`gh pr create`). The PR description
+  says what changed, why, how it was tested, and any known limits.
+- Before asking me to merge, review the PR for bugs, security flaws, inconsistencies, best
+  practice and things that can be simpler. Fix what you find, run the check, and review again
+  until a round finds nothing new. Prove each code fix with a test that fails without it, where
+  practical. Test what the tests cannot cover (e.g. side panel behaviour) in Chrome; if that was
+  not possible, say so in the PR.
 - PRs are merged with a **merge commit** only (`gh pr merge --merge`), never squash or rebase.
 - Do not merge a PR without my OK. After the merge, switch back to `main`, pull, and delete
-  the branch.
+  the local branch (GitHub deletes the remote one).
 - GitHub enforces this with the ruleset "Protect main": PR required, CI check `check` must pass,
   no force-push or deletion, merge commits only. GitHub deletes merged branches automatically.
-- Commits use the GitHub noreply email (set in this repo's git config); GitHub blocks pushes
-  that would expose the private email.
+- Never rewrite published history or force-push without my explicit OK.
+- **Always commit with the GitHub noreply email**
+  **`174874369+ricardo4raus@users.noreply.github.com`**, never my private email. It is set in
+  this repo's git config; check `git config user.email` before the first commit of a session.
+  GitHub blocks pushes that would expose the private email.
 - On Windows, write commit messages and PR bodies to a file (`git commit -F`,
   `gh pr create --body-file`); PowerShell 5.1 breaks multi-line arguments that contain quotes.
+- On Windows, run `npm` and Vitest in PowerShell, not Git Bash: Vitest fails in Git Bash because
+  of the lowercase drive letter (`/c/…`).
 
 ## Checks
 
@@ -108,12 +127,26 @@ explain every red flag, and work offline, with a cloud only as fallback."
 
 ## Conventions (the tests enforce them)
 
-- No remote code: no `<script src="https://…">`, no remote `import()`, no `script.src = 'https://…'`,
-  no `eval`/`new Function`. External links (`<a href>`) and `fetch` to APIs are fine.
+- No remote code: no `<script src="https://…">`, no remote `import()`,
+  no `script.src = 'https://…'`, no `eval`/`new Function`. External links (`<a href>`) and
+  `fetch` to APIs are fine.
 - Open external links with an `<a href>` or `chrome.tabs.create({ url })`.
 - Gmail is read by a content script declared in `manifest.json` `content_scripts` with
   `matches: ['https://mail.google.com/*']`. Do not use crxjs `?script` injection (it exposes
   files to every site).
 - Firebase App Check: use a `CustomProvider` with the debug token, never a reCAPTCHA provider
   (it loads remote scripts). Firebase Auth, if ever needed: only `firebase/auth/web-extension`.
+- The App Check debug token is a secret: read it only behind `import.meta.env.DEV`, so release
+  builds never contain it. The `dist` test fails if the token is in the build.
 - No custom `content_security_policy` in the manifest; the MV3 default is what we want.
+
+## Privacy and contest rules (mostly not enforced by tests)
+
+- No personal data (PII), production API keys or project secrets in the repo, commits, PR texts,
+  the submission form or testing instructions (contest rule). Keys belong in `.env.local`.
+  Only API keys in tracked files are tested; the rest is up to us.
+- The repo stays public with its license until the end of judging (16 Dec 2026).
+- Never show DevTools in screenshots or the demo video: in dev builds the App Check SDK prints
+  the debug token in the console.
+- Before a demo: exit Chrome completely (also from the tray), then open the side panel once so
+  the model is loaded.
