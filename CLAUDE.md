@@ -134,10 +134,11 @@ explain every red flag, and work offline, with a cloud only as fallback."
   builds never contain it. The `dist` test fails if the token is in the build.
 - No custom `content_security_policy` in the manifest; the MV3 default is what we want.
 
-## Privacy and contest rules (not enforced by tests)
+## Privacy and contest rules (mostly not enforced by tests)
 
 - No personal data (PII), production API keys or project secrets in the repo, commits, PR texts,
   the submission form or testing instructions (contest rule). Keys belong in `.env.local`.
+  Only API keys in tracked files are tested; the rest is up to us.
 - The repo stays public with its license until the end of judging (16 Dec 2026).
 - Never show DevTools in screenshots or the demo video: in dev builds the App Check SDK prints
   the debug token in the console.
