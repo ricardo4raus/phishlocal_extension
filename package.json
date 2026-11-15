@@ -24,7 +24,8 @@
   "license": "Apache-2.0",
   "author": "Ricardo Kraus",
   "dependencies": {
-    "firebase": "^13.3.0"
+    "firebase": "^13.3.0",
+    "parse5": "8.0.1"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^3.0.0",
@@ -33,7 +34,6 @@
     "jsdom": "30.1.3",
     "lightningcss": "1.33.0",
     "oxlint": "^1.93.0",
-    "parse5": "8.0.1",
     "prettier": "^3.10.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
