@@ -52,7 +52,7 @@ _Current state, updated as features land._
   for more permissions than allowed, or an API key ends up in a committed file.
 - **GitHub security tools:** a ruleset protects `main` (pull request and passing CI required, no
   force-push). CodeQL scans the code on every pull request, secret scanning blocks pushes that
-  contain keys, and Dependabot reports vulnerable packages.
+  contain known secret formats, and Dependabot reports vulnerable packages.
 
 ## Challenges
 

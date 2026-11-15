@@ -207,6 +207,8 @@ describe('htmlResources / findHtmlProblems', () => {
     `<!--> <script src="https://evil.example/x.js"></script> -->`,
     `<!---> <script src="https://evil.example/x.js"></script> -->`,
     `<! <!-- > <script src="https://evil.example/x.js"></script> -->`,
+    // an unclosed <script> in a comment swallows the next script; still reported (inline rule)
+    `<!-- <script> --><script src="https://evil.example/x.js"></script>`,
   ])('flags %s', (html) => {
     expect(findHtmlProblems(html)).not.toEqual([]);
   });

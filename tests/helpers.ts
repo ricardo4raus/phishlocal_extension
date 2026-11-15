@@ -383,13 +383,6 @@ const TAG_REGEX = /<([a-z][a-z\d-]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/gi;
 // `(?:^|\s)` so `data-src` is not read as `src`.
 const ATTR_REGEX = /(?:^|\s)([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
 
-/*
- * HTML comments are deliberately NOT removed before scanning. A regex cannot remove them the way
- * the browser parses them (`<!-->` is a complete, empty comment; a bogus comment `<!x>` ends at the
- * first `>`), so stripping could hide a script that the browser runs. Scanning comments too is
- * stricter: a commented-out remote script is reported, and the fix is to delete the comment.
- */
-
 const INLINE_BLOCK_REGEX = /<(script|style)\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/\1\s*>/gi;
 
 function parseAttributes(attrText: string): Map<string, string> {
@@ -407,7 +400,14 @@ interface HtmlResource {
   url: string;
 }
 
-/** Every resource URL an HTML document loads (`<script src>`, `<link href>`, `<img src>`, …). */
+/**
+ * Every resource URL an HTML document loads (`<script src>`, `<link href>`, `<img src>`, …).
+ *
+ * HTML comments are deliberately scanned too. A regex cannot remove them the way the browser
+ * parses them (`<!-->` is a complete, empty comment; a bogus comment `<!x>` ends at the first
+ * `>`), so removing them could hide a script that the browser runs. A commented-out remote script
+ * is therefore reported; the fix is to delete the comment.
+ */
 export function htmlResources(html: string): HtmlResource[] {
   const resources: HtmlResource[] = [];
   // Drop inline script/style contents first: tags inside JS strings are data, not elements.
@@ -438,6 +438,9 @@ const isExecutedScriptType = (type: string): boolean =>
  * Problems in an HTML page: resources from outside the package (`data:` is fine except for
  * scripts), inline scripts, and remote URLs in inline `<style>` blocks.
  * Existence of local files is checked separately (only meaningful for build output).
+ * Comments are scanned like everything else (see {@link htmlResources}). An unclosed `<script>`
+ * inside a comment can make {@link htmlResources} miss a following remote script; the inline
+ * script rule below still reports that span, and a test covers it.
  */
 export function findHtmlProblems(html: string): string[] {
   const problems: string[] = [];

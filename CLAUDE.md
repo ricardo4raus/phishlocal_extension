@@ -50,7 +50,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
   cloud requests fail. The contest rules accept debug tokens in submissions.
 - The side panel warms up the on-device model when it opens. Model load can take seconds or,
   in a long-running Chrome session, many minutes; a full Chrome exit fixed it. Inference on a
-  loaded model takes about 1 s. On-device needs `expectedInputs` / `expectedOutputs` with
+  loaded model takes about 1 s for short answers; one run took 39 s, cause unknown. On-device
+  needs `expectedInputs` / `expectedOutputs` with
   languages, otherwise Chrome warns.
 - `PREFER_ON_DEVICE` falls back to the cloud silently; consent before cloud is the 21 Nov task.
 - The GitHub repo is public (contest rule: public with an open-source license until 16 Dec).
