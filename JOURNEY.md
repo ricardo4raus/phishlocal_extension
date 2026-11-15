@@ -38,7 +38,9 @@ _Current state, updated as features land._
   The panel shows where the prompt ran and how long it took.
 - When the side panel opens, it loads the on-device model in the background and shows its state
   (loading, ready, not downloaded, not available).
-- No check of real emails yet.
+- "Read open email" in the side panel reads the email open in Gmail (sender, subject, visible
+  text, links with their text and real target) through a content script, only on click. Nothing
+  leaves the browser. No phishing check of the email yet.
 
 ## How we built it
 
@@ -88,6 +90,13 @@ _Current state, updated as features land._
   (Chrome's GPU program cache files were empty) turned out wrong: after a full Chrome exit,
   including background processes, the model loaded in 3.8 s with the cache files still empty.
   The exact cause is unknown; the long-running Chrome session was probably in a bad state.
+- **Reading Gmail without guessing:** Gmail's class names are generated and undocumented. A
+  DevTools snippet that printed only counts and class names (no email content) measured the
+  real page before any code was written. Gmail's details box (with "Reply-To") closes as soon as
+  DevTools gets focus, so that field could not be measured yet.
+- **No `innerText` in tests:** jsdom has no layout, so `innerText` is undefined there. The code
+  keeps the real `innerText` (which skips hidden text, a common phishing trick); the tests use a
+  small stand-in, and the hidden-text behaviour was checked in Chrome.
 
 ## What we learned
 
@@ -142,6 +151,13 @@ _Current state, updated as features land._
   pinned to the version Vite already uses, so nothing new is downloaded.
 - A security alert needs context: Dependabot flagged `@grpc/grpc-js`, but it is only used by
   Firestore's Node build, which we neither use nor bundle.
+- An extension needs fewer permissions than expected: the side panel can message the active tab
+  (`chrome.tabs.sendMessage`) without the `tabs` permission, and a content script declared in
+  the manifest needs no `host_permissions`. The only new access is the Gmail content script.
+- Email content is attacker-controlled: it is shown only with `textContent`, and a test fails
+  if the side panel ever renders it as HTML.
+- `npm install --before=<date>` resolves a new package's dependencies only to releases older
+  than that date, which keeps fresh (riskier) releases out of the lockfile.
 
 ## Accomplishments we're proud of
 
@@ -245,3 +261,10 @@ _To fill in near the submission._
 - Wrote the decisions of the day into `CLAUDE.md` so every future session follows them: the
   noreply commit email, review until nothing new before a merge, the dependency rules, the
   debug-token rule, and the privacy and contest rules.
+- Gmail content script (planned for Mon 16 Nov, done a day early): measured the Gmail page with
+  a content-free DevTools snippet, then built the extraction (selectors in one place, with
+  fallbacks), the content script (Gmail only, reads only on click) and a "Read open email"
+  button in the side panel. Added jsdom (pinned, dependencies older than two weeks) for DOM
+  tests. Tested in Chrome on an open email, the inbox list and a non-Gmail tab; all three gave
+  the expected result. Decided: automatic scanning when an email opens becomes an optional
+  setting (off by default) on 23 Nov.
