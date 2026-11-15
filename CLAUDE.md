@@ -44,11 +44,16 @@ explain every red flag, and work offline, with a cloud only as fallback."
 
 - Project setup done (commit "Project setup"); side panel opens in Chrome.
 - Firebase project `phishlocal` exists, AI Logic enabled with Gemini Developer API.
-- **App Check is enforced but still "Unregistered"** → cloud requests will fail until we add an
-  App Check debug token for development. Handle this when adding the first hybrid prompt.
-- Gemini Nano works on the dev machine (Chrome 157, multilingual flag enabled).
-  First prompt after a cold start can take minutes; warm prompts take ~1 s.
-  On-device needs `expectedInputs` / `expectedOutputs` with languages, otherwise Chrome warns.
+- First hybrid prompt works from the side panel (PR #4): on-device with Gemini Nano, cloud via
+  Firebase AI Logic. App Check uses a debug token (`VITE_APPCHECK_DEBUG_TOKEN` in `.env.local`),
+  read **only in dev builds** (`npm run dev`); production builds have no App Check yet, so their
+  cloud requests fail. The contest rules accept debug tokens in submissions.
+- The side panel warms up the on-device model when it opens. Model load can take seconds or,
+  in a long-running Chrome session, many minutes; a full Chrome exit fixed it. Inference on a
+  loaded model takes about 1 s. On-device needs `expectedInputs` / `expectedOutputs` with
+  languages, otherwise Chrome warns.
+- `PREFER_ON_DEVICE` falls back to the cloud silently; consent before cloud is the 21 Nov task.
+- The GitHub repo is public (contest rule: public with an open-source license until 16 Dec).
 
 ## Timetable and workflow
 
@@ -74,6 +79,12 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - PRs are merged with a **merge commit** only (`gh pr merge --merge`), never squash or rebase.
 - Do not merge a PR without my OK. After the merge, switch back to `main`, pull, and delete
   the branch.
+- GitHub enforces this with the ruleset "Protect main": PR required, CI check `check` must pass,
+  no force-push or deletion, merge commits only. GitHub deletes merged branches automatically.
+- Commits use the GitHub noreply email (set in this repo's git config); GitHub blocks pushes
+  that would expose the private email.
+- On Windows, write commit messages and PR bodies to a file (`git commit -F`,
+  `gh pr create --body-file`); PowerShell 5.1 breaks multi-line arguments that contain quotes.
 
 ## Checks
 
@@ -87,6 +98,9 @@ explain every red flag, and work offline, with a cloud only as fallback."
   match, update the allow-list in `tests/manifest.test.ts` on purpose.
 - `npm run dev` overwrites `dist` with a dev build; run `npm run build` before `npm test`.
 - If a `dist` test fails, find the pattern in the source; the minified names won't help.
+- GitHub also runs CodeQL (default setup, on every PR and weekly), secret scanning with push
+  protection, and Dependabot alerts with security updates. Treat a new alert like a failing
+  test: check it, then fix it or dismiss it with a reason.
 
 ## Conventions (the tests enforce them)
 

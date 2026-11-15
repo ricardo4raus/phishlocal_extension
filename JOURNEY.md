@@ -50,6 +50,9 @@ _Current state, updated as features land._
   GitHub Actions CI. One command, `npm run check`, runs everything locally and in CI.
 - **Privacy guarded by tests:** the tests fail if the build loads remote code, the manifest asks
   for more permissions than allowed, or an API key ends up in a committed file.
+- **GitHub security tools:** a ruleset protects `main` (pull request and passing CI required, no
+  force-push). CodeQL scans the code on every pull request, secret scanning blocks pushes that
+  contain keys, and Dependabot reports vulnerable packages.
 
 ## Challenges
 
@@ -124,6 +127,11 @@ _Current state, updated as features land._
   read.
 - Read the installed SDK types instead of trusting memory: the hybrid API and the default cloud
   model (`gemini-3.5-flash-lite`) were taken from `node_modules`.
+- A regex cannot remove HTML comments the way a browser does (`<!-->` is already a complete
+  comment), so removing them can hide a script. The safer check scans comments too. CodeQL's
+  usual fix (repeat the removal until nothing changes) would have made it worse.
+- A security alert needs context: Dependabot flagged `@grpc/grpc-js`, but it is only used by
+  Firestore's Node build, which we neither use nor bundle.
 
 ## Accomplishments we're proud of
 
@@ -212,3 +220,8 @@ _To fill in near the submission._
   Apache-2.0 license. The old commits in PRs #1–#4 still show the private address; deleting and
   recreating the repository would remove them, but that was not worth it, so we accepted it.
   GitHub now blocks pushes that would expose the private address.
+- Turned on GitHub's free tools for public repos: a ruleset for `main`, secret scanning with push
+  protection, CodeQL and Dependabot. The first scans found three things. CodeQL flagged the HTML
+  comment removal in the remote-code test; the real gap was that `<!--> <script src=…>` could
+  hide a script, so the check now scans comments too (4 new test cases, all failing with the old
+  code). Dependabot flagged `@grpc/grpc-js` twice; dismissed as not used, with the reason.
