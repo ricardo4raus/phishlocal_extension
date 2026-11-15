@@ -36,6 +36,8 @@ _Current state, updated as features land._
 - The side panel sends a test prompt through Firebase AI Logic hybrid inference
   (`InferenceMode.PREFER_ON_DEVICE`): Gemini Nano answers on-device; the cloud is the fallback.
   The panel shows where the prompt ran and how long it took.
+- When the side panel opens, it loads the on-device model in the background and shows its state
+  (loading, ready, not downloaded, not available).
 - No check of real emails yet.
 
 ## How we built it
@@ -74,9 +76,13 @@ _Current state, updated as features land._
 - **The cloud path could not be tested:** with Gemini Nano available, `PREFER_ON_DEVICE` never
   uses the cloud. A development-only "Force cloud" switch (`ONLY_IN_CLOUD`) made App Check
   testable.
-- **On-device is far too slow from the side panel (open):** the same short prompt took 314 s on
-  the first run and 646 s on the second; the cloud took 1.6 s. So it is not only a cold start.
-  The cause is not known yet (slow session creation, slow inference, or the language options).
+- **On-device was far too slow from the side panel:** the same short prompt took 314 s on the
+  first run and 646 s on the second; the cloud took 1.6 s. A timing test in the DevTools console
+  split it up: `LanguageModel.create()` took 572 s, every prompt and every later session took
+  0.1–0.3 s. So loading the model into memory was the problem, not inference. A first theory
+  (Chrome's GPU program cache files were empty) turned out wrong: after a full Chrome exit,
+  including background processes, the model loaded in 3.8 s with the cache files still empty.
+  The exact cause is unknown; the long-running Chrome session was probably in a bad state.
 
 ## What we learned
 
@@ -101,6 +107,13 @@ _Current state, updated as features land._
   App Check SDK, so the build stays free of remote code.
 - `PREFER_ON_DEVICE` falls back to the cloud only when the on-device model is not available, and
   it does so silently. For real emails that needs a design with explicit consent.
+- On-device timing has two parts: loading the model into memory (seconds, but minutes in a bad
+  state) and inference (about 1 s). While one session stays open, Chrome keeps the model loaded
+  and new sessions start in 0.1 s. The SDK creates a new session for every prompt, so an
+  extra session kept open by the side panel works as a warm-up.
+- Measure before fixing: a 6-line timing script showed where the time went, and a check of the
+  cache files disproved our own theory.
+- Before a demo: exit Chrome completely (also from the tray) and open the side panel once.
 - Read the installed SDK types instead of trusting memory: the hybrid API and the default cloud
   model (`gemini-3.5-flash-lite`) were taken from `node_modules`.
 
@@ -168,3 +181,10 @@ _To fill in near the submission._
 - Tested in Chrome with a phishing sample: on-device (Gemini Nano) answered in 314.1 s on the
   first run and in 646.1 s on the second, the cloud answered in 1.6 s. App Check accepted the
   debug token. Both paths work; the on-device speed is an open problem.
+- Timing test in the DevTools console: model load (`LanguageModel.create()`) 571.8 s, prompts
+  0.3 s, a second session 0.1 s. Checked the hardware (performance class "Very High",
+  RTX 5070 Ti, 32 GB RAM) and the model folder; the GPU program cache files were empty.
+- Moved the empty cache files to a backup and exited Chrome completely. After the restart the
+  model loaded in 3.8 s, but the cache files were empty again, so the cache was not the cause.
+- Added a warm-up: the side panel loads the model when it opens and shows its state. Result in
+  Chrome: model ready in 3.8 s, then the on-device prompt took 1.0 s.
