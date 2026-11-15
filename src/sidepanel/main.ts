@@ -1,5 +1,5 @@
 import { InferenceSource } from 'firebase/ai';
-import { runPrompt } from '../ai';
+import { runPrompt, warmUpOnDevice } from '../ai';
 import { appCheckEnabled } from '../firebase';
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -8,6 +8,7 @@ function byId<T extends HTMLElement>(id: string): T {
   return element;
 }
 
+const modelStatus = byId<HTMLParagraphElement>('model-status');
 const promptInput = byId<HTMLTextAreaElement>('prompt');
 const forceCloudRow = byId<HTMLLabelElement>('force-cloud-row');
 const forceCloudInput = byId<HTMLInputElement>('force-cloud');
@@ -69,3 +70,32 @@ async function run(): Promise<void> {
 }
 
 runButton.addEventListener('click', () => void run());
+
+/** Loads the on-device model as soon as the panel opens, so the first check does not wait. */
+async function warmUp(): Promise<void> {
+  const start = performance.now();
+  const showLoading = (): void => {
+    modelStatus.textContent = `Loading on-device model… ${seconds(performance.now() - start)}`;
+  };
+  showLoading();
+  const timer = setInterval(showLoading, 1000);
+
+  try {
+    const result = await warmUpOnDevice();
+    if (result.state === 'ready') {
+      modelStatus.textContent = `On-device model ready (loaded in ${seconds(result.durationMs)})`;
+    } else if (result.state === 'not-downloaded') {
+      modelStatus.textContent = 'On-device model not downloaded yet. Prompts use the cloud.';
+    } else {
+      modelStatus.textContent =
+        'On-device model not available on this device. Prompts use the cloud.';
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    modelStatus.textContent = `On-device model could not load: ${message}`;
+  } finally {
+    clearInterval(timer);
+  }
+}
+
+void warmUp();

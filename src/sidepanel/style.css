@@ -20,6 +20,12 @@ h1 {
   font-size: 18px;
 }
 
+.model-status {
+  margin: 0 0 4px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 textarea {
   box-sizing: border-box;
   width: 100%;
