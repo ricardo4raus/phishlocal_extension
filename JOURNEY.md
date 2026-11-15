@@ -242,3 +242,6 @@ _To fill in near the submission._
   The CSS part had the same weakness and now uses lightningcss; CSS that cannot be parsed is
   reported. 13 more test cases; the old CSS regex fails all 5 that were tried against it.
   Dependabot flagged `@grpc/grpc-js` twice; dismissed as not used, with the reason.
+- Wrote the decisions of the day into `CLAUDE.md` so every future session follows them: the
+  noreply commit email, review until nothing new before a merge, the dependency rules, the
+  debug-token rule, and the privacy and contest rules.
