@@ -25,7 +25,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
   git-ignored; `.env.example` with empty values is committed.
 - License: **Apache-2.0** (hackathon requirement: public repo with visible open-source license).
 - Supported email languages on-device: en, de, fr, es.
-- Privacy is the core selling point: never send email content anywhere without explicit user consent.
+- Privacy is the core selling point: never send email content anywhere without explicit user
+  consent.
 - Keep it simple. No frameworks (React etc.) unless I ask. Plain TypeScript + HTML + CSS.
 
 ## Product concept (what makes PhishLocal different)
@@ -53,7 +54,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
   loaded model takes about 1 s for short answers; one run took 39 s, cause unknown. On-device
   needs `expectedInputs` / `expectedOutputs` with languages, otherwise Chrome warns.
 - `PREFER_ON_DEVICE` falls back to the cloud silently; consent before cloud is the 21 Nov task.
-- The GitHub repo is public (contest rule: public with an open-source license until 16 Dec).
+  Until the consent step exists, use only test text in the side panel, never real emails.
+- The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow
 
@@ -66,6 +68,9 @@ explain every red flag, and work offline, with a cloud only as fallback."
   git workflow below.
 - Check APIs in the installed types and sources in `node_modules`, not from memory.
 - When something is slow or broken, measure first and find the cause before changing code.
+- New dependencies: ask me first. Pin the exact version (`--save-exact`) and choose a release
+  that is at least two weeks old; fresh releases are the usual window for supply-chain attacks.
+  Prefer a version that is already in the lockfile.
 - **At the end of every session, update `JOURNEY.md`** (rules at the top of that file): add what
   we did to today's daily-log entry, plus new challenges and learnings. Commit it in the
   session's branch, so it goes into the same PR. Never invent content for my personal sections.
@@ -83,16 +88,19 @@ explain every red flag, and work offline, with a cloud only as fallback."
   says what changed, why, how it was tested, and any known limits.
 - Before asking me to merge, review the PR for bugs, security flaws, inconsistencies, best
   practice and things that can be simpler. Fix what you find, run the check, and review again
-  until a round finds nothing new. Prove each code fix with a test that fails without it.
+  until a round finds nothing new. Prove each code fix with a test that fails without it, where
+  practical. Test what the tests cannot cover (e.g. side panel behaviour) in Chrome; if that was
+  not possible, say so in the PR.
 - PRs are merged with a **merge commit** only (`gh pr merge --merge`), never squash or rebase.
 - Do not merge a PR without my OK. After the merge, switch back to `main`, pull, and delete
-  the branch.
+  the local branch (GitHub deletes the remote one).
 - GitHub enforces this with the ruleset "Protect main": PR required, CI check `check` must pass,
   no force-push or deletion, merge commits only. GitHub deletes merged branches automatically.
 - Never rewrite published history or force-push without my explicit OK.
-- **Always commit with the GitHub noreply email `174874369+ricardo4raus@users.noreply.github.com`**,
-  never my private email. It is set in this repo's git config; check `git config user.email`
-  before the first commit of a session. GitHub blocks pushes that would expose the private email.
+- **Always commit with the GitHub noreply email**
+  **`174874369+ricardo4raus@users.noreply.github.com`**, never my private email. It is set in
+  this repo's git config; check `git config user.email` before the first commit of a session.
+  GitHub blocks pushes that would expose the private email.
 - On Windows, write commit messages and PR bodies to a file (`git commit -F`,
   `gh pr create --body-file`); PowerShell 5.1 breaks multi-line arguments that contain quotes.
 - On Windows, run `npm` and Vitest in PowerShell, not Git Bash: Vitest fails in Git Bash because
@@ -116,14 +124,12 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - GitHub also runs CodeQL (default setup, on every PR and weekly), secret scanning with push
   protection, and Dependabot alerts with security updates. Treat a new alert like a failing
   test: check it, then fix it or dismiss it with a reason.
-- New dependencies: ask me first. Pin the exact version (`--save-exact`) and choose a release
-  that is at least two weeks old; fresh releases are the usual window for supply-chain attacks.
-  Prefer a version that is already in the lockfile.
 
 ## Conventions (the tests enforce them)
 
-- No remote code: no `<script src="https://…">`, no remote `import()`, no `script.src = 'https://…'`,
-  no `eval`/`new Function`. External links (`<a href>`) and `fetch` to APIs are fine.
+- No remote code: no `<script src="https://…">`, no remote `import()`,
+  no `script.src = 'https://…'`, no `eval`/`new Function`. External links (`<a href>`) and
+  `fetch` to APIs are fine.
 - Open external links with an `<a href>` or `chrome.tabs.create({ url })`.
 - Gmail is read by a content script declared in `manifest.json` `content_scripts` with
   `matches: ['https://mail.google.com/*']`. Do not use crxjs `?script` injection (it exposes
