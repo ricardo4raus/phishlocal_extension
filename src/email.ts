@@ -35,7 +35,11 @@ export interface ReadEmailRequest {
   type: typeof READ_EMAIL;
 }
 
-export type ReadEmailResponse = { ok: true; email: Email } | { ok: false; reason: 'no-email-open' };
+/** `unreadable`: an email is open, but reading it failed (e.g. Gmail changed its page). */
+export type ReadEmailFailure = 'no-email-open' | 'unreadable';
+
+export type ReadEmailResponse =
+  { ok: true; email: Email } | { ok: false; reason: ReadEmailFailure };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -66,5 +70,5 @@ function isEmail(value: unknown): value is Email {
 export function isReadEmailResponse(value: unknown): value is ReadEmailResponse {
   if (!isRecord(value)) return false;
   if (value.ok === true) return isEmail(value.email);
-  return value.ok === false && value.reason === 'no-email-open';
+  return value.ok === false && (value.reason === 'no-email-open' || value.reason === 'unreadable');
 }

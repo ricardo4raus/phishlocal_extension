@@ -66,6 +66,12 @@ describe('readOpenEmail', () => {
     expect(!result.ok && result.message).toMatch(/No email is open/);
   });
 
+  it('reports when Gmail could not be read', async () => {
+    stubChrome(async () => ({ ok: false, reason: 'unreadable' }));
+    const result = await readOpenEmail();
+    expect(!result.ok && result.message).toMatch(/Could not read this email/);
+  });
+
   it('rejects an answer with the wrong shape', async () => {
     stubChrome(async () => ({ ok: true, email: { subject: 1 } }));
     const result = await readOpenEmail();

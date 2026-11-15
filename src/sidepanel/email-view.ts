@@ -29,7 +29,11 @@ export async function readOpenEmail(): Promise<ReadResult> {
     };
   }
   if (!response.ok) {
-    return { ok: false, message: 'No email is open. Open an email in Gmail, then click again.' };
+    const message =
+      response.reason === 'unreadable'
+        ? 'Could not read this email. Gmail may have changed its page; please report it.'
+        : 'No email is open. Open an email in Gmail, then click again.';
+    return { ok: false, message };
   }
   return { ok: true, email: response.email };
 }

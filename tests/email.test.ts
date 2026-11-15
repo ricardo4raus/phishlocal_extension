@@ -33,6 +33,7 @@ describe('isReadEmailResponse', () => {
   it('accepts an email and "no email open"', () => {
     expect(isReadEmailResponse({ ok: true, email })).toBe(true);
     expect(isReadEmailResponse({ ok: false, reason: 'no-email-open' })).toBe(true);
+    expect(isReadEmailResponse({ ok: false, reason: 'unreadable' })).toBe(true);
   });
 
   it.each([

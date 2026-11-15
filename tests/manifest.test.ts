@@ -20,8 +20,11 @@ const ALLOWED_PERMISSIONS: readonly string[] = ['sidePanel'];
 const ALLOWED_HOST_PERMISSIONS: readonly string[] = [];
 const ALLOWED_OPTIONAL_PERMISSIONS: readonly string[] = [];
 const ALLOWED_OPTIONAL_HOST_PERMISSIONS: readonly string[] = [];
-/** Pages content scripts may run on. Will become ['https://mail.google.com/*'] for Gmail. */
-const ALLOWED_CONTENT_SCRIPT_MATCHES: readonly string[] = [];
+/**
+ * Pages content scripts may run on. Gmail only: the content script reads the open email when the
+ * user clicks "Read open email" in the side panel.
+ */
+const ALLOWED_CONTENT_SCRIPT_MATCHES: readonly string[] = ['https://mail.google.com/*'];
 
 const manifest = readJson<Manifest>(fromRoot('manifest.json'));
 const pkg = readJson<{ version: string }>(fromRoot('package.json'));
