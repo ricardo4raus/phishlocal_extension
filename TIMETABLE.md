@@ -16,7 +16,7 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 - [x] Sun 15.11. – Extension skeleton: Vite + Manifest V3 + side panel (side panel tested in Chrome)
 - [x] Sun 15.11. – First hybrid prompt from the side panel (`InferenceMode.PREFER_ON_DEVICE`)
       incl. App Check debug token so the cloud fallback works
-- [ ] Sun 15.11. – Create public GitHub repo, Apache-2.0 license visible in the About section
+- [x] Sun 15.11. – Create public GitHub repo, Apache-2.0 license visible in the About section
 
 ## Phase 2 · Email input & rules
 
@@ -60,5 +60,12 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 - [ ] Text description: how Firebase AI Logic is used, features, value proposition
 - [ ] Public GitHub/GitLab repo: all source code + setup instructions, Firebase AI Logic actually
       imported and called at runtime, open-source license visible in About
+- [ ] Repo and README describe the value proposition
+- [ ] Repo stays public and the project stays testable until the end of judging (16 Dec 2026)
+- [ ] No PII, production API keys or project secrets in the repo, submission form or testing
+      instructions (App Check debug tokens are accepted in submissions; never commit one)
+- [ ] Summary of what was built during the submission period (from 11 Nov); mention AI coding
+      assistants and any pre-existing code
+- [ ] Testing instructions: how judges install the extension and set up Firebase
 - [ ] Demo video ≤ 3 min, public on YouTube, English or English subtitles
 - [ ] Project free of charge, all materials in English
