@@ -83,7 +83,7 @@ explain every red flag, and work offline, with a cloud only as fallback."
   says what changed, why, how it was tested, and any known limits.
 - Before asking me to merge, review the PR for bugs, security flaws, inconsistencies, best
   practice and things that can be simpler. Fix what you find, run the check, and review again
-  until a round finds nothing new. Prove each fix with a test that fails without it.
+  until a round finds nothing new. Prove each code fix with a test that fails without it.
 - PRs are merged with a **merge commit** only (`gh pr merge --merge`), never squash or rebase.
 - Do not merge a PR without my OK. After the merge, switch back to `main`, pull, and delete
   the branch.
@@ -95,8 +95,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
   before the first commit of a session. GitHub blocks pushes that would expose the private email.
 - On Windows, write commit messages and PR bodies to a file (`git commit -F`,
   `gh pr create --body-file`); PowerShell 5.1 breaks multi-line arguments that contain quotes.
-- Run `npm` and Vitest in PowerShell, not Git Bash: Vitest fails in Git Bash because of the
-  lowercase drive letter (`/c/…`).
+- On Windows, run `npm` and Vitest in PowerShell, not Git Bash: Vitest fails in Git Bash because
+  of the lowercase drive letter (`/c/…`).
 
 ## Checks
 
