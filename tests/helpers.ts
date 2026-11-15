@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, posix, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { type DefaultTreeAdapterTypes, parse } from 'parse5';
 import { type ESTree, parseSync } from 'vite';
 
 /** Absolute path of the repository root (independent of the current working directory). */
@@ -66,14 +67,28 @@ export function fileExistsExactCase(baseDir: string, path: string): boolean {
  * URL classification
  * --------------------------------------------------------------------------------------------- */
 
+/**
+ * A URL as the browser's URL parser reads it: ASCII tabs and newlines are removed everywhere,
+ * leading and trailing control characters and spaces are dropped. A backslash is read as `/`
+ * (browsers do that for http(s) URLs; for the check, treating `\\host` like `//host` is stricter).
+ */
+function cleanUrl(url: string): string {
+  const text = url.replace(/[\t\n\r]/g, '').replaceAll('\\', '/');
+  let start = 0;
+  let end = text.length;
+  while (start < end && text.charCodeAt(start) <= 0x20) start++;
+  while (end > start && text.charCodeAt(end - 1) <= 0x20) end--;
+  return text.slice(start, end);
+}
+
 /** True if a URL points outside the extension package (any scheme, or protocol-relative `//`). */
 export const isNonLocalUrl = (url: string): boolean =>
-  /^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(url.trim());
+  /^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(cleanUrl(url));
 
 /** True for network URLs: `http:`, `https:` or protocol-relative `//`. */
-const isRemoteUrl = (url: string): boolean => /^(?:https?:)?\/\//i.test(url.trim());
+const isRemoteUrl = (url: string): boolean => /^(?:https?:)?\/\//i.test(cleanUrl(url));
 
-const isDataUrl = (url: string): boolean => /^data:/i.test(url.trim());
+const isDataUrl = (url: string): boolean => /^data:/i.test(cleanUrl(url));
 
 /** Shortens a code snippet for failure messages. */
 const snippet = (text: string, max = 160): string => {
@@ -362,10 +377,20 @@ export function findCssRemoteUrls(css: string): string[] {
  * HTML
  * --------------------------------------------------------------------------------------------- */
 
-/** Which attributes of which tags make the browser fetch a resource. */
+/*
+ * HTML is read with parse5, a parser that follows the HTML standard, so the check sees exactly the
+ * elements and attribute values the browser sees. Regexes could not: comments (`<!-->`), fake
+ * opening tags in comments or attribute values, unquoted values with quotes, and character
+ * references (`https&#58;//`) all let a remote script slip through earlier versions.
+ */
+
+type HtmlElement = DefaultTreeAdapterTypes.Element;
+type HtmlParent = DefaultTreeAdapterTypes.ParentNode;
+
+/** Which attributes of which elements make the browser fetch a resource. */
 const RESOURCE_ATTRIBUTES: Readonly<Record<string, readonly string[]>> = {
-  script: ['src'],
-  link: ['href'],
+  script: ['src', 'href'], // `href` (also `xlink:href`) for SVG `<script>`
+  link: ['href', 'imagesrcset'],
   base: ['href'],
   iframe: ['src'],
   frame: ['src'],
@@ -376,22 +401,51 @@ const RESOURCE_ATTRIBUTES: Readonly<Record<string, readonly string[]>> = {
   video: ['src', 'poster'],
   audio: ['src'],
   track: ['src'],
+  input: ['src'], // `<input type="image">`
+  body: ['background'],
+  table: ['background'],
+  td: ['background'],
+  th: ['background'],
+  image: ['href'], // SVG
+  use: ['href'], // SVG
+  feImage: ['href'], // SVG (parse5 uses the camelCase SVG name)
 };
 
-// Quote-aware: a `>` inside an attribute value does not end the tag.
-const TAG_REGEX = /<([a-z][a-z\d-]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/gi;
-// `(?:^|\s)` so `data-src` is not read as `src`.
-const ATTR_REGEX = /(?:^|\s)([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+/** Value of an attribute (parse5 lowercases HTML names and keeps only the first duplicate). */
+const attribute = (element: HtmlElement, name: string): string | undefined =>
+  element.attrs.find((attr) => attr.name === name)?.value;
 
-const INLINE_BLOCK_REGEX = /<(script|style)\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/\1\s*>/gi;
+/** Every element below `root` in document order, including the contents of `<template>`. */
+function htmlElements(root: HtmlParent): HtmlElement[] {
+  const elements: HtmlElement[] = [];
+  const visit = (parent: HtmlParent): void => {
+    for (const node of parent.childNodes) {
+      if (!('tagName' in node)) continue;
+      elements.push(node);
+      visit(node);
+      if ('content' in node) visit(node.content); // <template>
+    }
+  };
+  visit(root);
+  return elements;
+}
 
-function parseAttributes(attrText: string): Map<string, string> {
-  const attrs = new Map<string, string>();
-  for (const match of attrText.matchAll(ATTR_REGEX)) {
-    const name = (match[1] ?? '').toLowerCase();
-    if (name && !attrs.has(name)) attrs.set(name, match[2] ?? match[3] ?? match[4] ?? '');
-  }
-  return attrs;
+/** Text content of an element (e.g. the code of an inline `<script>`). */
+const textOf = (element: HtmlElement): string =>
+  element.childNodes.map((node) => ('value' in node ? node.value : '')).join('');
+
+/**
+ * Target of `<meta http-equiv="refresh" content="5; url=…">`, which navigates the page.
+ * Follows the standard: optional delay, `;` or `,`, optional `url=`, optional quotes.
+ */
+function metaRefreshUrl(element: HtmlElement): string | undefined {
+  if (attribute(element, 'http-equiv')?.trim().toLowerCase() !== 'refresh') return undefined;
+  const target = (attribute(element, 'content') ?? '')
+    .replace(/^\s*[\d.]*\s*[;,]?\s*/, '')
+    .replace(/^url\s*=\s*/i, '')
+    .replace(/^(["'])(.*?)\1?$/, '$2')
+    .trim();
+  return target === '' ? undefined : target;
 }
 
 interface HtmlResource {
@@ -400,27 +454,20 @@ interface HtmlResource {
   url: string;
 }
 
-/**
- * Every resource URL an HTML document loads (`<script src>`, `<link href>`, `<img src>`, …).
- *
- * Deliberately over-inclusive: every tag in the raw text counts, also inside comments and inline
- * `<script>`/`<style>` blocks. A regex cannot tell those regions apart the way the browser does
- * (`<!-->` is a complete, empty comment; a `<script>` inside a comment or an attribute value opens
- * nothing), so skipping them could hide a script that the browser runs. Tag-like text in a comment
- * or an inline block is therefore reported too; the fix is to remove it.
- */
-export function htmlResources(html: string): HtmlResource[] {
+function resourcesOf(elements: readonly HtmlElement[]): HtmlResource[] {
   const resources: HtmlResource[] = [];
-  for (const match of html.matchAll(TAG_REGEX)) {
-    const tag = (match[1] ?? '').toLowerCase();
-    const attrs = parseAttributes(match[2] ?? '');
+  for (const element of elements) {
+    const tag = element.tagName;
+    const refresh = tag === 'meta' ? metaRefreshUrl(element) : undefined;
+    if (refresh !== undefined) resources.push({ tag, attr: 'content', url: refresh });
     for (const attr of RESOURCE_ATTRIBUTES[tag] ?? []) {
-      const value = attrs.get(attr);
-      if (value === undefined) continue;
-      const urls =
-        attr === 'srcset'
+      // All matches, not only the first: SVG can carry both `href` and `xlink:href`.
+      const values = element.attrs.filter((a) => a.name === attr).map((a) => a.value);
+      const urls = values.flatMap((value) =>
+        attr.endsWith('srcset')
           ? value.split(',').map((candidate) => candidate.trim().split(/\s+/)[0] ?? '')
-          : [value.trim()];
+          : [value.trim()],
+      );
       for (const url of urls) {
         if (url !== '') resources.push({ tag, attr, url });
       }
@@ -429,29 +476,45 @@ export function htmlResources(html: string): HtmlResource[] {
   return resources;
 }
 
+/**
+ * Every resource URL an HTML document loads (`<script src>`, `<link href>`, `<img src>`, …), as
+ * the browser parses it. Comments are ignored like in the browser; `<template>` contents count.
+ */
+export const htmlResources = (html: string): HtmlResource[] =>
+  resourcesOf(htmlElements(parse(html)));
+
 /** Script types the browser executes; others (e.g. `application/json`) are inert data blocks. */
 const isExecutedScriptType = (type: string): boolean =>
   ['', 'module', 'importmap'].includes(type) || /(?:java|ecma)script/.test(type);
 
 /**
  * Problems in an HTML page: resources from outside the package (`data:` is fine except for
- * scripts), inline scripts, and remote URLs in inline `<style>` blocks.
+ * scripts), inline scripts, remote URLs in inline CSS (`<style>` and `style` attributes), and the
+ * same problems inside `<iframe srcdoc>`.
  * Existence of local files is checked separately (only meaningful for build output).
- * Comments and inline blocks are scanned like everything else (see {@link htmlResources}).
  */
 export function findHtmlProblems(html: string): string[] {
+  const elements = htmlElements(parse(html));
   const problems: string[] = [];
-  for (const { tag, attr, url } of htmlResources(html)) {
+  for (const { tag, attr, url } of resourcesOf(elements)) {
     if (isNonLocalUrl(url) && !(isDataUrl(url) && tag !== 'script')) {
       problems.push(`<${tag} ${attr}> loads non-local URL ${snippet(url)}`);
     }
   }
-  for (const [, kind = '', attrs = '', code = ''] of html.matchAll(INLINE_BLOCK_REGEX)) {
+  for (const element of elements) {
+    const tag = element.tagName;
+    const style = attribute(element, 'style');
+    if (style) problems.push(...findCssRemoteUrls(style).map((hit) => `<${tag} style>: ${hit}`));
+    const srcdoc = tag === 'iframe' ? attribute(element, 'srcdoc') : undefined;
+    if (srcdoc) problems.push(...findHtmlProblems(srcdoc).map((hit) => `<iframe srcdoc>: ${hit}`));
+
+    const code = textOf(element);
     if (code.trim() === '') continue;
-    if (kind.toLowerCase() === 'style') {
+    if (tag === 'style') {
       problems.push(...findCssRemoteUrls(code).map((hit) => `inline <style>: ${hit}`));
     } else if (
-      isExecutedScriptType(parseAttributes(attrs).get('type')?.trim().toLowerCase() ?? '')
+      tag === 'script' &&
+      isExecutedScriptType(attribute(element, 'type')?.trim().toLowerCase() ?? '')
     ) {
       problems.push(
         `inline <script>${snippet(code, 60)}</script>: MV3 extension pages don't run inline ` +

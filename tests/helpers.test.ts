@@ -177,6 +177,7 @@ describe('htmlResources / findHtmlProblems', () => {
       `<script src="/a.js"></script>`,
       `<link rel="stylesheet" href='b.css'>`,
       `<img alt="a > b" src="c.png" data-src="https://lazy.example/x.png">`,
+      `<!-- <script src="https://commented.example/x.js"></script> -->`,
       `<script>1</script>`,
     ].join('');
     expect(htmlResources(html).map((r) => r.url)).toEqual(['/a.js', 'b.css', 'c.png']);
@@ -202,16 +203,35 @@ describe('htmlResources / findHtmlProblems', () => {
     `<script type="text/javascript">1</script>`,
     `<script type="importmap">{"imports":{"x":"https://cdn.example/x.js"}}</script>`,
     `<script>const sample = '<script src="https://evil.example/x.js">';</script>`,
-    // Comments are scanned too: a regex cannot end them the way the browser does.
-    `<!-- <script src="https://commented.example/x.js"></script> -->`,
+    // Parsing tricks that fooled the earlier regex versions; the browser runs each script.
     `<!--> <script src="https://evil.example/x.js"></script> -->`,
     `<!---> <script src="https://evil.example/x.js"></script> -->`,
     `<! <!-- > <script src="https://evil.example/x.js"></script> -->`,
-    // A fake opening tag (in a comment or an attribute value) must not hide the next real script.
     `<!-- <script> --><script src="https://evil.example/x.js"></script>`,
     `<!-- <script type="application/json"> --><script src="https://evil.example/x.js"></script>`,
     `<!-- <style> --><script src="https://evil.example/x.js"></script><style></style>`,
     `<p title="<script type=application/json>"></p><script src="https://evil.example/x.js"></script>`,
+    `<p title=x"><script src="https://evil.example/x.js"></script><a title=y">ok</a>`,
+    `<SCRIPT SRC="https://evil.example/x.js"></SCRIPT>`,
+    `<script src="https://evil.example/x.js" src="/local.js"></script>`,
+    // URL tricks: the browser decodes character references and removes tabs and newlines.
+    `<script src="https&#58;//evil.example/x.js"></script>`,
+    `<script src="ht\ttps://evil.example/x.js"></script>`,
+    `<script src="\nhttps://evil.example/x.js"></script>`,
+    `<img src="\\\\evil.example/x.png">`,
+    // Other places that load resources.
+    `<template><img src="https://tracker.example/pixel.gif"></template>`,
+    `<div style="background: url(https://tracker.example/pixel.gif)"></div>`,
+    `<iframe srcdoc="<script src='https://evil.example/x.js'></script>"></iframe>`,
+    `<svg><image href="https://tracker.example/pixel.gif"></image></svg>`,
+    `<svg><image href="./a.png" xlink:href="https://tracker.example/pixel.gif"></image></svg>`,
+    `<svg><script href="https://evil.example/x.js"></script></svg>`,
+    `<svg><filter><feImage href="https://tracker.example/pixel.gif"/></filter></svg>`,
+    `<input type="image" src="https://tracker.example/button.png">`,
+    `<body background="https://tracker.example/bg.png"></body>`,
+    `<link rel="preload" as="image" imagesrcset="https://tracker.example/a.png 1x">`,
+    `<meta http-equiv="refresh" content="0; url=https://evil.example/">`,
+    `<meta http-equiv="Refresh" content="5,'https://evil.example/'">`,
   ])('flags %s', (html) => {
     expect(findHtmlProblems(html)).not.toEqual([]);
   });
@@ -225,6 +245,10 @@ describe('htmlResources / findHtmlProblems', () => {
     `<p title="<script src='https://evil.example/x.js'>">sample</p>`,
     `<script type="application/json">{"url":"https://example.com"}</script>`,
     `<script type="module" src="./main.ts">  </script>`,
+    // Comments are ignored, like in the browser.
+    `<!-- <script src="https://commented.example/x.js"></script> -->`,
+    `<meta http-equiv="refresh" content="0; url=./other.html">`,
+    `<meta http-equiv="refresh" content="30">`,
   ])('does not flag %s', (html) => {
     expect(findHtmlProblems(html)).toEqual([]);
   });
@@ -253,12 +277,21 @@ describe('findRemoteCodeInFile', () => {
 });
 
 describe('isNonLocalUrl / normalizeInside', () => {
-  it.each(['https://x/a.js', 'http://x/a.js', '//x/a.js', 'data:text/js,1', 'chrome://x'])(
-    '%s is non-local',
-    (url) => {
-      expect(isNonLocalUrl(url)).toBe(true);
-    },
-  );
+  it.each([
+    'https://x/a.js',
+    'http://x/a.js',
+    '//x/a.js',
+    'data:text/js,1',
+    'chrome://x',
+    // The browser removes tabs and newlines and trims control characters and spaces.
+    'ht\ttps://x/a.js',
+    '/\n/x/a.js',
+    '\u0000 https://x/a.js',
+    // `\\host` is read like `//host` (strict).
+    '\\\\x/a.js',
+  ])('%s is non-local', (url) => {
+    expect(isNonLocalUrl(url)).toBe(true);
+  });
 
   it.each(['/assets/a.js', './a.js', 'a.js', '../a.css', 'firebase/app'])('%s is local', (url) => {
     expect(isNonLocalUrl(url)).toBe(false);
