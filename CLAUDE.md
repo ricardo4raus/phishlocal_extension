@@ -99,6 +99,9 @@ explain every red flag, and work offline, with a cloud only as fallback."
   match, update the allow-list in `tests/manifest.test.ts` on purpose.
 - `npm run dev` overwrites `dist` with a dev build; run `npm run build` before `npm test`.
 - If a `dist` test fails, find the pattern in the source; the minified names won't help.
+- The remote-code check reads JavaScript with Vite's parser, HTML with parse5 and CSS with
+  lightningcss. Never use regexes to parse HTML or CSS in a security check: every regex version
+  had gaps that let a remote script or URL through.
 - GitHub also runs CodeQL (default setup, on every PR and weekly), secret scanning with push
   protection, and Dependabot alerts with security updates. Treat a new alert like a failing
   test: check it, then fix it or dismiss it with a reason.
