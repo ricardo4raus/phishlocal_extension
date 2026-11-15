@@ -67,5 +67,6 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 - [ ] Summary of what was built during the submission period (from 11 Nov); mention AI coding
       assistants and any pre-existing code
 - [ ] Testing instructions: how judges install the extension and set up Firebase
+- [ ] Submission form: platform Web (Chrome) selected
 - [ ] Demo video ≤ 3 min, public on YouTube, English or English subtitles
 - [ ] Project free of charge, all materials in English

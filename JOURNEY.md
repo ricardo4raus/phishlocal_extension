@@ -115,7 +115,7 @@ _Current state, updated as features land._
   cache files disproved our own theory.
 - Before a demo: exit Chrome completely (also from the tray) and open the side panel once.
 - Set the GitHub noreply email before the first commit. Rewriting history later cleans `main`,
-  but GitHub keeps the old commits of merged pull requests reachable (`refs/pull/N/head`), and a
+  but GitHub keeps the old commits of every pull request reachable (`refs/pull/N/head`), and a
   force-push cannot change those.
 - In debug mode the App Check SDK prints the debug token in the DevTools console. Never show
   DevTools in screenshots or the demo video.
@@ -163,8 +163,9 @@ _To fill in near the submission._
 
 - Project setup: Vite + TypeScript + crxjs, MV3 manifest with a side panel, Firebase app
   initialisation from `.env.local`, Apache-2.0 license. Side panel tested in Chrome.
-- GitHub repo connected (private at first); agreed on the git workflow (feature branch, small commits, PR,
-  merge commit) and wrote it into `CLAUDE.md`. `TIMETABLE.md` added with the hackathon plan.
+- GitHub repo connected (private at first); agreed on the git workflow (feature branch, small
+  commits, PR, merge commit) and wrote it into `CLAUDE.md`. `TIMETABLE.md` added with the
+  hackathon plan.
 - Added formatting, linting, type check, structure tests and CI (PR #2). Builder and reviewer
   agents worked in parallel; two review rounds found and fixed false positives and gaps in the
   remote-code check.
@@ -205,7 +206,9 @@ _To fill in near the submission._
 - Read the official contest rules. The repository must be public with a detectable open-source
   license and stay available until the end of judging (16 Dec); it must not contain PII, API
   keys or project secrets; App Check debug tokens are accepted in submissions.
-- Before going public: scanned all 33 commits for secrets (none found). The only personal data
-  was the private email address in the commit metadata. Rewrote the history to the GitHub
+- Before going public: scanned all 33 commits for secrets (none found). The only private
+  personal data was the email address in the commit metadata. Rewrote the history to the GitHub
   noreply address and force-pushed `main`, then made the repository public. GitHub detects the
-  Apache-2.0 license.
+  Apache-2.0 license. The old commits in PRs #1–#4 still show the private address; deleting and
+  recreating the repository would remove them, but that was not worth it, so we accepted it.
+  GitHub now blocks pushes that would expose the private address.
