@@ -20,6 +20,54 @@ h1 {
   font-size: 18px;
 }
 
+h2 {
+  margin: 8px 0 0;
+  font-size: 15px;
+}
+
+.email {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.email-status {
+  margin: 0;
+}
+
+.email-status.error {
+  color: #c62828;
+}
+
+.email-details {
+  margin: 0;
+}
+
+.email-details[hidden] {
+  display: none;
+}
+
+.email-details dt {
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.email-details dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.email-details ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.email-body {
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 .model-status {
   margin: 0 0 4px;
   font-size: 12px;

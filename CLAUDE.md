@@ -54,7 +54,12 @@ explain every red flag, and work offline, with a cloud only as fallback."
   loaded model takes about 1 s for short answers; one run took 39 s, cause unknown. On-device
   needs `expectedInputs` / `expectedOutputs` with languages, otherwise Chrome warns.
 - `PREFER_ON_DEVICE` falls back to the cloud silently; consent before cloud is the 21 Nov task.
-  Until the consent step exists, use only test text in the side panel, never real emails.
+  Until the consent step exists, never run a prompt on a real email (only test text). Reading
+  and showing an email in the side panel is fine: it stays local.
+- "Read open email" in the side panel reads the open Gmail email through the content script
+  `src/content/gmail.ts`, only on click. Gmail's selectors live in `SELECTORS` in
+  `src/content/gmail-extract.ts` (measured 15 Nov 2026). If Gmail changes its page, measure
+  again with a DevTools snippet that prints only counts and class names, never email content.
 - The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow
@@ -110,7 +115,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
 
 - `npm run check` runs everything in this order: `format:check` → `lint` (Oxlint) →
   `typecheck` (src + tests) → `build` → `test` (Vitest). CI runs the same command on every PR.
-- Node version: see `.nvmrc` (CI uses it); `engines` requires Node >= 24.12.
+- Node version: see `.nvmrc` (CI uses it); `engines` requires Node `^24.15.0 || >=26.0.0`
+  (jsdom's requirement).
 - `npm run format` fixes formatting (Prettier).
 - Linter is Oxlint, not ESLint, because typescript-eslint does not support TypeScript 7.
 - `tests/` holds structure tests for the source, the manifest and the `dist` build output

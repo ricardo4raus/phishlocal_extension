@@ -20,17 +20,21 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 
 ## Phase 2 · Email input & rules
 
-- [ ] Mon 16.11. – Content script: read sender, subject, body and links from the open Gmail email
+- [x] Mon 16.11. – Content script: read sender, subject, body and links from the open Gmail email
+      (done Sun 15.11; reads on button click)
 - [ ] Tue 17.11. – Paste fallback field in the side panel (demo must always work)
 - [ ] Wed 18.11. – Rule checks in plain TypeScript (no AI): link text vs real domain,
-      lookalike domains (e.g. paypa1.com), reply-to ≠ sender, urgency words (en/de/fr/es)
+      lookalike domains (e.g. paypa1.com), reply-to ≠ sender, urgency words (en/de/fr/es).
+      Note: Reply-To is not in the Gmail page by default (only in the details box); check
+      first whether it can be read, otherwise drop that rule. Legit emails also have link text
+      that differs from the target (e.g. Google's `c.gle` links), so don't flag that blindly.
 
 ## Phase 3 · AI & result
 
 - [ ] Thu 19.11. – Prompt + fixed JSON output schema (risk level, reasons, advice);
       feed the rule results into the prompt; answer in the user's language
-- [ ] Fri 20.11. – Result UI: traffic light 🟢🟡🔴, reasons, highlighted suspicious links;
-      test end to end
+- [ ] Fri 20.11. – Result UI: traffic light 🟢🟡🔴, reasons, highlighted suspicious links
+      (show the link's domain prominently, shorten long URLs); test end to end
 
 ## Phase 4 · Hybrid & Firebase (main selling point)
 
@@ -41,7 +45,8 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 
 ## Phase 5 · Polish & test
 
-- [ ] Mon 23.11. – UI polish: loading states, error messages, design
+- [ ] Mon 23.11. – UI polish: loading states, error messages, design; optional setting
+      "scan automatically when an email opens" (off by default; reading stays on click otherwise)
 - [ ] Tue 24.11. – Collect test emails (phishing samples + normal emails; private only, no company data)
 - [ ] Wed 25.11. – Test and tune prompt/thresholds; note results
 - [ ] Thu 26.11. – Fix bugs; test in a fresh Chrome profile and the cloud-only path

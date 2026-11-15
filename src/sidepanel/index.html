@@ -11,7 +11,24 @@
       <h1>PhishLocal</h1>
       <p id="model-status" class="model-status" role="status"></p>
 
-      <label for="prompt">Test prompt</label>
+      <section class="email" aria-labelledby="email-heading">
+        <h2 id="email-heading">Email</h2>
+        <button id="read-email" type="button">Read open email</button>
+        <p id="email-status" class="email-status" role="status"></p>
+        <dl id="email-details" class="email-details" hidden>
+          <dt>From</dt>
+          <dd id="email-sender"></dd>
+          <dt>Subject</dt>
+          <dd id="email-subject"></dd>
+          <dt>Links</dt>
+          <dd><ul id="email-links"></ul></dd>
+          <dt>Text</dt>
+          <dd id="email-body" class="email-body"></dd>
+        </dl>
+      </section>
+
+      <h2>Test prompt</h2>
+      <label for="prompt">Prompt (test text only, no real emails)</label>
       <textarea id="prompt" rows="6">
 Is this email suspicious? Answer in two sentences.
 
