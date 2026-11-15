@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   findApiKeys,
-  findCssRemoteUrls,
+  findCssProblems,
   findDeniedRemoteHosts,
   findHtmlProblems,
   findRemoteCodeInFile,
@@ -145,15 +145,25 @@ describe('findDeniedRemoteHosts', () => {
   });
 });
 
-describe('findCssRemoteUrls', () => {
+describe('findCssProblems', () => {
   it.each([
     `@import url("https://fonts.googleapis.com/css2?family=Inter");`,
     `@import 'https://cdn.example/a.css';`,
     `@import url(//cdn.example/a.css);`,
     `body { background: url(https://tracker.example/p.gif) }`,
     `body { background: url( 'http://x.example/a.png' ) }`,
+    `@font-face { font-family: x; src: url(https://cdn.example/f.woff2) }`,
+    `:root { --bg: url(https://tracker.example/p.gif) }`,
+    // Tricks that fooled the earlier regex version.
+    String.raw`body { background: u\72l(https://tracker.example/p.gif) }`,
+    String.raw`body { background: url(https\3a //tracker.example/p.gif) }`,
+    `p { content: "/*" } body { background: url(https://tracker.example/p.gif) } /* */`,
+    `body { background-image: image-set("https://tracker.example/p.gif" 1x) }`,
+    `body { background: url(https://tracker.example/p.gif)`,
+    // CSS that cannot be parsed is reported: the browser might still load URLs from it.
+    `background: url(./local.png)`,
   ])('flags %s', (css) => {
-    expect(findCssRemoteUrls(css)).not.toEqual([]);
+    expect(findCssProblems(css)).not.toEqual([]);
   });
 
   it.each([
@@ -162,12 +172,21 @@ describe('findCssRemoteUrls', () => {
     `body { background: url(/assets/bg.png) }`,
     `i { background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'/>") }`,
     `/* url(https://commented.example/x.png) */ p { color: red }`,
+    `@font-face { font-family: x; src: url(./f.woff2) }`,
+    `p { content: "https://example.com" }`,
   ])('does not flag %s', (css) => {
-    expect(findCssRemoteUrls(css)).toEqual([]);
+    expect(findCssProblems(css)).toEqual([]);
   });
 
   it('reports @import url(…) once', () => {
-    expect(findCssRemoteUrls(`@import url("https://fonts.example/a.css");`)).toHaveLength(1);
+    expect(findCssProblems(`@import url("https://fonts.example/a.css");`)).toHaveLength(1);
+  });
+
+  it('reads a style attribute as declarations', () => {
+    expect(findCssProblems('color: red; background: url(./a.png)', { inline: true })).toEqual([]);
+    expect(
+      findCssProblems('background: url(https://x.example/a.png)', { inline: true }),
+    ).not.toEqual([]);
   });
 });
 
@@ -203,6 +222,37 @@ describe('htmlResources / findHtmlProblems', () => {
     `<script type="text/javascript">1</script>`,
     `<script type="importmap">{"imports":{"x":"https://cdn.example/x.js"}}</script>`,
     `<script>const sample = '<script src="https://evil.example/x.js">';</script>`,
+    // Parsing tricks that fooled the earlier regex versions; the browser runs each script.
+    `<!--> <script src="https://evil.example/x.js"></script> -->`,
+    `<!---> <script src="https://evil.example/x.js"></script> -->`,
+    `<! <!-- > <script src="https://evil.example/x.js"></script> -->`,
+    `<!-- <script> --><script src="https://evil.example/x.js"></script>`,
+    `<!-- <script type="application/json"> --><script src="https://evil.example/x.js"></script>`,
+    `<!-- <style> --><script src="https://evil.example/x.js"></script><style></style>`,
+    `<p title="<script type=application/json>"></p><script src="https://evil.example/x.js"></script>`,
+    `<p title=x"><script src="https://evil.example/x.js"></script><a title=y">ok</a>`,
+    `<SCRIPT SRC="https://evil.example/x.js"></SCRIPT>`,
+    `<script src="https://evil.example/x.js" src="/local.js"></script>`,
+    // URL tricks: the browser decodes character references and removes tabs and newlines.
+    `<script src="https&#58;//evil.example/x.js"></script>`,
+    `<script src="ht\ttps://evil.example/x.js"></script>`,
+    `<script src="\nhttps://evil.example/x.js"></script>`,
+    `<img src="\\\\evil.example/x.png">`,
+    // Other places that load resources.
+    `<template><img src="https://tracker.example/pixel.gif"></template>`,
+    `<div style="background: url(https://tracker.example/pixel.gif)"></div>`,
+    String.raw`<div style="background: u\72l(https://tracker.example/pixel.gif)"></div>`,
+    String.raw`<style>body { background: u\72l(https://tracker.example/pixel.gif) }</style>`,
+    `<iframe srcdoc="<script src='https://evil.example/x.js'></script>"></iframe>`,
+    `<svg><image href="https://tracker.example/pixel.gif"></image></svg>`,
+    `<svg><image href="./a.png" xlink:href="https://tracker.example/pixel.gif"></image></svg>`,
+    `<svg><script href="https://evil.example/x.js"></script></svg>`,
+    `<svg><filter><feImage href="https://tracker.example/pixel.gif"/></filter></svg>`,
+    `<input type="image" src="https://tracker.example/button.png">`,
+    `<body background="https://tracker.example/bg.png"></body>`,
+    `<link rel="preload" as="image" imagesrcset="https://tracker.example/a.png 1x">`,
+    `<meta http-equiv="refresh" content="0; url=https://evil.example/">`,
+    `<meta http-equiv="Refresh" content="5,'https://evil.example/'">`,
   ])('flags %s', (html) => {
     expect(findHtmlProblems(html)).not.toEqual([]);
   });
@@ -216,6 +266,10 @@ describe('htmlResources / findHtmlProblems', () => {
     `<p title="<script src='https://evil.example/x.js'>">sample</p>`,
     `<script type="application/json">{"url":"https://example.com"}</script>`,
     `<script type="module" src="./main.ts">  </script>`,
+    // Comments are ignored, like in the browser.
+    `<!-- <script src="https://commented.example/x.js"></script> -->`,
+    `<meta http-equiv="refresh" content="0; url=./other.html">`,
+    `<meta http-equiv="refresh" content="30">`,
   ])('does not flag %s', (html) => {
     expect(findHtmlProblems(html)).toEqual([]);
   });
@@ -244,12 +298,21 @@ describe('findRemoteCodeInFile', () => {
 });
 
 describe('isNonLocalUrl / normalizeInside', () => {
-  it.each(['https://x/a.js', 'http://x/a.js', '//x/a.js', 'data:text/js,1', 'chrome://x'])(
-    '%s is non-local',
-    (url) => {
-      expect(isNonLocalUrl(url)).toBe(true);
-    },
-  );
+  it.each([
+    'https://x/a.js',
+    'http://x/a.js',
+    '//x/a.js',
+    'data:text/js,1',
+    'chrome://x',
+    // The browser removes tabs and newlines and trims control characters and spaces.
+    'ht\ttps://x/a.js',
+    '/\n/x/a.js',
+    '\u0000 https://x/a.js',
+    // `\\host` is read like `//host` (strict).
+    '\\\\x/a.js',
+  ])('%s is non-local', (url) => {
+    expect(isNonLocalUrl(url)).toBe(true);
+  });
 
   it.each(['/assets/a.js', './a.js', 'a.js', '../a.css', 'firebase/app'])('%s is local', (url) => {
     expect(isNonLocalUrl(url)).toBe(false);

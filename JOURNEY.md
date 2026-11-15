@@ -49,7 +49,12 @@ _Current state, updated as features land._
 - **Quality checks:** Prettier, Oxlint, a TypeScript type check, Vitest structure tests and
   GitHub Actions CI. One command, `npm run check`, runs everything locally and in CI.
 - **Privacy guarded by tests:** the tests fail if the build loads remote code, the manifest asks
-  for more permissions than allowed, or an API key ends up in a committed file.
+  for more permissions than allowed, or an API key ends up in a committed file. JavaScript is
+  checked on the syntax tree (Vite's parser), HTML with a standard-conformant parser (parse5),
+  CSS with lightningcss (the CSS parser Vite uses).
+- **GitHub security tools:** a ruleset protects `main` (pull request and passing CI required, no
+  force-push). CodeQL scans the code on every pull request, secret scanning blocks pushes that
+  contain known secret formats, and Dependabot reports vulnerable packages.
 
 ## Challenges
 
@@ -124,6 +129,19 @@ _Current state, updated as features land._
   read.
 - Read the installed SDK types instead of trusting memory: the hybrid API and the default cloud
   model (`gemini-3.5-flash-lite`) were taken from `node_modules`.
+- Don't parse HTML or CSS with regexes in a security check. Each regex fix for the remote-code
+  test left the next trick open: in HTML comments (`<!-->`), fake opening tags, quotes in
+  unquoted values and character references (`https&#58;//`); in CSS escapes (`u\72l(`), `/*`
+  inside strings and `image-set("…")`. Real parsers (parse5 for HTML, lightningcss for CSS) see
+  what the browser sees and closed all of them at once. CodeQL's usual fix (repeat the removal
+  until nothing changes) would have made it worse.
+- Repeated reviews pay off: the first fix for the CodeQL alert opened a new gap, the second one
+  too; only the third review led to the real fix.
+- Pin new dependencies to a release that is a few weeks old (here parse5 8.0.1 instead of the
+  8-day-old 8.1.1): fresh releases are the usual window for supply-chain attacks. lightningcss is
+  pinned to the version Vite already uses, so nothing new is downloaded.
+- A security alert needs context: Dependabot flagged `@grpc/grpc-js`, but it is only used by
+  Firestore's Node build, which we neither use nor bundle.
 
 ## Accomplishments we're proud of
 
@@ -212,3 +230,15 @@ _To fill in near the submission._
   Apache-2.0 license. The old commits in PRs #1–#4 still show the private address; deleting and
   recreating the repository would remove them, but that was not worth it, so we accepted it.
   GitHub now blocks pushes that would expose the private address.
+- Turned on GitHub's free tools for public repos: a ruleset for `main`, secret scanning with push
+  protection, CodeQL and Dependabot. The first scans found three things. CodeQL flagged the HTML
+  comment removal in the remote-code test; the real gap was that `<!--> <script src=…>` could
+  hide a script. The first fix (scan comments too) left a second gap: a fake `<script>` or
+  `<style>` opening tag in a comment or attribute value could still swallow a real remote script.
+  The third review found a quote trick in unquoted attribute values. The check now reads HTML
+  with parse5 like the browser, cleans URLs like the browser (tabs, newlines), and also covers
+  `<template>`, `style` attributes, `<iframe srcdoc>`, SVG links, `<meta http-equiv="refresh">`
+  and more resource attributes. 33 new test cases; the previous regex version fails 21 of them.
+  The CSS part had the same weakness and now uses lightningcss; CSS that cannot be parsed is
+  reported. 13 more test cases; the old CSS regex fails all 5 that were tried against it.
+  Dependabot flagged `@grpc/grpc-js` twice; dismissed as not used, with the reason.
