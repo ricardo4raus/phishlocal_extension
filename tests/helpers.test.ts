@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   findApiKeys,
   findCssProblems,
+  findHtmlSinks,
   findDeniedRemoteHosts,
   findHtmlProblems,
   findRemoteCodeInFile,
@@ -142,6 +143,36 @@ describe('findDeniedRemoteHosts', () => {
 
   it('does not flag API endpoints', () => {
     expect(findDeniedRemoteHosts(`"https://firebasevertexai.googleapis.com/v1beta"`)).toEqual([]);
+  });
+});
+
+describe('findHtmlSinks', () => {
+  it.each([
+    `el.innerHTML = html;`,
+    `el.innerHTML += '<b>x</b>';`,
+    `el['outerHTML'] = html;`,
+    `frame.srcdoc = html;`,
+    `el.insertAdjacentHTML('beforeend', html);`,
+    `range.createContextualFragment(html);`,
+    `el.setHTMLUnsafe(html);`,
+    `Document.parseHTMLUnsafe(html);`,
+    `document.write(html);`,
+    `document.writeln(html);`,
+    `new DOMParser().parseFromString(html, 'text/html');`,
+    `new window.DOMParser();`,
+  ])('flags %s', (code) => {
+    expect(findHtmlSinks(code)).not.toEqual([]);
+  });
+
+  it.each([
+    `el.textContent = text;`,
+    `const html = '<b>sample</b>';`,
+    `el.title = 'x';`,
+    `logger.write(text);`,
+    `const s = 'el.innerHTML = x';`,
+    `el.replaceChildren(document.createElement('li'));`,
+  ])('does not flag %s', (code) => {
+    expect(findHtmlSinks(code)).toEqual([]);
   });
 });
 

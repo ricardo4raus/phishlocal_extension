@@ -324,6 +324,61 @@ export function findRemoteCodeLoads(code: string, filename = 'input.js'): string
   return hits;
 }
 
+/** Properties that parse a string as HTML when assigned. */
+const HTML_SINK_PROPERTIES: readonly string[] = ['innerHTML', 'outerHTML', 'srcdoc'];
+/** Methods that parse a string as HTML. */
+const HTML_SINK_METHODS: readonly string[] = [
+  'insertAdjacentHTML',
+  'createContextualFragment',
+  'setHTMLUnsafe',
+  'parseHTMLUnsafe',
+];
+
+/**
+ * Finds places where a string is turned into HTML: `innerHTML`/`outerHTML`/`srcdoc` assignments,
+ * `insertAdjacentHTML()`, `createContextualFragment()`, `setHTMLUnsafe()`, `parseHTMLUnsafe()`,
+ * `document.write()` and `new DOMParser()`. Email content is attacker-controlled: in the extension
+ * it may only be shown as text (`textContent`) and parsed with parse5, which loads nothing.
+ * DOMParser is listed too: its documents can still fetch `<img>` and `<iframe>` resources, so a
+ * tracking pixel in a pasted email would fire.
+ */
+export function findHtmlSinks(code: string, filename = 'input.ts'): string[] {
+  const result = parseSync(filename, code, {
+    lang: langFor(filename),
+    sourceType: 'module',
+    preserveParens: false,
+  });
+  if (result.errors.length > 0) {
+    return [`could not parse ${filename}: ${result.errors[0]?.message ?? 'unknown error'}`];
+  }
+
+  const hits: string[] = [];
+  const hit = (what: string, node: Node): void => {
+    hits.push(`${what}: ${snippet(code.slice(node.start, node.end))}`);
+  };
+
+  walk(result.program, (node) => {
+    if (node.type === 'AssignmentExpression') {
+      const name = node.left.type === 'MemberExpression' ? propertyName(node.left) : undefined;
+      if (name && HTML_SINK_PROPERTIES.includes(name)) hit(`assigns HTML to ${name}`, node);
+    } else if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression') {
+      const method = propertyName(node.callee);
+      const object = node.callee.object;
+      if (method && HTML_SINK_METHODS.includes(method)) hit(`${method}() parses HTML`, node);
+      else if (
+        (method === 'write' || method === 'writeln') &&
+        object.type === 'Identifier' &&
+        object.name === 'document'
+      ) {
+        hit(`document.${method}() writes HTML`, node);
+      }
+    } else if (node.type === 'NewExpression' && globalName(node.callee) === 'DOMParser') {
+      hit('new DOMParser() (can load images; use parse5)', node);
+    }
+  });
+  return hits;
+}
+
 /**
  * Remote script hosts that Firebase (and Google SDKs in general) inject as `<script>` tags. These
  * must never be in the bundle: MV3 blocks them and they would break at runtime.
