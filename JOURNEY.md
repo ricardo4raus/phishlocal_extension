@@ -74,8 +74,9 @@ _Current state, updated as features land._
 - **The cloud path could not be tested:** with Gemini Nano available, `PREFER_ON_DEVICE` never
   uses the cloud. A development-only "Force cloud" switch (`ONLY_IN_CLOUD`) made App Check
   testable.
-- **Cold start through the SDK:** the first on-device prompt from the side panel took 314 s; the
-  same prompt in the cloud took 1.6 s. The demo needs a warmed-up model.
+- **On-device is far too slow from the side panel (open):** the same short prompt took 314 s on
+  the first run and 646 s on the second; the cloud took 1.6 s. So it is not only a cold start.
+  The cause is not known yet (slow session creation, slow inference, or the language options).
 
 ## What we learned
 
@@ -165,4 +166,5 @@ _To fill in near the submission._
   development-only "Force cloud" switch.
 - New test: the production build must not contain the debug token (checked with a planted token).
 - Tested in Chrome with a phishing sample: on-device (Gemini Nano) answered in 314.1 s on the
-  first run, the cloud answered in 1.6 s. App Check accepted the debug token.
+  first run and in 646.1 s on the second, the cloud answered in 1.6 s. App Check accepted the
+  debug token. Both paths work; the on-device speed is an open problem.
