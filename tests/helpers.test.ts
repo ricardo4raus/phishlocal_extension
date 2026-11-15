@@ -177,7 +177,6 @@ describe('htmlResources / findHtmlProblems', () => {
       `<script src="/a.js"></script>`,
       `<link rel="stylesheet" href='b.css'>`,
       `<img alt="a > b" src="c.png" data-src="https://lazy.example/x.png">`,
-      `<!-- <script src="https://commented.example/x.js"></script> -->`,
       `<script>1</script>`,
     ].join('');
     expect(htmlResources(html).map((r) => r.url)).toEqual(['/a.js', 'b.css', 'c.png']);
@@ -203,6 +202,11 @@ describe('htmlResources / findHtmlProblems', () => {
     `<script type="text/javascript">1</script>`,
     `<script type="importmap">{"imports":{"x":"https://cdn.example/x.js"}}</script>`,
     `<script>const sample = '<script src="https://evil.example/x.js">';</script>`,
+    // HTML comments are scanned too; regex stripping cannot match how browsers end comments
+    `<!-- <script src="https://commented.example/x.js"></script> -->`,
+    `<!--> <script src="https://evil.example/x.js"></script> -->`,
+    `<!---> <script src="https://evil.example/x.js"></script> -->`,
+    `<! <!-- > <script src="https://evil.example/x.js"></script> -->`,
   ])('flags %s', (html) => {
     expect(findHtmlProblems(html)).not.toEqual([]);
   });

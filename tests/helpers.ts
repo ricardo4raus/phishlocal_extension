@@ -383,7 +383,12 @@ const TAG_REGEX = /<([a-z][a-z\d-]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/gi;
 // `(?:^|\s)` so `data-src` is not read as `src`.
 const ATTR_REGEX = /(?:^|\s)([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
 
-const stripHtmlComments = (html: string): string => html.replace(/<!--[\s\S]*?-->/g, '');
+/*
+ * HTML comments are deliberately NOT removed before scanning. A regex cannot remove them the way
+ * the browser parses them (`<!-->` is a complete, empty comment; a bogus comment `<!x>` ends at the
+ * first `>`), so stripping could hide a script that the browser runs. Scanning comments too is
+ * stricter: a commented-out remote script is reported, and the fix is to delete the comment.
+ */
 
 const INLINE_BLOCK_REGEX = /<(script|style)\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/\1\s*>/gi;
 
@@ -406,7 +411,7 @@ interface HtmlResource {
 export function htmlResources(html: string): HtmlResource[] {
   const resources: HtmlResource[] = [];
   // Drop inline script/style contents first: tags inside JS strings are data, not elements.
-  const markup = stripHtmlComments(html).replace(INLINE_BLOCK_REGEX, '<$1$2></$1>');
+  const markup = html.replace(INLINE_BLOCK_REGEX, '<$1$2></$1>');
   for (const match of markup.matchAll(TAG_REGEX)) {
     const tag = (match[1] ?? '').toLowerCase();
     const attrs = parseAttributes(match[2] ?? '');
@@ -441,9 +446,7 @@ export function findHtmlProblems(html: string): string[] {
       problems.push(`<${tag} ${attr}> loads non-local URL ${snippet(url)}`);
     }
   }
-  for (const [, kind = '', attrs = '', code = ''] of stripHtmlComments(html).matchAll(
-    INLINE_BLOCK_REGEX,
-  )) {
+  for (const [, kind = '', attrs = '', code = ''] of html.matchAll(INLINE_BLOCK_REGEX)) {
     if (code.trim() === '') continue;
     if (kind.toLowerCase() === 'style') {
       problems.push(...findCssRemoteUrls(code).map((hit) => `inline <style>: ${hit}`));
