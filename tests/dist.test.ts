@@ -6,8 +6,9 @@
  * shipped extension. `npm run check` and CI run build before test, so dist is fresh there.
  * To run only the fast source tests locally: `npx vitest run tests/manifest.test.ts tests/source-structure.test.ts`.
  */
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, extname, join, posix } from 'node:path';
+import { parseEnv as parseDotenv } from 'node:util';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   type Manifest,
@@ -18,7 +19,6 @@ import {
   htmlResources,
   isNonLocalUrl,
   normalizeInside,
-  parseEnv,
   readJson,
   readText,
   sorted,
@@ -36,8 +36,25 @@ const distManifestPath = join(distDir, 'manifest.json');
  */
 const BUILD_INPUTS = ['manifest.json', 'vite.config.ts', 'tsconfig.json', 'package-lock.json'];
 
-/** The .env files Vite reads for a production build. */
-const ENV_FILES = ['.env', '.env.local', '.env.production', '.env.production.local'];
+const DEBUG_TOKEN_KEY = 'VITE_APPCHECK_DEBUG_TOKEN';
+
+/**
+ * Every debug token value a build could see: any `.env*` file in the repo root (whatever the
+ * build mode) except the template, plus the OS environment, which Vite also reads. Files are
+ * parsed with `node:util` `parseEnv`, the same parser Vite uses (`export KEY=…`, multi-line values).
+ */
+function localDebugTokens(): string[] {
+  const envFiles = readdirSync(fromRoot(), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.startsWith('.env'))
+    .filter((entry) => entry.name !== '.env.example')
+    .map((entry) => fromRoot(entry.name));
+  return [
+    ...envFiles.map((file) => parseDotenv(readText(file))[DEBUG_TOKEN_KEY]),
+    process.env[DEBUG_TOKEN_KEY],
+  ]
+    .map((value) => value?.trim() ?? '')
+    .filter((value) => value !== '');
+}
 
 let manifest: Manifest;
 let sourceManifest: Manifest;
@@ -213,11 +230,7 @@ describe('dist/ build output', () => {
     // Vite copies every VITE_* value the code reads into the bundle. The debug token is a secret,
     // so the source reads it only in dev builds. This checks a production build really drops it.
     // Without a local token (e.g. in CI) there is nothing to look for.
-    const tokens = ENV_FILES.filter((file) => existsSync(fromRoot(file)))
-      .flatMap((file) => parseEnv(readText(fromRoot(file))))
-      .filter((entry) => entry.key === 'VITE_APPCHECK_DEBUG_TOKEN')
-      .map((entry) => entry.value ?? '')
-      .filter((value) => value !== '');
+    const tokens = localDebugTokens();
 
     // Only file names in the output: a failure message must not leak the token.
     const leaks = files
