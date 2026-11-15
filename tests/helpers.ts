@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, posix, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { type Dependency, transform, transformStyleAttribute, type Warning } from 'lightningcss';
 import { type DefaultTreeAdapterTypes, parse } from 'parse5';
 import { type ESTree, parseSync } from 'vite';
 
@@ -353,24 +354,44 @@ export function findDeniedRemoteHosts(text: string): string[] {
 
 /* ------------------------------------------------------------------------------------------------
  * CSS
+ *
+ * Read with lightningcss (the CSS parser Vite uses), so the check sees every `@import` and `url()`
+ * the way the browser does: also with CSS escapes (`u\72l(…)`), `/*` inside strings and
+ * `image-set("…")`. Regexes missed all three. CSS that lightningcss cannot parse is reported as a
+ * problem, because the browser might still load URLs from it.
  * --------------------------------------------------------------------------------------------- */
 
-/** `@import` and `url()` references that point outside the package (`data:` is allowed). */
-export function findCssRemoteUrls(css: string): string[] {
-  const text = css.replace(/\/\*[\s\S]*?\*\//g, '');
-  const hits: string[] = [];
-  const patterns = [
-    /@import\s+(["'])([^"']*)\1/gi, // quoted form; `@import url(…)` is matched by the url() rule
-    /url\(\s*(["']?)([^"')]*?)\1\s*\)/gi,
+function cssResultProblems(dependencies: Dependency[] | void, warnings: Warning[]): string[] {
+  const urls = (dependencies ?? []).flatMap((dependency) =>
+    dependency.type === 'import' || dependency.type === 'url'
+      ? [{ kind: dependency.type === 'import' ? '@import' : 'url()', url: dependency.url }]
+      : [],
+  );
+  return [
+    ...urls
+      .filter(({ url }) => isNonLocalUrl(url) && !isDataUrl(url))
+      .map(({ kind, url }) => `CSS ${kind} loads non-local URL ${snippet(url)}`),
+    ...warnings.map((warning) => `CSS that cannot be parsed: ${snippet(warning.message)}`),
   ];
-  for (const regex of patterns) {
-    for (const match of text.matchAll(regex)) {
-      const url = match[2] ?? '';
-      if (isNonLocalUrl(url) && !isDataUrl(url))
-        hits.push(`non-local CSS URL: ${snippet(match[0])}`);
-    }
+}
+
+/**
+ * Problems in CSS: `@import` and `url()` that point outside the package (`data:` is allowed), and
+ * CSS that cannot be parsed. `inline` is for a `style` attribute (declarations only).
+ */
+export function findCssProblems(css: string, { inline = false } = {}): string[] {
+  const options = {
+    filename: 'checked.css',
+    code: new TextEncoder().encode(css),
+    analyzeDependencies: true,
+    errorRecovery: true,
+  };
+  try {
+    const result = inline ? transformStyleAttribute(options) : transform(options);
+    return cssResultProblems(result.dependencies, result.warnings);
+  } catch (error) {
+    return [`CSS that cannot be parsed: ${snippet(String(error))}`];
   }
-  return hits;
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -502,14 +523,18 @@ export function findHtmlProblems(html: string): string[] {
   for (const element of elements) {
     const tag = element.tagName;
     const style = attribute(element, 'style');
-    if (style) problems.push(...findCssRemoteUrls(style).map((hit) => `<${tag} style>: ${hit}`));
+    if (style) {
+      problems.push(
+        ...findCssProblems(style, { inline: true }).map((hit) => `<${tag} style>: ${hit}`),
+      );
+    }
     const srcdoc = tag === 'iframe' ? attribute(element, 'srcdoc') : undefined;
     if (srcdoc) problems.push(...findHtmlProblems(srcdoc).map((hit) => `<iframe srcdoc>: ${hit}`));
 
     const code = textOf(element);
     if (code.trim() === '') continue;
     if (tag === 'style') {
-      problems.push(...findCssRemoteUrls(code).map((hit) => `inline <style>: ${hit}`));
+      problems.push(...findCssProblems(code).map((hit) => `inline <style>: ${hit}`));
     } else if (
       tag === 'script' &&
       isExecutedScriptType(attribute(element, 'type')?.trim().toLowerCase() ?? '')
@@ -531,7 +556,7 @@ export function findHtmlProblems(html: string): string[] {
 export function findRemoteCodeInFile(filename: string, text: string): string[] {
   if (/\.(?:[cm]?[jt]sx?)$/i.test(filename)) return findRemoteCodeLoads(text, filename);
   if (/\.html?$/i.test(filename)) return findHtmlProblems(text);
-  if (/\.css$/i.test(filename)) return findCssRemoteUrls(text);
+  if (/\.css$/i.test(filename)) return findCssProblems(text);
   return [];
 }
 

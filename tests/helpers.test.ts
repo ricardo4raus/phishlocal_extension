@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   findApiKeys,
-  findCssRemoteUrls,
+  findCssProblems,
   findDeniedRemoteHosts,
   findHtmlProblems,
   findRemoteCodeInFile,
@@ -145,15 +145,25 @@ describe('findDeniedRemoteHosts', () => {
   });
 });
 
-describe('findCssRemoteUrls', () => {
+describe('findCssProblems', () => {
   it.each([
     `@import url("https://fonts.googleapis.com/css2?family=Inter");`,
     `@import 'https://cdn.example/a.css';`,
     `@import url(//cdn.example/a.css);`,
     `body { background: url(https://tracker.example/p.gif) }`,
     `body { background: url( 'http://x.example/a.png' ) }`,
+    `@font-face { font-family: x; src: url(https://cdn.example/f.woff2) }`,
+    `:root { --bg: url(https://tracker.example/p.gif) }`,
+    // Tricks that fooled the earlier regex version.
+    String.raw`body { background: u\72l(https://tracker.example/p.gif) }`,
+    String.raw`body { background: url(https\3a //tracker.example/p.gif) }`,
+    `p { content: "/*" } body { background: url(https://tracker.example/p.gif) } /* */`,
+    `body { background-image: image-set("https://tracker.example/p.gif" 1x) }`,
+    `body { background: url(https://tracker.example/p.gif)`,
+    // CSS that cannot be parsed is reported: the browser might still load URLs from it.
+    `background: url(./local.png)`,
   ])('flags %s', (css) => {
-    expect(findCssRemoteUrls(css)).not.toEqual([]);
+    expect(findCssProblems(css)).not.toEqual([]);
   });
 
   it.each([
@@ -162,12 +172,21 @@ describe('findCssRemoteUrls', () => {
     `body { background: url(/assets/bg.png) }`,
     `i { background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'/>") }`,
     `/* url(https://commented.example/x.png) */ p { color: red }`,
+    `@font-face { font-family: x; src: url(./f.woff2) }`,
+    `p { content: "https://example.com" }`,
   ])('does not flag %s', (css) => {
-    expect(findCssRemoteUrls(css)).toEqual([]);
+    expect(findCssProblems(css)).toEqual([]);
   });
 
   it('reports @import url(…) once', () => {
-    expect(findCssRemoteUrls(`@import url("https://fonts.example/a.css");`)).toHaveLength(1);
+    expect(findCssProblems(`@import url("https://fonts.example/a.css");`)).toHaveLength(1);
+  });
+
+  it('reads a style attribute as declarations', () => {
+    expect(findCssProblems('color: red; background: url(./a.png)', { inline: true })).toEqual([]);
+    expect(
+      findCssProblems('background: url(https://x.example/a.png)', { inline: true }),
+    ).not.toEqual([]);
   });
 });
 
@@ -222,6 +241,8 @@ describe('htmlResources / findHtmlProblems', () => {
     // Other places that load resources.
     `<template><img src="https://tracker.example/pixel.gif"></template>`,
     `<div style="background: url(https://tracker.example/pixel.gif)"></div>`,
+    String.raw`<div style="background: u\72l(https://tracker.example/pixel.gif)"></div>`,
+    String.raw`<style>body { background: u\72l(https://tracker.example/pixel.gif) }</style>`,
     `<iframe srcdoc="<script src='https://evil.example/x.js'></script>"></iframe>`,
     `<svg><image href="https://tracker.example/pixel.gif"></image></svg>`,
     `<svg><image href="./a.png" xlink:href="https://tracker.example/pixel.gif"></image></svg>`,
