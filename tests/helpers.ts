@@ -375,14 +375,12 @@ export function findCssRemoteUrls(css: string): string[] {
 
 /* ------------------------------------------------------------------------------------------------
  * HTML
- * --------------------------------------------------------------------------------------------- */
-
-/*
- * HTML is read with parse5, a parser that follows the HTML standard, so the check sees exactly the
+ *
+ * Read with parse5, a parser that follows the HTML standard, so the check sees exactly the
  * elements and attribute values the browser sees. Regexes could not: comments (`<!-->`), fake
  * opening tags in comments or attribute values, unquoted values with quotes, and character
  * references (`https&#58;//`) all let a remote script slip through earlier versions.
- */
+ * --------------------------------------------------------------------------------------------- */
 
 type HtmlElement = DefaultTreeAdapterTypes.Element;
 type HtmlParent = DefaultTreeAdapterTypes.ParentNode;
