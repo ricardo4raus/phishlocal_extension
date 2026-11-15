@@ -6,6 +6,7 @@ import {
   findApiKeys,
   findRemoteCodeInFile,
   fromRoot,
+  parseEnv,
   readText,
   repoRoot,
   toPosixRelative,
@@ -35,21 +36,6 @@ const FIREBASE_ENV_KEYS = [
 
 /** Paths that must be git-ignored (checked with `git check-ignore`, so any pattern style works). */
 const MUST_BE_IGNORED = ['dist/x', 'node_modules/x', '.env', '.env.local', '.env.production.local'];
-
-/** Non-empty, non-comment lines of a text file (CRLF-safe). */
-const meaningfulLines = (text: string): string[] =>
-  text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line !== '' && !line.startsWith('#'));
-
-/** dotenv-style value: strips an inline ` # comment` and one pair of surrounding quotes. */
-function envValue(raw: string): string {
-  const trimmed = raw.trim();
-  const quoted = /^(["'])(.*)\1(?:\s+#.*)?$/.exec(trimmed);
-  if (quoted) return quoted[2] ?? '';
-  return trimmed.replace(/(?:^|\s+)#.*$/, '').trim();
-}
 
 function git(args: string[]): string {
   return execFileSync('git', args, { cwd: fromRoot(), encoding: 'utf8', stdio: 'pipe' });
@@ -82,12 +68,7 @@ describe('LICENSE', () => {
 });
 
 describe('.env.example', () => {
-  const entries = meaningfulLines(readText(fromRoot('.env.example'))).map((line) => {
-    const eq = line.indexOf('=');
-    return eq === -1
-      ? { key: line, value: undefined }
-      : { key: line.slice(0, eq).trim(), value: envValue(line.slice(eq + 1)) };
-  });
+  const entries = parseEnv(readText(fromRoot('.env.example')));
 
   const keys = entries.map((entry) => entry.key);
 
