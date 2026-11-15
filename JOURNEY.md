@@ -96,7 +96,7 @@ _Current state, updated as features land._
   DevTools gets focus, so that field could not be measured yet.
 - **No `innerText` in tests:** jsdom has no layout, so `innerText` is undefined there. The code
   keeps the real `innerText` (which skips hidden text, a common phishing trick); the tests use a
-  small stand-in, and the hidden-text behaviour was checked in Chrome.
+  small stand-in. Hidden text in a real Gmail email still has to be checked in Chrome.
 
 ## What we learned
 
