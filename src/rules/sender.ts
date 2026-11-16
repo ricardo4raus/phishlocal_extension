@@ -1,11 +1,12 @@
 /*
  * Sender rules: does the sender name promise someone the address does not belong to?
  *
- * This replaces a Reply-To check: Gmail's page does not show Reply-To (only its details box
- * does), so the rules use what every path has, the sender name and address.
+ * Every path has the sender name and address; Reply-To and the sender checks need the raw email
+ * and live in `headers.ts`.
  */
 import type { Email } from '../email';
 import { BRANDS } from './brands';
+import { companyRelation } from './company';
 import { domainsInText, type Host, hostOfAddress, isInternational } from './domains';
 import { clip, type Finding } from './types';
 import { normalizeText, wordsPattern } from './words';
@@ -30,21 +31,6 @@ export function checkSender(sender: Email['sender']): Finding[] {
   return [...findings, ...checkSenderName(sender.name, host, evidence)];
 }
 
-/**
- * How a domain in the sender name relates to the sender's domain: `same` company (same domain,
- * or two domains of one listed brand such as "PayPal.de" for paypal.com), the `same-name` with
- * another ending ("Shop.ch" for shop.de: often the same company, sometimes a fake), or `other`.
- */
-function relation(shown: Host, sender: Host): 'same' | 'same-name' | 'other' {
-  const a = shown.domain;
-  const b = sender.domain;
-  if (a === b) return 'same';
-  if (a && b && BRANDS.some((brand) => brand.domains.includes(a) && brand.domains.includes(b))) {
-    return 'same';
-  }
-  return shown.label !== undefined && shown.label === sender.label ? 'same-name' : 'other';
-}
-
 function checkSenderName(rawName: string, host: Host, evidence: string[]): Finding[] {
   const name = normalizeText(rawName);
   const domain = host.domain ?? host.hostname;
@@ -52,7 +38,10 @@ function checkSenderName(rawName: string, host: Host, evidence: string[]): Findi
   const findings: Finding[] = [];
 
   // "service@paypal.com <x@evil.example>": the name shows another company's address or domain.
-  const shown = domainsInText(name).map((named) => ({ named, relation: relation(named, host) }));
+  const shown = domainsInText(name).map((named) => ({
+    named,
+    relation: companyRelation(named, host),
+  }));
   const other = shown.find((entry) => entry.relation === 'other')?.named;
   if (other) {
     return [

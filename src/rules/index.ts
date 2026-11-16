@@ -3,6 +3,7 @@
  * their findings will be fed into the AI prompt.
  */
 import type { Email } from '../email';
+import { checkHeaders } from './headers';
 import { checkLinks } from './links';
 import { checkLookalikes } from './lookalike';
 import { checkPhrases } from './phrases';
@@ -20,6 +21,7 @@ const ORDER: Record<Severity, number> = { danger: 0, warning: 1, info: 2 };
 /** All findings for an email: the most severe first, each one once. */
 export function checkEmail(email: Email): Finding[] {
   const findings = [
+    ...checkHeaders(email),
     ...checkSender(email.sender),
     ...checkLookalikes(email),
     ...checkLinks(email.links),
