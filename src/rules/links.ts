@@ -51,7 +51,8 @@ function checkLink(link: EmailLink): Finding[] {
     findings.push({
       rule: 'hidden-link-target',
       severity: 'danger',
-      message: `A link starts with "${clip(url.username)}@", but it really goes to ${url.hostname}.`,
+      // The text before the "@" stays in the evidence only: it is attacker text.
+      message: `A link hides its real target behind an "@": it goes to ${url.hostname}.`,
       evidence: [href],
     });
   }

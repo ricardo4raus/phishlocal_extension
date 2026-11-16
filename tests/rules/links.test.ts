@@ -19,8 +19,16 @@ describe('checkLinks', () => {
     const [finding] = checkLinks([
       { text: 'Log in', href: 'https://bank.example@evil.example/login' },
     ]);
-    expect(finding).toMatchObject({ rule: 'hidden-link-target', severity: 'danger' });
-    expect(finding?.message).toContain('really goes to evil.example');
+    expect(finding).toEqual({
+      rule: 'hidden-link-target',
+      severity: 'danger',
+      message: 'A link hides its real target behind an "@": it goes to evil.example.',
+      evidence: ['https://bank.example@evil.example/login'],
+    });
+    // Only a password before the "@": the message still reads well.
+    expect(checkLinks([{ text: 'x', href: 'https://:pw@evil.example/' }])[0]?.message).toBe(
+      'A link hides its real target behind an "@": it goes to evil.example.',
+    );
   });
 
   it('flags IP addresses and international domains', () => {
