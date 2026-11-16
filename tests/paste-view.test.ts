@@ -137,6 +137,16 @@ describe('paste area', () => {
     expect(elements.use.disabled).toBe(false);
   });
 
+  it('drops a reading that finishes after Clear', async () => {
+    paste(['From: a@x.example', 'Received: x', 'Subject: Old', '', 'Old email'].join('\r\n'));
+    elements.use.click();
+    elements.clear.click();
+    expect(elements.use.disabled).toBe(false);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(onEmail).not.toHaveBeenCalled();
+    expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
   it('loads the raw sample with its headers', async () => {
     elements.sample.value = 'phishing-raw-dmarc-en';
     await click(elements.loadSample);

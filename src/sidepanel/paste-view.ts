@@ -46,18 +46,26 @@ export function setUpPaste(elements: PasteElements, callbacks: PasteCallbacks): 
     elements.sample.append(option);
   }
 
+  /** Counts readings; Clear also counts, so a reading that finishes after Clear is dropped. */
+  let reading = 0;
+  const setBusy = (busy: boolean): void => {
+    elements.use.disabled = busy;
+    elements.loadSample.disabled = busy;
+  };
+
   /** Reads the input (raw source takes a moment) and reports the email or the error. */
   const show = async (input: PastedEmail, status: (raw: boolean) => string): Promise<void> => {
-    elements.use.disabled = true;
-    elements.loadSample.disabled = true;
+    const current = ++reading;
+    setBusy(true);
     try {
       const { email, raw } = await readPaste(input);
-      callbacks.onEmail(email, status(raw));
+      if (current === reading) callbacks.onEmail(email, status(raw));
     } catch (error) {
-      callbacks.onError(error instanceof Error ? error.message : String(error));
+      if (current === reading) {
+        callbacks.onError(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      elements.use.disabled = false;
-      elements.loadSample.disabled = false;
+      if (current === reading) setBusy(false);
     }
   };
 
@@ -95,6 +103,8 @@ export function setUpPaste(elements: PasteElements, callbacks: PasteCallbacks): 
     elements.text.value = '';
     elements.sample.value = '';
     pastedHtml = undefined;
+    reading++;
+    setBusy(false);
     callbacks.onClear();
   });
 }
