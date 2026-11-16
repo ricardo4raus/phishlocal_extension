@@ -298,7 +298,8 @@ _To fill in near the submission._
 - parse5 moved from a development to a runtime dependency; the side panel bundle grew from
   69 KB to 226 KB, which is fine for a local extension.
 - Tested in Chrome: the samples load and show the real link targets; an email copied from Gmail
-  and pasted shows its links with the real `c.gle` targets; Clear empties everything. The long
+  and pasted shows its links with the real `c.gle` targets; Clear empties everything. The side
+  panel's Network tab stayed empty during a paste with images, so no tracking pixel fired. The long
   tracking URLs make the link list hard to read; shortening them is planned for 20 Nov.
 - Review of the branch: links from an earlier paste stuck to new text when the field was emptied
   and refilled. Fixed, with a test that fails without the fix.
