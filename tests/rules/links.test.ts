@@ -55,6 +55,25 @@ describe('checkLinks', () => {
     expect(rulesFor('www.bank.example', 'https://bank.example/')).toEqual([]);
   });
 
+  it('compares the link text with the target a link forwards to', () => {
+    const [finding] = checkLinks([
+      { text: 'google.com', href: 'https://www.google.com/url?q=https://evil.example/login' },
+    ]);
+    expect(finding).toMatchObject({
+      rule: 'link-text-mismatch',
+      severity: 'warning',
+      message:
+        'The link text says google.com, but the link forwards to evil.example (through www.google.com).',
+    });
+    // Outlook safe links that forward to the promised domain are fine.
+    expect(
+      rulesFor(
+        'bank.example',
+        'https://eur01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.bank.example%2F',
+      ),
+    ).toEqual([]);
+  });
+
   it('only notes a redirect service (real emails use them too)', () => {
     expect(rulesFor('debattr.com', 'https://c.gle/AGSJx')).toEqual(['redirect-link:info']);
     expect(

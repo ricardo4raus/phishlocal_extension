@@ -2,7 +2,7 @@
  * Link rules: what a link really does, compared with what its text promises.
  */
 import type { EmailLink } from '../email';
-import { domainsInText, hostOf, parseUrl } from './domains';
+import { domainsInText, forwardTarget, hostOf, parseUrl } from './domains';
 import { clip, type Finding } from './types';
 
 /** Schemes that run code or open local files instead of a web page. */
@@ -74,7 +74,24 @@ function checkLink(link: EmailLink): Finding[] {
 
   // Only link texts that name a domain promise a target ("paypal.com", not "Click here").
   const promised = domainsInText(link.text)[0];
-  if (promised?.domain && host.domain && promised.domain !== host.domain) {
+  if (!promised?.domain || !host.domain) return findings;
+
+  // A link that forwards elsewhere through a parameter: compare the text with the final target.
+  const forward = forwardTarget(url);
+  const final = forward && hostOf(forward.hostname);
+  if (final?.domain && final.domain !== host.domain) {
+    if (final.domain !== promised.domain) {
+      findings.push({
+        rule: 'link-text-mismatch',
+        severity: 'warning',
+        message: `The link text says ${promised.hostname}, but the link forwards to ${final.hostname} (through ${url.hostname}).`,
+        evidence: [clip(link.text), href],
+      });
+    }
+    return findings;
+  }
+
+  if (promised.domain !== host.domain) {
     findings.push(
       isRedirect(url.hostname)
         ? {

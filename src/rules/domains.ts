@@ -53,6 +53,24 @@ export function parseUrl(href: string): URL | undefined {
   }
 }
 
+/** Upper limit for query parameters inspected per link. */
+const MAX_PARAMETERS = 20;
+
+/**
+ * The web address a link forwards to through a query parameter, e.g. the `q` in
+ * `https://www.google.com/url?q=https://evil.example/`. Attackers abuse such forwarding
+ * ("open redirect") on trusted domains so that the visible domain looks harmless.
+ */
+export function forwardTarget(url: URL): URL | undefined {
+  let checked = 0;
+  for (const value of url.searchParams.values()) {
+    if (++checked > MAX_PARAMETERS) break;
+    const target = /^\s*https?:\/\//i.test(value) ? parseUrl(value) : undefined;
+    if (target) return target;
+  }
+  return undefined;
+}
+
 /** The host of an email address (`a@bank.example`), if it has a registrable domain. */
 export function hostOfAddress(address: string): Host | undefined {
   const at = address.lastIndexOf('@');

@@ -53,6 +53,12 @@ describe('checkLookalikes', () => {
     ]);
   });
 
+  it('checks the target a link forwards to', () => {
+    expect(found(email('', [link('https://www.google.com/url?q=https://paypa1.com/')]))).toEqual([
+      'lookalike-domain:paypa1.com',
+    ]);
+  });
+
   it('warns about a brand name with a different ending', () => {
     expect(
       checkLookalikes(

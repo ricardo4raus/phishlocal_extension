@@ -8,7 +8,14 @@
  */
 import type { Email } from '../email';
 import { BRAND_DOMAINS, BRANDS } from './brands';
-import { domainsInText, type Host, hostOf, hostOfAddress, parseUrl } from './domains';
+import {
+  domainsInText,
+  forwardTarget,
+  type Host,
+  hostOf,
+  hostOfAddress,
+  parseUrl,
+} from './domains';
 import { clip, type Finding, type Severity } from './types';
 
 /** Shorter names match too much by chance ("post", "mail"). */
@@ -85,9 +92,11 @@ function candidatesOf(email: Email, sender: Host | undefined): Host[] {
   if (sender) hosts.set(sender.hostname, sender);
   for (const link of email.links) {
     const url = parseUrl(link.href);
-    if (url && (url.protocol === 'https:' || url.protocol === 'http:')) {
-      const host = hostOf(url.hostname);
-      if (host.domain && !hosts.has(host.hostname)) hosts.set(host.hostname, host);
+    if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) continue;
+    // The link's own host and, for forwarding links, the final target.
+    for (const target of [url, forwardTarget(url)]) {
+      const host = target && hostOf(target.hostname);
+      if (host?.domain && !hosts.has(host.hostname)) hosts.set(host.hostname, host);
     }
   }
   return [...hosts.values()];

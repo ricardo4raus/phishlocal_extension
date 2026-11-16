@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_DOMAINS_IN_TEXT,
   domainsInText,
+  forwardTarget,
   hostOf,
   hostOfAddress,
   parseUrl,
@@ -33,6 +34,21 @@ describe('parseUrl', () => {
     expect(parseUrl(' https://PayPal.COM/x ')?.hostname).toBe('paypal.com');
     expect(parseUrl('https://päypal.com/')?.hostname).toBe('xn--pypal-gra.com');
     expect(parseUrl('not a url')).toBeUndefined();
+  });
+});
+
+const target = (href: string): string | undefined => forwardTarget(new URL(href))?.hostname;
+
+describe('forwardTarget', () => {
+  it('finds the address a link forwards to', () => {
+    expect(target('https://www.google.com/url?sa=t&q=https://evil.example/x')).toBe('evil.example');
+    expect(target('https://t.example/c?u=HTTPS%3A%2F%2Fevil.example')).toBe('evil.example');
+  });
+
+  it('ignores other parameters and stops after 20', () => {
+    expect(target('https://shop.example/?id=42&ref=mail')).toBeUndefined();
+    const many = Array.from({ length: 20 }, (_, i) => `p${i}=x`).join('&');
+    expect(target(`https://shop.example/?${many}&u=https://evil.example`)).toBeUndefined();
   });
 });
 
