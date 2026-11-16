@@ -69,7 +69,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
   domains, sender name vs address, pressure phrases (en/de/fr/es), invisible characters and
   mixed alphabets, and the side panel lists the findings. Registrable domains
   come from tldts (Public Suffix List, runtime dependency since 16 Nov 2026). `brands.ts` lists
-  real brands as reference data only. No AI check of the email yet.
+  real brands as reference data only. No AI check of the email yet. Every rule is documented in
+  `docs/rules.md`; keep it in sync when a rule changes.
 - The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow

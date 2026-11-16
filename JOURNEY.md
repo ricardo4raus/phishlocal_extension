@@ -47,9 +47,11 @@ _Current state, updated as features land._
   load with one click.
 - Rule checks (no AI, on-device, in milliseconds) list red flags for every email read or pasted:
   links that run code or hide their target, link text that names a different domain than the
-  real target, lookalike domains (`paypa1.com`, `paypal.com.secure-login.example`), a sender
-  name that claims another domain or brand, and pressure phrases in English, German, French and
-  Spanish.
+  real target (also behind forwarding links such as `google.com/url?q=…`), lookalike domains
+  (`paypa1.com`, `paypal.support`, `paypal.com.secure-login.example`), a sender name that claims
+  another domain or brand, invisible characters and lookalike letters from other alphabets, and
+  pressure phrases in English, German, French and Spanish. All rules are listed in
+  [`docs/rules.md`](docs/rules.md).
 
 ## How we built it
 
@@ -347,4 +349,7 @@ _To fill in near the submission._
   harmless sentences ("we will never ask for your card number") got warnings, a company's own
   domains in the sender name were "danger", "no red flags" sounded like "safe", and a failing
   rule showed a wrong error. The next review round found that one fix hid a case completely;
-  it is a note now.
+  it is a note now. The round after that found that a forwarding link's final target skipped
+  the IP and international-letter checks; fixed too.
+- Documentation: a README with features, privacy, setup and checks, and `docs/rules.md` with
+  every rule, its severity, its reason and its limits.

@@ -60,6 +60,8 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 ## Phase 6 · Submission
 
 - [ ] Fri 27.11. – README: setup, how it works, how Firebase AI Logic is used
+      (first version with features, privacy, setup and checks written Mon 16.11; finish it
+      with the AI check, the consent flow and judge testing instructions)
 - [ ] Sat 28.11. – Demo video (max 3 min, English, public on YouTube, app running in Chrome;
       warm up the model before recording); Devpost description; thumbnail (3:2)
 - [ ] Sun 29.11. – Submit on Devpost, double-check every requirement
