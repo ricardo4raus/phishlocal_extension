@@ -3,29 +3,11 @@
  */
 import type { EmailLink } from '../email';
 import { domainsInText, forwardTarget, hostOf, isInternational, parseUrl } from './domains';
+import { isRedirect } from './services';
 import { clip, type Finding } from './types';
 
 /** Schemes that run code or open local files instead of a web page. */
 const DANGEROUS_SCHEMES = new Set(['javascript:', 'data:', 'file:', 'vbscript:']);
-
-/**
- * Redirect and link-protection services. Real emails use them too (Google's `c.gle`, Outlook's
- * safe links), so a mismatch behind one is only info: the final target is simply unknown.
- */
-const REDIRECT_HOSTS = [
-  'c.gle',
-  't.co',
-  'bit.ly',
-  'tinyurl.com',
-  'ow.ly',
-  'lnkd.in',
-  'safelinks.protection.outlook.com',
-  'urldefense.com',
-  'urldefense.proofpoint.com',
-];
-
-const isRedirect = (hostname: string): boolean =>
-  REDIRECT_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
 
 function checkLink(link: EmailLink): Finding[] {
   const url = parseUrl(link.href);
