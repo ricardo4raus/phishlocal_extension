@@ -353,3 +353,8 @@ _To fill in near the submission._
   the IP and international-letter checks; fixed too.
 - Documentation: a README with features, privacy, setup and checks, and `docs/rules.md` with
   every rule, its severity, its reason and its limits.
+- Tested the rule checks in Chrome: the three samples, three hand-written pastes (lookalike
+  sender and brand in front of another domain, a forwarding link through google.com, a German
+  email with an IP link and a fake sender name) and the real Google email. Every result matched
+  the expected list line by line; the Google email with its `c.gle` links got only one note.
+  Danger and warning labels are readable in dark mode.
