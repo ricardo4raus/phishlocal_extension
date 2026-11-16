@@ -1,4 +1,11 @@
-import { type Email, isReadEmailResponse, READ_EMAIL, type ReadEmailRequest } from '../email';
+import {
+  type AuthResults,
+  type Email,
+  isReadEmailResponse,
+  type Mailbox,
+  READ_EMAIL,
+  type ReadEmailRequest,
+} from '../email';
 
 export type ReadResult = { ok: true; email: Email } | { ok: false; message: string };
 
@@ -45,15 +52,44 @@ export interface EmailElements {
   details: HTMLElement;
   sender: HTMLElement;
   subject: HTMLElement;
+  auth: HTMLElement;
+  headerRows: HTMLElement;
+  replyTo: HTMLElement;
+  returnPath: HTMLElement;
   links: HTMLUListElement;
   body: HTMLElement;
 }
 
+/** Where to get the headers when the email was read without them. */
+export const HEADERS_HINT =
+  'Not available. For the full check with SPF, DKIM and DMARC: in Gmail, open ⋮ → Show original → ' +
+  'Copy to clipboard, then paste it under "Or paste an email".';
+
+const mailbox = ({ name, address }: Mailbox): string =>
+  name && address ? `${name} <${address}>` : name || address || '–';
+
+/** "SPF pass · DKIM pass (shop.example) · DMARC pass, checked by mx.example". */
+export function authSummary(auth: AuthResults | undefined): string {
+  if (!auth) return 'None in the headers: the sender cannot be verified.';
+  const dkim =
+    auth.dkim.length === 0
+      ? 'none'
+      : auth.dkim
+          .map((entry) => (entry.domain ? `${entry.result} (${entry.domain})` : entry.result))
+          .join(', ');
+  return `SPF ${auth.spf ?? 'none'} · DKIM ${dkim} · DMARC ${auth.dmarc ?? 'none'}, checked by ${auth.server}`;
+}
+
 /** Shows the email. Only as text (`textContent`): email content may come from an attacker. */
 export function showEmail(email: Email, elements: EmailElements): void {
-  const { name, address } = email.sender;
-  elements.sender.textContent = name && address ? `${name} <${address}>` : name || address || '–';
+  elements.sender.textContent = mailbox(email.sender);
   elements.subject.textContent = email.subject || '–';
+
+  const { headers } = email;
+  elements.auth.textContent = headers ? authSummary(headers.auth) : HEADERS_HINT;
+  elements.headerRows.hidden = !headers;
+  elements.replyTo.textContent = headers?.replyTo.map(mailbox).join(', ') || '–';
+  elements.returnPath.textContent = headers?.returnPath || '–';
 
   elements.links.replaceChildren(
     ...email.links.map((link) => {
