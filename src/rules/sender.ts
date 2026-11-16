@@ -31,49 +31,58 @@ export function checkSender(sender: Email['sender']): Finding[] {
 }
 
 /**
- * True if both hosts belong to the same company: same domain, same name with another ending
- * ("PayPal.de" for paypal.com, "Shop.ch" for shop.de) or two domains of one listed brand.
+ * How a domain in the sender name relates to the sender's domain: `same` company (same domain,
+ * or two domains of one listed brand such as "PayPal.de" for paypal.com), the `same-name` with
+ * another ending ("Shop.ch" for shop.de: often the same company, sometimes a fake), or `other`.
  */
-function sameOwner(a: Host, b: Host): boolean {
-  if (a.domain === b.domain || (a.label !== undefined && a.label === b.label)) return true;
-  return BRANDS.some(
-    (brand) =>
-      a.domain !== undefined &&
-      b.domain !== undefined &&
-      brand.domains.includes(a.domain) &&
-      brand.domains.includes(b.domain),
-  );
+function relation(shown: Host, sender: Host): 'same' | 'same-name' | 'other' {
+  const a = shown.domain;
+  const b = sender.domain;
+  if (a === b) return 'same';
+  if (a && b && BRANDS.some((brand) => brand.domains.includes(a) && brand.domains.includes(b))) {
+    return 'same';
+  }
+  return shown.label !== undefined && shown.label === sender.label ? 'same-name' : 'other';
 }
 
 function checkSenderName(rawName: string, host: Host, evidence: string[]): Finding[] {
   const name = normalizeText(rawName);
   const domain = host.domain ?? host.hostname;
   if (name.trim() === '') return [];
+  const findings: Finding[] = [];
 
   // "service@paypal.com <x@evil.example>": the name shows another company's address or domain.
-  const shown = domainsInText(name).find((named) => !sameOwner(named, host));
-  if (shown) {
+  const shown = domainsInText(name).map((named) => ({ named, relation: relation(named, host) }));
+  const other = shown.find((entry) => entry.relation === 'other')?.named;
+  if (other) {
     return [
       {
         rule: 'sender-name-domain',
         severity: 'danger',
-        message: `The sender name shows ${clip(shown.hostname)}, but the email comes from ${domain}.`,
+        message: `The sender name shows ${clip(other.hostname)}, but the email comes from ${domain}.`,
         evidence,
       },
     ];
+  }
+  const sameName = shown.find((entry) => entry.relation === 'same-name')?.named;
+  if (sameName) {
+    findings.push({
+      rule: 'sender-name-domain',
+      severity: 'info',
+      message: `The sender name shows ${clip(sameName.hostname)}, but the email comes from ${domain} (same name, other ending).`,
+      evidence,
+    });
   }
 
   // "PayPal <x@evil.example>". Brands also use domains we don't list, so only a warning.
   const brand = brandPatterns.find(({ pattern }) => pattern.test(name))?.brand;
   if (brand && !brand.domains.includes(domain)) {
-    return [
-      {
-        rule: 'sender-name-brand',
-        severity: 'warning',
-        message: `The sender name says ${brand.name}, but ${domain} is not one of ${brand.name}'s known domains.`,
-        evidence,
-      },
-    ];
+    findings.push({
+      rule: 'sender-name-brand',
+      severity: 'warning',
+      message: `The sender name says ${brand.name}, but ${domain} is not one of ${brand.name}'s known domains.`,
+      evidence,
+    });
   }
-  return [];
+  return findings;
 }

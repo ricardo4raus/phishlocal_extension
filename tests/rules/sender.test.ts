@@ -38,9 +38,21 @@ describe('checkSender', () => {
     ]);
   });
 
+  it('only notes the same name with another ending', () => {
+    // Often the same company (shop.ch and shop.de), sometimes a fake: a note, not danger.
+    expect(rulesFor('Shop.ch', 'news@shop.de')).toEqual(['sender-name-domain:info']);
+    expect(rulesFor('Lumora Bank lumorabank.ch', 'x@lumorabank.xyz')).toEqual([
+      'sender-name-domain:info',
+    ]);
+    // A brand's domain with an unknown ending still gets the brand warning.
+    expect(rulesFor('paypal.com', 'x@paypal.support')).toEqual([
+      'sender-name-domain:info',
+      'sender-name-brand:warning',
+    ]);
+  });
+
   it.each([
     ['PayPal.de', 'service@paypal.com'],
-    ['Shop.ch', 'news@shop.de'],
     ['YouTube (youtube.com)', 'no-reply@google.com'],
     ['PayPal', 'service@paypal.com'],
     ['Google', 'no-reply@accounts.google.com'],
