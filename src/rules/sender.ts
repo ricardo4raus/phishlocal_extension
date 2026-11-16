@@ -6,7 +6,7 @@
  */
 import type { Email } from '../email';
 import { BRANDS } from './brands';
-import { domainsInText, hostOfAddress } from './domains';
+import { domainsInText, type Host, hostOfAddress } from './domains';
 import { clip, type Finding } from './types';
 import { normalizeText, wordsPattern } from './words';
 
@@ -18,7 +18,7 @@ export function checkSender(sender: Email['sender']): Finding[] {
   const evidence = [clip(sender.name), clip(sender.address)];
   const findings: Finding[] = [];
 
-  // "x@pаypal.com" with a Cyrillic "а" arrives as "xn--…". The reader sees a familiar name.
+  // "paypal.com" written with a Cyrillic "a" arrives as "xn--…"; the reader sees a familiar name.
   if (host.hostname.split('.').some((label) => label.startsWith('xn--'))) {
     findings.push({
       rule: 'international-domain',
@@ -27,15 +27,31 @@ export function checkSender(sender: Email['sender']): Finding[] {
       evidence,
     });
   }
-  return [...findings, ...checkSenderName(sender.name, host.domain, evidence)];
+  return [...findings, ...checkSenderName(sender.name, host, evidence)];
 }
 
-function checkSenderName(rawName: string, domain: string, evidence: string[]): Finding[] {
+/**
+ * True if both hosts belong to the same company: same domain, same name with another ending
+ * ("PayPal.de" for paypal.com, "Shop.ch" for shop.de) or two domains of one listed brand.
+ */
+function sameOwner(a: Host, b: Host): boolean {
+  if (a.domain === b.domain || (a.label !== undefined && a.label === b.label)) return true;
+  return BRANDS.some(
+    (brand) =>
+      a.domain !== undefined &&
+      b.domain !== undefined &&
+      brand.domains.includes(a.domain) &&
+      brand.domains.includes(b.domain),
+  );
+}
+
+function checkSenderName(rawName: string, host: Host, evidence: string[]): Finding[] {
   const name = normalizeText(rawName);
+  const domain = host.domain ?? host.hostname;
   if (name.trim() === '') return [];
 
-  // "service@paypal.com <x@evil.example>": the name shows an address or domain of its own.
-  const shown = domainsInText(name).find((named) => named.domain !== domain);
+  // "service@paypal.com <x@evil.example>": the name shows another company's address or domain.
+  const shown = domainsInText(name).find((named) => !sameOwner(named, host));
   if (shown) {
     return [
       {

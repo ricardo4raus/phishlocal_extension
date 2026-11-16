@@ -39,6 +39,9 @@ describe('checkSender', () => {
   });
 
   it.each([
+    ['PayPal.de', 'service@paypal.com'],
+    ['Shop.ch', 'news@shop.de'],
+    ['YouTube (youtube.com)', 'no-reply@google.com'],
     ['PayPal', 'service@paypal.com'],
     ['Google', 'no-reply@accounts.google.com'],
     ['Amazon.de', 'versandbestaetigung@amazon.de'],

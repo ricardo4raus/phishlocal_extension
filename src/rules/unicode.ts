@@ -1,6 +1,6 @@
 /*
  * Unicode tricks: invisible characters inside words, and words that mix Latin letters with
- * Cyrillic or Greek ones that look the same ("pаypal" with a Cyrillic "а"). Both hide a word
+ * Cyrillic or Greek ones that look the same ("paypal" written with a Cyrillic "a"). Both hide a word
  * from filters while the reader sees a normal word, so both are red flags of their own.
  */
 import type { Email } from '../email';
