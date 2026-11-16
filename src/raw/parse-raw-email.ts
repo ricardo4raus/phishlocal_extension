@@ -68,8 +68,10 @@ export async function parseRawEmail(raw: string): Promise<Email> {
   }
 
   const [sender = { name: '', address: '' }] = mailboxes(parsed.from ? [parsed.from] : []);
+  // Mail apps show the HTML part when there is one, so the rules check that text. A harmless
+  // plain-text part next to a phishing HTML part must not hide it.
   const html = parsed.html ? readHtml(parsed.html) : undefined;
-  const text = parsed.text?.trim() ? parsed.text : (html?.text ?? '');
+  const text = html?.text.trim() ? html.text : (parsed.text ?? '');
   const email = buildEmail({ text, html, sender, subject: parsed.subject ?? '' });
 
   // Only the topmost result counts: the receiving server adds it last, above everything the

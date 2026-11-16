@@ -44,7 +44,8 @@ describe('parseRawEmail', () => {
     expect(email).toMatchObject({
       sender: { name: 'Lumora Bank Ü', address: 'news@lumorabank.example' },
       subject: 'Your statement',
-      bodyText: 'Hello, your statement is ready: https://lumorabank.example/statement',
+      // From the HTML part, which mail apps show.
+      bodyText: 'Hello, open your statement',
       truncated: false,
       headers: {
         replyTo: [
@@ -67,6 +68,50 @@ describe('parseRawEmail', () => {
       dkim: [{ result: 'pass', domain: 'lumorabank.example' }],
       dmarc: 'pass',
     });
+  });
+
+  it('checks the HTML part that mail apps show, not a harmless plain-text part', async () => {
+    const email = await parseRawEmail(
+      raw(
+        'From: Bank <a@bank.example>',
+        'Subject: Hi',
+        'Content-Type: multipart/alternative; boundary="b"',
+        '',
+        '--b',
+        'Content-Type: text/plain',
+        '',
+        'Hello, have a nice day.',
+        '--b',
+        'Content-Type: text/html',
+        '',
+        '<p>Your account has been suspended. Confirm your identity within 24 hours.</p>',
+        '--b--',
+      ),
+    );
+    expect(email.bodyText).toBe(
+      'Your account has been suspended. Confirm your identity within 24 hours.',
+    );
+  });
+
+  it('uses the plain-text part when the HTML has no text', async () => {
+    const email = await parseRawEmail(
+      raw(
+        'From: a@shop.example',
+        'Subject: Hi',
+        'Content-Type: multipart/alternative; boundary="b"',
+        '',
+        '--b',
+        'Content-Type: text/plain',
+        '',
+        'Plain text only',
+        '--b',
+        'Content-Type: text/html',
+        '',
+        '<img src="cid:logo">',
+        '--b--',
+      ),
+    );
+    expect(email.bodyText).toBe('Plain text only');
   });
 
   it('uses the HTML as text when there is no plain-text part', async () => {
