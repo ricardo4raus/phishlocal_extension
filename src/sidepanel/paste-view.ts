@@ -1,5 +1,5 @@
 import type { Email } from '../email';
-import { MAX_PASTE_HTML_CHARS, type PastedEmail } from '../paste/parse-pasted-email';
+import type { PastedEmail } from '../paste/parse-pasted-email';
 import { readPaste } from '../paste/read-paste';
 import { SAMPLE_EMAILS } from '../paste/samples';
 
@@ -67,15 +67,12 @@ export function setUpPaste(elements: PasteElements, callbacks: PasteCallbacks): 
       callbacks.onError('Paste the email text first.');
       return;
     }
-    const tooBig = pastedHtml !== undefined && pastedHtml.length > MAX_PASTE_HTML_CHARS;
     void show(
       { text, html: pastedHtml, sender: elements.sender.value, subject: elements.subject.value },
-      (raw) => {
-        if (raw) return 'Raw email read, with its headers. Nothing left your browser.';
-        return tooBig
-          ? 'Pasted email ready. The formatting was too large, so links come from the text only.'
-          : 'Pasted email ready. Nothing left your browser.';
-      },
+      (raw) =>
+        raw
+          ? 'Raw email read, with its headers. Nothing left your browser.'
+          : 'Pasted email ready. Nothing left your browser.',
     );
   });
 

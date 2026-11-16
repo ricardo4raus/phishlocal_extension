@@ -18,9 +18,19 @@ export const MAX_FINDINGS = 30;
 
 const ORDER: Record<Severity, number> = { danger: 0, warning: 1, info: 2 };
 
+/** Part of the HTML was not read: hostile emails pad or nest their HTML to slip past checks. */
+const INCOMPLETE: Finding = {
+  rule: 'incomplete-check',
+  severity: 'warning',
+  message:
+    'Part of this email could not be checked: its formatting is too large or too deeply nested. Hostile emails do that to hide from checks; treat it with care.',
+  evidence: [],
+};
+
 /** All findings for an email: the most severe first, each one once. */
 export function checkEmail(email: Email): Finding[] {
-  const findings = [
+  const findings: Finding[] = [
+    ...(email.incomplete ? [INCOMPLETE] : []),
     ...checkHeaders(email),
     ...checkSender(email.sender),
     ...checkLookalikes(email),

@@ -7,7 +7,7 @@
  */
 import PostalMime, { type Address, type PostalMimeOptions } from 'postal-mime';
 import type { Email, Mailbox } from '../email';
-import { buildEmail, htmlToText } from '../paste/parse-pasted-email';
+import { buildEmail, readHtml } from '../paste/parse-pasted-email';
 import { parseAuthResults } from './auth-results';
 
 /** Larger input is refused: postal-mime holds the whole message in memory. */
@@ -68,8 +68,9 @@ export async function parseRawEmail(raw: string): Promise<Email> {
   }
 
   const [sender = { name: '', address: '' }] = mailboxes(parsed.from ? [parsed.from] : []);
-  const text = parsed.text?.trim() ? parsed.text : parsed.html ? htmlToText(parsed.html) : '';
-  const email = buildEmail({ text, html: parsed.html, sender, subject: parsed.subject ?? '' });
+  const html = parsed.html ? readHtml(parsed.html) : undefined;
+  const text = parsed.text?.trim() ? parsed.text : (html?.text ?? '');
+  const email = buildEmail({ text, html, sender, subject: parsed.subject ?? '' });
 
   // Only the topmost result counts: the receiving server adds it last, above everything the
   // sender wrote. A fake "dmarc=pass" further down is ignored.

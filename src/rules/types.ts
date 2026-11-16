@@ -20,6 +20,7 @@ export type RuleId =
   | 'auth-fail'
   | 'dkim-other-domain'
   | 'no-auth-results'
+  | 'incomplete-check'
   | 'urgency'
   | 'threat'
   | 'credentials'

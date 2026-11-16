@@ -52,6 +52,8 @@ export interface Email {
   truncated: boolean;
   /** Only when the raw email (with headers) was read. */
   headers?: EmailHeaders;
+  /** True if part of the email's HTML could not be read (too large or too deeply nested). */
+  incomplete?: boolean;
 }
 
 /** Upper limit for the body text sent between the content script and the side panel. */

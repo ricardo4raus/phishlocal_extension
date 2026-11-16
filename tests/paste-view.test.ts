@@ -80,14 +80,17 @@ describe('paste area', () => {
     expect(onEmail).not.toHaveBeenCalled();
   });
 
-  it('says when the HTML was too large to use', async () => {
+  it('marks the email incomplete when the HTML is too large', async () => {
     paste(
       'see https://x.example/a',
       `<a href="https://x.example/b">b</a>${' '.repeat(MAX_PASTE_HTML_CHARS)}`,
     );
     await click(elements.use);
-    expect(lastEmail()?.links.map((link) => link.href)).toEqual(['https://x.example/a']);
-    expect(onEmail.mock.calls.at(-1)?.[1]).toMatch(/too large/);
+    expect(lastEmail()?.incomplete).toBe(true);
+    expect(lastEmail()?.links.map((link) => link.href)).toEqual([
+      'https://x.example/b',
+      'https://x.example/a',
+    ]);
   });
 
   it('lists the samples and loads one into the fields', async () => {

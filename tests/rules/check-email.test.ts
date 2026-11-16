@@ -95,6 +95,10 @@ describe('checkEmail', () => {
     expect(checkEmail({ ...base, links: many })).toHaveLength(MAX_FINDINGS);
   });
 
+  it('warns when part of the email could not be read', () => {
+    expect(rules({ ...base, incomplete: true })).toEqual(['incomplete-check:warning']);
+  });
+
   it('finds nothing in an empty email', () => {
     expect(checkEmail({ ...base, sender: { name: '', address: '' } })).toEqual([]);
   });
