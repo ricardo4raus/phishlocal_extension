@@ -193,6 +193,14 @@ _Current state, updated as features land._
 - Lookalike domains are found by mapping characters that look alike (`1`→`l`, `0`→`o`,
   `rn`→`m`) and allowing one typo, but only for names of six or more letters; otherwise
   "apply" would imitate "apple".
+- Phishing hides words from filters with Unicode: zero-width characters inside a word
+  ("con<U+200B>firm" looks like "confirm"), Cyrillic letters that look Latin, full-width letters. The
+  rules now fold the text first (NFKC, invisible characters removed) and treat the tricks
+  themselves as red flags.
+- Our own tools can plant invisible characters: an editing tool turned the escape `\u200b` in a
+  test into the real zero-width character. A structure test now rejects invisible characters in
+  the source ("Trojan Source").
+- A "no findings" message is a security statement: "no red flags" must not sound like "safe".
 - The same library can be twice as large depending on which of its builds the bundler picks:
   tldts' ES module build adds 267 KB to the side panel, its prebuilt file only 130 KB.
 
@@ -331,3 +339,12 @@ _To fill in near the submission._
   raw email next: Gmail's "Show original" in the background, plus pasting the raw source.
 - Review of the branch: a name taken from the email in front of another domain was flagged as
   danger, but mailing services do that for click tracking. It is a warning now.
+- Security review against OWASP Top 10, the OWASP Top 10 for LLM applications, CWE and MITRE
+  ATT&CK's phishing techniques, with a probe that ran each suspected gap through the real code.
+  No injection, script or crash risk; ten gaps and false alarms, all fixed with tests that fail
+  without the fix: invisible characters and other alphabets slipped past the rules, a brand name
+  with another ending (`paypal.support`) and forwarding links (`google.com/url?q=…`) passed clean,
+  harmless sentences ("we will never ask for your card number") got warnings, a company's own
+  domains in the sender name were "danger", "no red flags" sounded like "safe", and a failing
+  rule showed a wrong error. The next review round found that one fix hid a case completely;
+  it is a note now.

@@ -36,7 +36,9 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 ## Phase 3 · AI & result
 
 - [ ] Thu 19.11. – Prompt + fixed JSON output schema (risk level, reasons, advice);
-      feed the rule results into the prompt; answer in the user's language
+      feed the rule results into the prompt; answer in the user's language. Prompt injection
+      (OWASP LLM01): email content and rule evidence only as escaped data; the AI must not lower
+      a rule's danger finding
 - [ ] Fri 20.11. – Result UI: traffic light 🟢🟡🔴, reasons, highlighted suspicious links
       (show the link's domain prominently, shorten long URLs); test end to end
 
