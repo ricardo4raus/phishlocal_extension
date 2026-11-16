@@ -155,3 +155,18 @@ describe('no HTML injection sinks in src/', () => {
     },
   );
 });
+
+describe('no invisible characters in the source', () => {
+  // Invisible format characters (zero-width, bidi controls) can hide code from reviewers
+  // ("Trojan Source"). Tests that need them write escapes such as \u200b.
+  const files = [...walkFiles(fromRoot('src')), ...walkFiles(fromRoot('tests'))].filter((file) =>
+    /\.(?:[cm]?tsx?|html|css|json)$/.test(file),
+  );
+
+  it.each(files.map((file) => [toPosixRelative(repoRoot, file), file]))(
+    '%s has no invisible characters',
+    (_name, file) => {
+      expect(readText(file)).not.toMatch(/\p{Cf}/u);
+    },
+  );
+});
