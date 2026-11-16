@@ -13,14 +13,45 @@ export interface EmailLink {
   href: string;
 }
 
+export interface Mailbox {
+  name: string;
+  address: string;
+}
+
+/**
+ * Results of the sender checks (SPF, DKIM, DMARC) from one `Authentication-Results` header
+ * (RFC 8601), lowercase as written, e.g. `pass`, `fail`, `softfail`, `none`.
+ */
+export interface AuthResults {
+  /** The server that ran the checks (the header's authserv-id), e.g. `mx.google.com`. */
+  server: string;
+  spf?: string;
+  /** One entry per DKIM signature, with the signing domain (`header.d`) if given. */
+  dkim: { result: string; domain?: string }[];
+  dmarc?: string;
+}
+
+/** What the raw email's headers add to the visible email. */
+export interface EmailHeaders {
+  replyTo: Mailbox[];
+  returnPath?: string;
+  /**
+   * The topmost `Authentication-Results` header: the one the receiving server added last.
+   * Headers further down can be written by the sender and are never trusted.
+   */
+  auth?: AuthResults;
+}
+
 export interface Email {
-  sender: { name: string; address: string };
+  sender: Mailbox;
   subject: string;
   /** Visible text of the message body, at most {@link MAX_BODY_CHARS} characters. */
   bodyText: string;
   links: EmailLink[];
   /** True if `bodyText` was cut to {@link MAX_BODY_CHARS}. */
   truncated: boolean;
+  /** Only when the raw email (with headers) was read. */
+  headers?: EmailHeaders;
 }
 
 /** Upper limit for the body text sent between the content script and the side panel. */

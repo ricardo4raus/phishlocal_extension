@@ -100,7 +100,58 @@ function parseSender(sender: string): Email['sender'] {
   return value.includes('@') ? { name: '', address: value } : { name: value, address: '' };
 }
 
-export function parsePastedEmail({ text, html, sender = '', subject = '' }: PastedEmail): Email {
+/** Elements whose content is not shown as text. */
+const NOT_TEXT = new Set(['head', 'script', 'style', 'template', 'title', 'noscript']);
+/** Elements that start a new line. */
+const BLOCKS = new Set([
+  'br',
+  'p',
+  'div',
+  'li',
+  'tr',
+  'table',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'blockquote',
+  'hr',
+]);
+
+/**
+ * Readable text of an HTML body, for raw emails that have no plain-text part. Like the HTML
+ * itself, it still contains text that CSS would hide (`display: none`).
+ */
+export function htmlToText(html: string): string {
+  if (html.length > MAX_PASTE_HTML_CHARS) return '';
+  const parts: string[] = [];
+  const visit = (node: HtmlNode): void => {
+    if (isElement(node) && NOT_TEXT.has(node.tagName)) return;
+    if (isElement(node) && BLOCKS.has(node.tagName)) parts.push('\n');
+    if ('value' in node && node.nodeName === '#text') parts.push(node.value);
+    if ('childNodes' in node) node.childNodes.forEach(visit);
+  };
+  visit(parse(html));
+  return parts
+    .join('')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/** The parts every email source provides; links come from the HTML and the text. */
+export interface EmailParts {
+  text: string;
+  html?: string;
+  sender: Email['sender'];
+  subject: string;
+}
+
+export function buildEmail({ text, html, sender, subject }: EmailParts): Email {
   const body = text.trim();
   const links = html ? linksFromHtml(html) : [];
   const known = new Set(links.map((link) => link.href));
@@ -111,10 +162,14 @@ export function parsePastedEmail({ text, html, sender = '', subject = '' }: Past
     }
   }
   return {
-    sender: parseSender(sender),
+    sender: { name: squeeze(sender.name), address: sender.address.trim() },
     subject: squeeze(subject),
     bodyText: body.slice(0, MAX_BODY_CHARS),
     links: links.slice(0, MAX_LINKS),
     truncated: body.length > MAX_BODY_CHARS,
   };
+}
+
+export function parsePastedEmail({ text, html, sender = '', subject = '' }: PastedEmail): Email {
+  return buildEmail({ text, html, sender: parseSender(sender), subject });
 }
