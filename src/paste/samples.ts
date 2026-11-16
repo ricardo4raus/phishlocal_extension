@@ -83,4 +83,37 @@ export const SAMPLE_EMAILS: readonly SampleEmail[] = [
       ].join(''),
     },
   },
+  {
+    // Raw source, as "Show original" shows it: the sender looks right, but the headers say that
+    // the bank's domain did not send it (DMARC failed), and replies go somewhere else.
+    id: 'phishing-raw-dmarc-en',
+    label: 'Phishing: forged sender, raw source with headers (English)',
+    email: {
+      text: [
+        'Delivered-To: you@receiver.example',
+        'Received: from mail.sender-host.example (mail.sender-host.example [192.0.2.44])',
+        '        by mx.receiver.example with ESMTPS; Mon, 16 Nov 2026 09:12:03 +0100',
+        'Authentication-Results: mx.receiver.example;',
+        '       spf=fail smtp.mailfrom=bounce@sender-host.example;',
+        '       dkim=none;',
+        '       dmarc=fail (p=REJECT) header.from=lumorabank.example',
+        'Return-Path: <bounce@sender-host.example>',
+        'From: Lumora Bank <security@lumorabank.example>',
+        'Reply-To: Lumora Bank Support <lumora.support@freemail.example>',
+        'To: you@receiver.example',
+        'Subject: Your card has been blocked',
+        'Date: Mon, 16 Nov 2026 09:12:00 +0100',
+        'Message-ID: <a1b2c3@sender-host.example>',
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        '<p>Dear customer,</p>',
+        '<p>We noticed suspicious activity, so your card has been blocked.</p>',
+        '<p>Confirm your card details within 24 hours:',
+        '<a href="https://lumorabank.example.card-check.example/unlock">lumorabank.example/unlock</a></p>',
+        '<p>Lumora Bank</p>',
+        '',
+      ].join('\r\n'),
+    },
+  },
 ];

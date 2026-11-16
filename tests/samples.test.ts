@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isReadEmailResponse } from '../src/email';
-import { parsePastedEmail } from '../src/paste/parse-pasted-email';
+import { readPaste } from '../src/paste/read-paste';
 import { SAMPLE_EMAILS } from '../src/paste/samples';
 
 /** Real brands that must not appear in samples (contest rule: no third-party trademarks). */
@@ -25,6 +25,13 @@ const REAL_BRANDS = [
 const hostOf = (url: string): string =>
   new URL(url.startsWith('www.') || !url.includes('://') ? `https://${url}` : url).hostname;
 
+/** Each sample read like the paste area reads it (raw samples with their headers). */
+const READ = new Map(
+  await Promise.all(
+    SAMPLE_EMAILS.map(async ({ id, email }) => [id, (await readPaste(email)).email] as const),
+  ),
+);
+
 describe('sample emails', () => {
   it('have unique ids and labels', () => {
     const ids = SAMPLE_EMAILS.map((sample) => sample.id);
@@ -41,7 +48,7 @@ describe('sample emails', () => {
   describe.each(SAMPLE_EMAILS.map((sample) => [sample.id, sample] as const))(
     '%s',
     (_id, sample) => {
-      const email = parsePastedEmail(sample.email);
+      const email = READ.get(sample.id)!;
 
       it('becomes a valid email with sender, subject, text and links', () => {
         expect(isReadEmailResponse({ ok: true, email })).toBe(true);

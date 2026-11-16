@@ -1,9 +1,6 @@
 import type { Email } from '../email';
-import {
-  MAX_PASTE_HTML_CHARS,
-  type PastedEmail,
-  parsePastedEmail,
-} from '../paste/parse-pasted-email';
+import { MAX_PASTE_HTML_CHARS, type PastedEmail } from '../paste/parse-pasted-email';
+import { readPaste } from '../paste/read-paste';
 import { SAMPLE_EMAILS } from '../paste/samples';
 
 export interface PasteElements {
@@ -28,7 +25,8 @@ export interface PasteCallbacks {
  *
  * On paste, the browser inserts the `text/plain` version into the text field; the `text/html`
  * version is kept here only for its links and is parsed with parse5, never inserted into the page.
- * Nothing is stored: everything is gone when the side panel closes.
+ * Raw source ("Show original") is recognized and read with its headers. Nothing is stored:
+ * everything is gone when the side panel closes.
  */
 export function setUpPaste(elements: PasteElements, callbacks: PasteCallbacks): void {
   let pastedHtml: string | undefined;
@@ -48,8 +46,19 @@ export function setUpPaste(elements: PasteElements, callbacks: PasteCallbacks): 
     elements.sample.append(option);
   }
 
-  const show = (input: PastedEmail, status: string): void => {
-    callbacks.onEmail(parsePastedEmail(input), status);
+  /** Reads the input (raw source takes a moment) and reports the email or the error. */
+  const show = async (input: PastedEmail, status: (raw: boolean) => string): Promise<void> => {
+    elements.use.disabled = true;
+    elements.loadSample.disabled = true;
+    try {
+      const { email, raw } = await readPaste(input);
+      callbacks.onEmail(email, status(raw));
+    } catch (error) {
+      callbacks.onError(error instanceof Error ? error.message : String(error));
+    } finally {
+      elements.use.disabled = false;
+      elements.loadSample.disabled = false;
+    }
   };
 
   elements.use.addEventListener('click', () => {
@@ -59,11 +68,14 @@ export function setUpPaste(elements: PasteElements, callbacks: PasteCallbacks): 
       return;
     }
     const tooBig = pastedHtml !== undefined && pastedHtml.length > MAX_PASTE_HTML_CHARS;
-    show(
+    void show(
       { text, html: pastedHtml, sender: elements.sender.value, subject: elements.subject.value },
-      tooBig
-        ? 'Pasted email ready. The formatting was too large, so links come from the text only.'
-        : 'Pasted email ready. Nothing left your browser.',
+      (raw) => {
+        if (raw) return 'Raw email read, with its headers. Nothing left your browser.';
+        return tooBig
+          ? 'Pasted email ready. The formatting was too large, so links come from the text only.'
+          : 'Pasted email ready. Nothing left your browser.';
+      },
     );
   });
 
@@ -77,7 +89,7 @@ export function setUpPaste(elements: PasteElements, callbacks: PasteCallbacks): 
     elements.subject.value = sample.email.subject ?? '';
     elements.text.value = sample.email.text;
     pastedHtml = sample.email.html;
-    show(sample.email, `Sample loaded: ${sample.label}. It is made up.`);
+    void show(sample.email, () => `Sample loaded: ${sample.label}. It is made up.`);
   });
 
   elements.clear.addEventListener('click', () => {
