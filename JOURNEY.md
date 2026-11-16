@@ -382,3 +382,9 @@ _To fill in near the submission._
   failed = danger, failed SPF/DKIM and Reply-To to another company = warning), raw-source
   detection in the paste field, a fourth sample (forged sender, raw source) and a "Sender checks"
   row in the side panel. A test proves that a fake `dmarc=pass` below the real result is ignored.
+- Tested in Chrome: the raw sample showed every expected finding, and a real newsletter pasted
+  from Gmail's "Show original" showed the same SPF, DKIM and DMARC results as Gmail's own table.
+  The test found a false alarm from the earlier rule checks: Mailchimp's click-tracking host
+  `chessable.us14.list-manage.com` was a warning ("chessable" in front of another domain). Known
+  mailing services are now listed; the email's own name in front of them is not flagged, a real
+  brand's name still is.

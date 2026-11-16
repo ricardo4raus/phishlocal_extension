@@ -53,7 +53,8 @@ catch known tricks.
   its final target: the text is compared with it, and the final target gets the IP,
   international-letter and lookalike checks too. Up to 20 parameters per link are read.
 - **Redirect services** (`c.gle`, `t.co`, `bit.ly`, `tinyurl.com`, `ow.ly`, `lnkd.in`, Outlook
-  safe links, Proofpoint URL Defense) hide the final target. Real emails use them (Google's own
+  safe links, Proofpoint URL Defense; listed in [`services.ts`](../src/rules/services.ts)) hide
+  the final target. Real emails use them (Google's own
   emails link "debattr.com" through `c.gle`), so a mismatch behind one is only a note.
 
 ### Lookalike domains ([`lookalike.ts`](../src/rules/lookalike.ts))
@@ -76,8 +77,12 @@ short list of often-imitated real brands in [`brands.ts`](../src/rules/brands.ts
   `microsoftonline.com`) are never flagged.
 - The same name with another ending, taken from the email itself (`shop.de` and `shop.ch`), is
   not flagged: companies often use several country domains.
-- Mailing services build click-tracking hosts such as `shop.mailer.example` for their customers,
-  so a name from the email in front of another domain is only a warning.
+- Mailing services build click-tracking hosts such as `shop.us14.list-manage.com` (Mailchimp)
+  for their customers. For the known ones in [`services.ts`](../src/rules/services.ts)
+  (Mailchimp, SendGrid, Mailgun, SparkPost, HubSpot, Salesforce, Mailjet, Klaviyo, Constant
+  Contact) the email's own name in front is not flagged; a listed brand's name still is danger,
+  because anyone can open an account under any name. For unknown domains, a name from the email
+  in front of another domain is a warning.
 - One finding per domain: the strongest one.
 
 ### Sender ([`sender.ts`](../src/rules/sender.ts))
