@@ -162,6 +162,7 @@ describe('no invisible characters in the source', () => {
   const files = [
     ...walkFiles(fromRoot('src')),
     ...walkFiles(fromRoot('tests')),
+    ...walkFiles(fromRoot('docs')),
     ...['manifest.json', 'CLAUDE.md', 'JOURNEY.md', 'TIMETABLE.md', 'README.md'].map((file) =>
       fromRoot(file),
     ),
