@@ -62,6 +62,32 @@ export const MAX_BODY_CHARS = 20_000;
 /** Upper limit for the number of links taken from one email. */
 export const MAX_LINKS = 200;
 
+/**
+ * Upper limits for single fields, in characters. Real values stay far below them; hostile ones
+ * are cut, so they cannot bloat the panel or, later, the AI prompt.
+ */
+export const FIELD_LIMITS = {
+  name: 500,
+  /** RFC 5321 allows at most 254 characters for a usable address. */
+  address: 320,
+  subject: 1_000,
+  linkText: 1_000,
+  href: 4_000,
+} as const;
+
+export const cut = (text: string, max: number): string =>
+  text.length > max ? text.slice(0, max) : text;
+
+export const cutMailbox = ({ name, address }: Mailbox): Mailbox => ({
+  name: cut(name, FIELD_LIMITS.name),
+  address: cut(address, FIELD_LIMITS.address),
+});
+
+export const cutLink = ({ text, href }: EmailLink): EmailLink => ({
+  text: cut(text, FIELD_LIMITS.linkText),
+  href: cut(href, FIELD_LIMITS.href),
+});
+
 export const READ_EMAIL = 'phishlocal/read-email';
 
 export interface ReadEmailRequest {
@@ -80,18 +106,24 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export const isReadEmailRequest = (value: unknown): value is ReadEmailRequest =>
   isRecord(value) && value.type === READ_EMAIL;
 
+const isText = (value: unknown, max: number): value is string =>
+  typeof value === 'string' && value.length <= max;
+
 function isEmailLink(value: unknown): value is EmailLink {
-  return isRecord(value) && typeof value.text === 'string' && typeof value.href === 'string';
+  return (
+    isRecord(value) &&
+    isText(value.text, FIELD_LIMITS.linkText) &&
+    isText(value.href, FIELD_LIMITS.href)
+  );
 }
 
 function isEmail(value: unknown): value is Email {
   if (!isRecord(value) || !isRecord(value.sender)) return false;
   return (
-    typeof value.sender.name === 'string' &&
-    typeof value.sender.address === 'string' &&
-    typeof value.subject === 'string' &&
-    typeof value.bodyText === 'string' &&
-    value.bodyText.length <= MAX_BODY_CHARS &&
+    isText(value.sender.name, FIELD_LIMITS.name) &&
+    isText(value.sender.address, FIELD_LIMITS.address) &&
+    isText(value.subject, FIELD_LIMITS.subject) &&
+    isText(value.bodyText, MAX_BODY_CHARS) &&
     Array.isArray(value.links) &&
     value.links.length <= MAX_LINKS &&
     value.links.every(isEmailLink) &&

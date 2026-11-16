@@ -16,7 +16,16 @@ import {
   parse,
   type TreeAdapter,
 } from 'parse5';
-import { type Email, type EmailLink, MAX_BODY_CHARS, MAX_LINKS } from '../email';
+import {
+  cut,
+  cutLink,
+  cutMailbox,
+  type Email,
+  type EmailLink,
+  FIELD_LIMITS,
+  MAX_BODY_CHARS,
+  MAX_LINKS,
+} from '../email';
 
 /** Only the first 2 MB of HTML are read, so a huge email cannot hang the panel. */
 export const MAX_PASTE_HTML_CHARS = 2_000_000;
@@ -252,10 +261,10 @@ export function buildEmail({ text, html, sender, subject }: EmailParts): Email {
     }
   }
   return {
-    sender: { name: squeeze(sender.name), address: sender.address.trim() },
-    subject: squeeze(subject),
+    sender: cutMailbox({ name: squeeze(sender.name), address: sender.address.trim() }),
+    subject: cut(squeeze(subject), FIELD_LIMITS.subject),
     bodyText: body.slice(0, MAX_BODY_CHARS),
-    links: links.slice(0, MAX_LINKS),
+    links: links.slice(0, MAX_LINKS).map(cutLink),
     truncated: body.length > MAX_BODY_CHARS,
     ...(html && !html.complete ? { incomplete: true } : {}),
   };

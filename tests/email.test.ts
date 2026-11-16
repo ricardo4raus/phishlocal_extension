@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   type Email,
+  FIELD_LIMITS,
   isReadEmailRequest,
   isReadEmailResponse,
   MAX_BODY_CHARS,
@@ -57,6 +58,24 @@ describe('isReadEmailResponse', () => {
       },
     ],
     ['a missing truncated flag', { ok: true, email: { ...email, truncated: undefined } }],
+    [
+      'a subject over the limit',
+      { ok: true, email: { ...email, subject: 'x'.repeat(FIELD_LIMITS.subject + 1) } },
+    ],
+    [
+      'a sender name over the limit',
+      {
+        ok: true,
+        email: { ...email, sender: { name: 'x'.repeat(FIELD_LIMITS.name + 1), address: '' } },
+      },
+    ],
+    [
+      'a link target over the limit',
+      {
+        ok: true,
+        email: { ...email, links: [{ text: 'x', href: 'x'.repeat(FIELD_LIMITS.href + 1) }] },
+      },
+    ],
   ])('rejects %s', (_label, value) => {
     expect(isReadEmailResponse(value)).toBe(false);
   });

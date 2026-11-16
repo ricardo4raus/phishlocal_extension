@@ -1,7 +1,7 @@
 // Runs in Node without a DOM on purpose: the parser must work with parse5 alone, so it cannot
 // create elements, load images or run scripts from a pasted email.
 import { describe, expect, it } from 'vitest';
-import { MAX_BODY_CHARS, MAX_LINKS } from '../src/email';
+import { FIELD_LIMITS, MAX_BODY_CHARS, MAX_LINKS } from '../src/email';
 import {
   MAX_HTML_DEPTH,
   MAX_PASTE_HTML_CHARS,
@@ -124,5 +124,16 @@ describe('parsePastedEmail', () => {
         '<html><head><title>T</title><style>p{}</style></head><body><p>Line one</p><p>Line <b>two</b></p><script>x()</script></body></html>',
       ).text,
     ).toBe('Line one\nLine two');
+  });
+
+  it('cuts fields that are longer than any real email has', () => {
+    const email = parsePastedEmail({
+      text: `https://x.example/${'p'.repeat(FIELD_LIMITS.href)}`,
+      sender: `${'N'.repeat(FIELD_LIMITS.name + 50)} <a@x.example>`,
+      subject: 'S'.repeat(FIELD_LIMITS.subject + 50),
+    });
+    expect(email.sender.name).toHaveLength(FIELD_LIMITS.name);
+    expect(email.subject).toHaveLength(FIELD_LIMITS.subject);
+    expect(email.links[0]?.href).toHaveLength(FIELD_LIMITS.href);
   });
 });

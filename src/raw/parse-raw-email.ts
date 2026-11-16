@@ -6,7 +6,7 @@
  * never rendered, only read with parse5 for links and text.
  */
 import PostalMime, { type Address, type PostalMimeOptions } from 'postal-mime';
-import type { Email, Mailbox } from '../email';
+import { cut, cutMailbox, type Email, FIELD_LIMITS, type Mailbox } from '../email';
 import { buildEmail, readHtml } from '../paste/parse-pasted-email';
 import { parseAuthResults } from './auth-results';
 
@@ -34,7 +34,7 @@ function mailboxes(addresses: Address[] | undefined): Mailbox[] {
   return (addresses ?? [])
     .flatMap((address) => (address.group ? address.group : [address]))
     .slice(0, MAX_REPLY_TO)
-    .map(({ name, address }) => ({ name, address }));
+    .map(({ name, address }) => cutMailbox({ name, address }));
 }
 
 /**
@@ -81,7 +81,7 @@ export async function parseRawEmail(raw: string): Promise<Email> {
     ...email,
     headers: {
       replyTo: mailboxes(parsed.replyTo),
-      ...(parsed.returnPath ? { returnPath: parsed.returnPath } : {}),
+      ...(parsed.returnPath ? { returnPath: cut(parsed.returnPath, FIELD_LIMITS.address) } : {}),
       ...(topmost ? { auth: parseAuthResults(topmost.value) } : {}),
     },
   };

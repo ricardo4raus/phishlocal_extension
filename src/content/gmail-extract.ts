@@ -1,4 +1,13 @@
-import { type Email, type EmailLink, MAX_BODY_CHARS, MAX_LINKS } from '../email';
+import {
+  cut,
+  cutLink,
+  cutMailbox,
+  type Email,
+  type EmailLink,
+  FIELD_LIMITS,
+  MAX_BODY_CHARS,
+  MAX_LINKS,
+} from '../email';
 
 /**
  * Gmail DOM selectors, measured on 15 Nov 2026 (Chrome 157, Gmail in German). Gmail's class names
@@ -43,7 +52,7 @@ function linksOf(body: Element): EmailLink[] {
     .map((anchor) => {
       const images = [...anchor.querySelectorAll('img[alt]')].map((img) => img.getAttribute('alt'));
       const text = squeeze(visibleText(anchor)) || squeeze(images.join(' '));
-      return { text, href: anchor.href };
+      return cutLink({ text, href: anchor.href });
     });
 }
 
@@ -63,11 +72,11 @@ export function extractEmail(document: Document): Email | undefined {
   const text = visibleText(body).trim();
 
   return {
-    sender: {
+    sender: cutMailbox({
       name: squeeze(sender?.getAttribute('name') ?? sender?.textContent ?? ''),
       address: (sender?.getAttribute('email') ?? '').trim(),
-    },
-    subject: squeeze(subject?.textContent ?? ''),
+    }),
+    subject: cut(squeeze(subject?.textContent ?? ''), FIELD_LIMITS.subject),
     bodyText: text.slice(0, MAX_BODY_CHARS),
     links: linksOf(body),
     truncated: text.length > MAX_BODY_CHARS,

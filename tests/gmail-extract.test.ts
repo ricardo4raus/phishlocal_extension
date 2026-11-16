@@ -5,7 +5,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { extractEmail } from '../src/content/gmail-extract';
-import { MAX_BODY_CHARS, MAX_LINKS } from '../src/email';
+import { FIELD_LIMITS, MAX_BODY_CHARS, MAX_LINKS } from '../src/email';
 
 /**
  * jsdom has no layout, so `innerText` is undefined there. This stand-in is close enough for the
@@ -74,6 +74,21 @@ describe('extractEmail', () => {
       links: [{ text: 'paypal.com', href: 'https://paypa1-secure.example/login' }],
       truncated: false,
     });
+  });
+
+  it('cuts fields that are longer than any real email has', () => {
+    const doc = gmail(
+      message({
+        name: 'N'.repeat(FIELD_LIMITS.name + 50),
+        body: `<a href="https://x.example/${'p'.repeat(FIELD_LIMITS.href)}">${'t'.repeat(FIELD_LIMITS.linkText + 50)}</a>`,
+      }),
+      'S'.repeat(FIELD_LIMITS.subject + 50),
+    );
+    const email = extractEmail(doc);
+    expect(email?.sender.name).toHaveLength(FIELD_LIMITS.name);
+    expect(email?.subject).toHaveLength(FIELD_LIMITS.subject);
+    expect(email?.links[0]?.text).toHaveLength(FIELD_LIMITS.linkText);
+    expect(email?.links[0]?.href).toHaveLength(FIELD_LIMITS.href);
   });
 
   it('returns undefined when no email is open (inbox list)', () => {
