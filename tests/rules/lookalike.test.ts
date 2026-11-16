@@ -85,6 +85,14 @@ describe('checkLookalikes', () => {
     ).toEqual(['lookalike-domain:lumorabamk.example']);
   });
 
+  it('only warns about a name from the email in front of another domain', () => {
+    // Mailing services build click-tracking hosts like this for their customers.
+    const [finding] = checkLookalikes(
+      email('news@lumorabank.example', [link('https://lumorabank.mailer.example/c/1')]),
+    );
+    expect(finding).toMatchObject({ rule: 'brand-in-subdomain', severity: 'warning' });
+  });
+
   it('accepts the real domains of a brand and other parts of a domain', () => {
     expect(
       found(

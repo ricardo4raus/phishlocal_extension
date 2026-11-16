@@ -50,14 +50,14 @@ export function withinOneEdit(a: string, b: string): boolean {
 
 interface Reference {
   host: Host & { domain: string; label: string };
-  /** Shortest name length this reference may be matched with. */
-  minLength: number;
+  /** From the brand list (real brands) rather than from the email itself. */
+  isBrand: boolean;
 }
 
 const brandReferences: Reference[] = BRANDS.flatMap((brand) => {
   const host = hostOf(brand.domains[0]);
   return host.domain && host.label
-    ? [{ host: { ...host, domain: host.domain, label: host.label }, minLength: 0 }]
+    ? [{ host: { ...host, domain: host.domain, label: host.label }, isBrand: true }]
     : [];
 });
 
@@ -70,7 +70,7 @@ function referencesOf(email: Email, sender: Host | undefined): Reference[] {
     ...domainsInText(email.bodyText),
   ].flatMap((host): Reference[] =>
     host.domain && host.label
-      ? [{ host: { ...host, domain: host.domain, label: host.label }, minLength: MIN_NAME_LENGTH }]
+      ? [{ host: { ...host, domain: host.domain, label: host.label }, isBrand: false }]
       : [],
   );
   const unique = new Map<string, Reference>();
@@ -101,16 +101,18 @@ function compare(candidate: Host, reference: Reference): Finding | undefined {
   const name = skeleton(label);
   const evidence = [clip(candidate.hostname)];
 
-  const subdomainMinimum = Math.max(reference.minLength, MIN_BRAND_SUBDOMAIN_LENGTH);
+  const subdomainMinimum = reference.isBrand ? MIN_BRAND_SUBDOMAIN_LENGTH : MIN_NAME_LENGTH;
   if (label.length >= subdomainMinimum && `.${candidate.subdomain}.`.includes(`.${label}.`)) {
     return {
       rule: 'brand-in-subdomain',
-      severity: 'danger',
+      // Mailing services build click-tracking hosts like "shop.mailer.example" for their
+      // customers, so a name from the email itself is only a warning.
+      severity: reference.isBrand ? 'danger' : 'warning',
       message: `${clip(candidate.hostname)} puts "${label}" in front of a different domain (${candidate.domain}).`,
       evidence,
     };
   }
-  if (label.length < Math.max(reference.minLength, MIN_NAME_LENGTH)) return undefined;
+  if (label.length < MIN_NAME_LENGTH) return undefined;
 
   const own = skeleton(candidate.label);
   if (own === name || (label.length >= MIN_TYPO_LENGTH && withinOneEdit(own, name))) {
