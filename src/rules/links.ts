@@ -2,7 +2,7 @@
  * Link rules: what a link really does, compared with what its text promises.
  */
 import type { EmailLink } from '../email';
-import { domainsInText, forwardTarget, hostOf, parseUrl } from './domains';
+import { domainsInText, forwardTarget, hostOf, isInternational, parseUrl } from './domains';
 import { clip, type Finding } from './types';
 
 /** Schemes that run code or open local files instead of a web page. */
@@ -46,6 +46,9 @@ function checkLink(link: EmailLink): Finding[] {
 
   const findings: Finding[] = [];
   const host = hostOf(url.hostname);
+  // A link that forwards elsewhere through a parameter: its final target counts too.
+  const forward = forwardTarget(url);
+  const final = forward && hostOf(forward.hostname);
 
   if (url.username || url.password) {
     findings.push({
@@ -56,30 +59,30 @@ function checkLink(link: EmailLink): Finding[] {
       evidence: [href],
     });
   }
-  if (host.isIp) {
-    findings.push({
-      rule: 'ip-link',
-      severity: 'warning',
-      message: `A link goes to a bare IP address (${url.hostname}) instead of a domain name.`,
-      evidence: [href],
-    });
-  }
-  if (url.hostname.split('.').some((label) => label.startsWith('xn--'))) {
-    findings.push({
-      rule: 'international-domain',
-      severity: 'warning',
-      message: `A link uses international letters in its domain (${url.hostname}); they can imitate a familiar name.`,
-      evidence: [href],
-    });
+  for (const target of final && final.hostname !== host.hostname ? [host, final] : [host]) {
+    if (target.isIp) {
+      findings.push({
+        rule: 'ip-link',
+        severity: 'warning',
+        message: `A link goes to a bare IP address (${target.hostname}) instead of a domain name.`,
+        evidence: [href],
+      });
+    }
+    if (isInternational(target.hostname)) {
+      findings.push({
+        rule: 'international-domain',
+        severity: 'warning',
+        message: `A link uses international letters in its domain (${target.hostname}); they can imitate a familiar name.`,
+        evidence: [href],
+      });
+    }
   }
 
   // Only link texts that name a domain promise a target ("paypal.com", not "Click here").
   const promised = domainsInText(link.text)[0];
   if (!promised?.domain || !host.domain) return findings;
 
-  // A link that forwards elsewhere through a parameter: compare the text with the final target.
-  const forward = forwardTarget(url);
-  const final = forward && hostOf(forward.hostname);
+  // For a forwarding link, compare the text with the final target.
   if (final?.domain && final.domain !== host.domain) {
     if (final.domain !== promised.domain) {
       findings.push({

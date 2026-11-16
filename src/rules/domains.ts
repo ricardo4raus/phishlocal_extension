@@ -44,6 +44,13 @@ export function hostOf(hostname: string): Host {
   };
 }
 
+/**
+ * True if the hostname has international letters. `URL` turns them into punycode (`xn--…`), and
+ * the browser has no decoder, so the rules can only say that they are there.
+ */
+export const isInternational = (hostname: string): boolean =>
+  hostname.split('.').some((label) => label.startsWith('xn--'));
+
 /** The URL of a link, or undefined if the browser could not open it either. */
 export function parseUrl(href: string): URL | undefined {
   try {

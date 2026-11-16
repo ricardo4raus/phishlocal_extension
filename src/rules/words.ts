@@ -18,7 +18,7 @@ export function wordsPattern(words: readonly string[], flags = 'giu'): RegExp {
  * Invisible formatting characters: zero-width space and joiners, soft hyphen, word joiner,
  * direction marks. Attackers put them inside words to slip past filters ("con\u200bfirm").
  */
-export const INVISIBLE = /\p{Cf}/gu;
+const INVISIBLE = /\p{Cf}/gu;
 
 /**
  * Text in one comparable form, used by every rule: compatibility characters folded (NFKC turns

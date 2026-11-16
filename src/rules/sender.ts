@@ -6,7 +6,7 @@
  */
 import type { Email } from '../email';
 import { BRANDS } from './brands';
-import { domainsInText, type Host, hostOfAddress } from './domains';
+import { domainsInText, type Host, hostOfAddress, isInternational } from './domains';
 import { clip, type Finding } from './types';
 import { normalizeText, wordsPattern } from './words';
 
@@ -19,7 +19,7 @@ export function checkSender(sender: Email['sender']): Finding[] {
   const findings: Finding[] = [];
 
   // "paypal.com" written with a Cyrillic "a" arrives as "xn--…"; the reader sees a familiar name.
-  if (host.hostname.split('.').some((label) => label.startsWith('xn--'))) {
+  if (isInternational(host.hostname)) {
     findings.push({
       rule: 'international-domain',
       severity: 'warning',

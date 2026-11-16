@@ -82,6 +82,15 @@ describe('checkLinks', () => {
     ).toEqual([]);
   });
 
+  it('checks the final target of a forwarding link for IP addresses and international letters', () => {
+    expect(rulesFor('Open', 'https://www.google.com/url?q=http://192.168.10.5/login')).toEqual([
+      'ip-link:warning',
+    ]);
+    expect(rulesFor('Open', 'https://www.google.com/url?q=https://xn--pypal-4ve.com/')).toEqual([
+      'international-domain:warning',
+    ]);
+  });
+
   it('only notes a redirect service (real emails use them too)', () => {
     expect(rulesFor('debattr.com', 'https://c.gle/AGSJx')).toEqual(['redirect-link:info']);
     expect(
