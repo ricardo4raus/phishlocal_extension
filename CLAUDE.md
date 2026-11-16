@@ -63,7 +63,12 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - "Or paste an email" in the side panel is the fallback when Gmail can't be read (and for the
   demo): the pasted text, plus the links from the clipboard's HTML (parsed with parse5, a runtime
   dependency since 16 Nov 2026), and three made-up sample emails (`src/paste/samples.ts`).
-  Both paths show the email the same way; there is no phishing check of the email yet.
+  Both paths show the email the same way.
+- Rule checks (`src/rules/`, `checkEmail()`): pure functions, no DOM, no network. They flag
+  dangerous links, link text vs real target, lookalike domains, sender name vs address and
+  pressure phrases (en/de/fr/es), and the side panel lists the findings. Registrable domains
+  come from tldts (Public Suffix List, runtime dependency since 16 Nov 2026). `brands.ts` lists
+  real brands as reference data only. No AI check of the email yet.
 - The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow

@@ -24,11 +24,14 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
       (done Sun 15.11; reads on button click)
 - [x] Tue 17.11. – Paste fallback field in the side panel (demo must always work)
       (done Mon 16.11; plus three made-up sample emails)
-- [ ] Wed 18.11. – Rule checks in plain TypeScript (no AI): link text vs real domain,
+- [x] Wed 18.11. – Rule checks in plain TypeScript (no AI): link text vs real domain,
       lookalike domains (e.g. paypa1.com), reply-to ≠ sender, urgency words (en/de/fr/es).
-      Note: Reply-To is not in the Gmail page by default (only in the details box); check
-      first whether it can be read, otherwise drop that rule. Legit emails also have link text
-      that differs from the target (e.g. Google's `c.gle` links), so don't flag that blindly.
+      (done Mon 16.11; Reply-To is not in the Gmail page, so a sender-name rule replaces it
+      until the raw email task below; redirect services such as `c.gle` are only noted)
+- [ ] Wed 18.11. – Raw email: read the headers (Reply-To, Return-Path, SPF/DKIM/DMARC results)
+      for header rules. Gmail: fetch the "Show original" page in the background when reading the
+      open email (undocumented URL: measure first). Other mail apps: paste the raw source.
+      Parsed with postal-mime 4.2.0 (no dependencies, MIT-0).
 
 ## Phase 3 · AI & result
 
