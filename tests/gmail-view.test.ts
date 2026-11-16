@@ -101,9 +101,12 @@ describe('Gmail view', () => {
     expect(calls.at(-1)).toMatch(/^status: Open an email in Gmail/);
   });
 
-  it('reports an unreadable Gmail page as an error', () => {
+  it('reports an unreadable Gmail page as an error and hides the old email', () => {
+    view.handle({ type: 'email', key: 'msg-f:1', email });
     view.handle({ type: 'unreadable' });
     expect(calls).toEqual([
+      'show',
+      'hide',
       'status error: Could not read this email. Gmail may have changed its page.',
     ]);
   });

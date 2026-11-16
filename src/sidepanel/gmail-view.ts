@@ -46,13 +46,13 @@ export function createGmailView(ui: GmailViewUi): GmailView {
   let source: 'none' | 'gmail' | 'paste' = 'none';
 
   /** No Gmail email to show: hide the Gmail email, but leave a pasted one alone. */
-  const idle = (status: string): void => {
+  const idle = (status: string, isError = false): void => {
     current = undefined;
     if (source === 'gmail') {
       source = 'none';
       ui.hide();
     }
-    if (source !== 'paste') ui.setStatus(status);
+    if (source !== 'paste') ui.setStatus(status, isError);
   };
 
   async function addHeaders(target: { key: string; email: Email }, html: string): Promise<void> {
@@ -93,8 +93,7 @@ export function createGmailView(ui: GmailViewUi): GmailView {
           idle(IDLE);
           break;
         case 'unreadable':
-          current = undefined;
-          ui.setStatus('Could not read this email. Gmail may have changed its page.', true);
+          idle('Could not read this email. Gmail may have changed its page.', true);
           break;
       }
     },

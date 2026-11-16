@@ -33,7 +33,14 @@ export function watchActiveTab(callbacks: WatchCallbacks): Watch {
       callbacks.onDisconnected();
       return;
     }
-    const next = chrome.tabs.connect(tabId, { name: WATCH_PORT });
+    let next: chrome.runtime.Port;
+    try {
+      next = chrome.tabs.connect(tabId, { name: WATCH_PORT });
+    } catch {
+      // Some tabs (e.g. chrome:// pages) refuse the connection outright.
+      callbacks.onDisconnected();
+      return;
+    }
     port = next;
     next.onMessage.addListener((message: unknown) => {
       if (port === next && isGmailMessage(message)) callbacks.onMessage(message);

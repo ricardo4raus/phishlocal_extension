@@ -188,4 +188,20 @@ describe('watchGmail', () => {
     await settle();
     expect(types()).toEqual(['email:msg-f:1', 'original:msg-f:1']);
   });
+
+  it('reports an unreadable page once, not on every change', async () => {
+    openEmail('msg-f:1');
+    const broken = vi.spyOn(Document.prototype, 'querySelectorAll').mockImplementation(() => {
+      throw new Error('Gmail changed');
+    });
+    connect();
+    await settle();
+    document.body.append(document.createElement('span'));
+    await settle();
+    expect(types()).toEqual(['unreadable']);
+    broken.mockRestore();
+    document.body.append(document.createElement('span'));
+    await settle();
+    expect(types()).toEqual(['unreadable', 'email:msg-f:1', 'original:msg-f:1']);
+  });
 });

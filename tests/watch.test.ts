@@ -134,6 +134,20 @@ describe('watchActiveTab', () => {
     expect(ports).toHaveLength(2);
   });
 
+  it('treats a tab that refuses the connection like a non-Gmail tab', async () => {
+    vi.stubGlobal('chrome', {
+      ...chrome,
+      tabs: {
+        ...chrome.tabs,
+        connect: () => {
+          throw new Error('Cannot access a chrome:// URL');
+        },
+      },
+    });
+    await start();
+    expect(disconnects).toBe(1);
+  });
+
   it('says so when there is no active tab', async () => {
     activeTab = undefined;
     await start();

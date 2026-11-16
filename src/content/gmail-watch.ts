@@ -27,6 +27,9 @@ export const SCAN_DELAY_MS = 300;
 /** Loaded "Show original" pages kept for reopened emails (each at most 1 MB). */
 const MAX_CACHED_PAGES = 10;
 
+/** Marks that the open email could not be read (so the failure is reported only once). */
+const UNREADABLE = Symbol('unreadable');
+
 /** A key for messages without an ID (should not happen in today's Gmail). */
 const fallbackKey = (email: Email): string =>
   `text:${cut(`${email.sender.address}|${email.subject}`, MAX_KEY_CHARS - 5)}`;
@@ -35,8 +38,8 @@ export function watchGmail(
   port: WatchPort,
   page: { document: Document; location: Location } = { document, location },
 ): void {
-  /** Key of the email last reported; `null` after "no email" was reported. */
-  let reported: string | null | undefined;
+  /** Key of the email last reported; `null` after "no email", `UNREADABLE` after a failure. */
+  let reported: string | null | typeof UNREADABLE | undefined;
   let loading: AbortController | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let connected = true;
@@ -94,8 +97,12 @@ export function watchGmail(
       if (!force && messageId !== undefined && messageId === reported) return;
       email = message && extractEmail(page.document);
     } catch {
-      reported = undefined;
-      post({ type: 'unreadable' });
+      // Reported once: Gmail keeps changing its page, and each change would try again.
+      if (force || reported !== UNREADABLE) {
+        reported = UNREADABLE;
+        loading?.abort();
+        post({ type: 'unreadable' });
+      }
       return;
     }
     if (!message || !email) {
