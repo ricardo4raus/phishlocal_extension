@@ -63,7 +63,22 @@ describe('checkPhrases', () => {
   });
 
   it.each([
+    ['en', 'Enter your card number and security code to unlock your account.'],
+    ['de', 'Geben Sie Ihre Kartennummer ein.'],
+    ['fr', 'Saisissez votre numéro de carte.'],
+    ['es', 'Introduzca su número de tarjeta.'],
+  ])('finds requests for card details in %s', (_language, text) => {
+    expect(check(text)).toContain('credentials');
+  });
+
+  it.each([
     'We will never ask for your password by email.',
+    'We will never ask for your card number, security code or login details.',
+    'Bitcoin hit a new high this week.',
+    'Buy a gift card for the holidays.',
+    'Wir fragen nie nach Ihrer Kartennummer oder Ihren Zugangsdaten.',
+    'Nous ne demandons jamais vos identifiants ni votre numéro de carte.',
+    'Nunca le pediremos sus datos de acceso ni su número de tarjeta.',
     'Your November statement is ready in online banking.',
     'Sofortbildkamera im Angebot', // "sofort" inside a longer word
     'The insurgent group', // "urgent" inside a longer word
