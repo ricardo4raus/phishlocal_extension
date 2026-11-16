@@ -29,6 +29,15 @@ describe('checkSender', () => {
     expect(rulesFor('La   Poste', 'info@colis.example')).toEqual(['sender-name-brand:warning']);
   });
 
+  it('flags a sender domain with international letters, also without a name', () => {
+    const address = `x@p${String.fromCodePoint(0x430)}ypal.com`;
+    expect(rulesFor('', address)).toEqual(['international-domain:warning']);
+    expect(rulesFor('PayPal', address)).toEqual([
+      'international-domain:warning',
+      'sender-name-brand:warning',
+    ]);
+  });
+
   it.each([
     ['PayPal', 'service@paypal.com'],
     ['Google', 'no-reply@accounts.google.com'],

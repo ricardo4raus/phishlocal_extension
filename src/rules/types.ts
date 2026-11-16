@@ -13,6 +13,8 @@ export type RuleId =
   | 'brand-in-subdomain'
   | 'sender-name-domain'
   | 'sender-name-brand'
+  | 'hidden-characters'
+  | 'mixed-script'
   | 'urgency'
   | 'threat'
   | 'credentials'

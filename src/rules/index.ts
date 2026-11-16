@@ -8,6 +8,7 @@ import { checkLookalikes } from './lookalike';
 import { checkPhrases } from './phrases';
 import { checkSender } from './sender';
 import type { Finding, Severity } from './types';
+import { checkUnicode } from './unicode';
 
 export type { Finding, Severity } from './types';
 
@@ -23,6 +24,7 @@ export function checkEmail(email: Email): Finding[] {
     ...checkLookalikes(email),
     ...checkLinks(email.links),
     ...checkPhrases(email),
+    ...checkUnicode(email),
   ];
   const unique = new Map<string, Finding>();
   for (const finding of findings) {
