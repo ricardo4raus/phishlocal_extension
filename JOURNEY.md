@@ -40,11 +40,18 @@ _Current state, updated as features land._
   (loading, ready, not downloaded, not available).
 - "Read open email" in the side panel reads the email open in Gmail (sender, subject, visible
   text, links with their text and real target) through a content script, only on click. Nothing
-  leaves the browser. No phishing check of the email yet.
+  leaves the browser. No AI check of the email yet.
 - "Or paste an email" is the fallback for other mail apps and for the demo: paste an email
   (optionally with sender and subject) and the panel shows its text and links, including the
   real target behind each link text. Three made-up sample emails (two phishing, one harmless)
   load with one click.
+- Rule checks (no AI, on-device, in milliseconds) list red flags for every email read or pasted:
+  links that run code or hide their target, link text that names a different domain than the
+  real target (also behind forwarding links such as `google.com/url?q=…`), lookalike domains
+  (`paypa1.com`, `paypal.support`, `paypal.com.secure-login.example`), a sender name that claims
+  another domain or brand, invisible characters and lookalike letters from other alphabets, and
+  pressure phrases in English, German, French and Spanish. All rules are listed in
+  [`docs/rules.md`](docs/rules.md).
 
 ## How we built it
 
@@ -106,6 +113,14 @@ _Current state, updated as features land._
   HTML version with the real targets, but that HTML comes from the attacker. The panel reads it
   with parse5 (a parser that only builds a tree, never loads anything) and never puts it into
   the page.
+- **Rules that don't cry wolf:** real emails also break simple rules. Google's own emails show
+  "debattr.com" as link text but link to `c.gle`; mailing services put the customer's name in
+  front of their own domain for click tracking; "password" appears in harmless emails ("we will
+  never ask for your password"). Redirect services are only noted, names taken from the email
+  give a warning instead of danger, and the phrase lists use phrases instead of single words.
+  The three samples are tests: both phishing samples must get warnings, the harmless one none.
+- **No Reply-To in Gmail's page:** Gmail shows Reply-To only in its details box. The rules use
+  the sender name instead for now; the raw email (headers) is the next task.
 
 ## What we learned
 
@@ -174,6 +189,22 @@ _Current state, updated as features land._
   off (`spellcheck="false"`), otherwise "nothing leaves your browser" would not be true.
 - Sample emails use made-up brands and `.example` domains (reserved, they can never resolve):
   a real bank's name in a phishing sample could look like a real attack or a trademark problem.
+- Comparing domains needs the Public Suffix List: `accounts.google.com` belongs to `google.com`,
+  but `bank.github.io` and `evil.github.io` are different sites. tldts bundles the list; it was
+  already in the lockfile through jsdom.
+- Lookalike domains are found by mapping characters that look alike (`1`→`l`, `0`→`o`,
+  `rn`→`m`) and allowing one typo, but only for names of six or more letters; otherwise
+  "apply" would imitate "apple".
+- Phishing hides words from filters with Unicode: zero-width characters inside a word
+  ("con<U+200B>firm" looks like "confirm"), Cyrillic letters that look Latin, full-width letters. The
+  rules now fold the text first (NFKC, invisible characters removed) and treat the tricks
+  themselves as red flags.
+- Our own tools can plant invisible characters: an editing tool turned the escape `\u200b` in a
+  test into the real zero-width character. A structure test now rejects invisible characters in
+  the source ("Trojan Source").
+- A "no findings" message is a security statement: "no red flags" must not sound like "safe".
+- The same library can be twice as large depending on which of its builds the bundler picks:
+  tldts' ES module build adds 267 KB to the side panel, its prebuilt file only 130 KB.
 
 ## Accomplishments we're proud of
 
@@ -303,3 +334,27 @@ _To fill in near the submission._
   tracking URLs make the link list hard to read; shortening them is planned for 20 Nov.
 - Review of the branch: links from an earlier paste stuck to new text when the field was emptied
   and refilled. Fixed, with a test that fails without the fix.
+- Rule checks (planned for Wed 18 Nov): planned with Ricardo, then built in small commits on
+  `feat/rule-checks`: domain helpers with tldts, link rules, lookalike rules with a short list of
+  often-imitated brands, sender-name rules, pressure phrases in four languages, and a "Red
+  flags" list in the side panel. Reply-To is not in Gmail's page, so Ricardo decided to read the
+  raw email next: Gmail's "Show original" in the background, plus pasting the raw source.
+- Review of the branch: a name taken from the email in front of another domain was flagged as
+  danger, but mailing services do that for click tracking. It is a warning now.
+- Security review against OWASP Top 10, the OWASP Top 10 for LLM applications, CWE and MITRE
+  ATT&CK's phishing techniques, with a probe that ran each suspected gap through the real code.
+  No injection, script or crash risk; ten gaps and false alarms, all fixed with tests that fail
+  without the fix: invisible characters and other alphabets slipped past the rules, a brand name
+  with another ending (`paypal.support`) and forwarding links (`google.com/url?q=…`) passed clean,
+  harmless sentences ("we will never ask for your card number") got warnings, a company's own
+  domains in the sender name were "danger", "no red flags" sounded like "safe", and a failing
+  rule showed a wrong error. The next review round found that one fix hid a case completely;
+  it is a note now. The round after that found that a forwarding link's final target skipped
+  the IP and international-letter checks; fixed too.
+- Documentation: a README with features, privacy, setup and checks, and `docs/rules.md` with
+  every rule, its severity, its reason and its limits.
+- Tested the rule checks in Chrome: the three samples, three hand-written pastes (lookalike
+  sender and brand in front of another domain, a forwarding link through google.com, a German
+  email with an IP link and a fake sender name) and the real Google email. Every result matched
+  the expected list line by line; the Google email with its `c.gle` links got only one note.
+  Danger and warning labels are readable in dark mode.

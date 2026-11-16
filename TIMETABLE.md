@@ -24,16 +24,21 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
       (done Sun 15.11; reads on button click)
 - [x] Tue 17.11. – Paste fallback field in the side panel (demo must always work)
       (done Mon 16.11; plus three made-up sample emails)
-- [ ] Wed 18.11. – Rule checks in plain TypeScript (no AI): link text vs real domain,
+- [x] Wed 18.11. – Rule checks in plain TypeScript (no AI): link text vs real domain,
       lookalike domains (e.g. paypa1.com), reply-to ≠ sender, urgency words (en/de/fr/es).
-      Note: Reply-To is not in the Gmail page by default (only in the details box); check
-      first whether it can be read, otherwise drop that rule. Legit emails also have link text
-      that differs from the target (e.g. Google's `c.gle` links), so don't flag that blindly.
+      (done Mon 16.11; Reply-To is not in the Gmail page, so a sender-name rule replaces it
+      until the raw email task below; redirect services such as `c.gle` are only noted)
+- [ ] Wed 18.11. – Raw email: read the headers (Reply-To, Return-Path, SPF/DKIM/DMARC results)
+      for header rules. Gmail: fetch the "Show original" page in the background when reading the
+      open email (undocumented URL: measure first). Other mail apps: paste the raw source.
+      Parsed with postal-mime 4.2.0 (no dependencies, MIT-0).
 
 ## Phase 3 · AI & result
 
 - [ ] Thu 19.11. – Prompt + fixed JSON output schema (risk level, reasons, advice);
-      feed the rule results into the prompt; answer in the user's language
+      feed the rule results into the prompt; answer in the user's language. Prompt injection
+      (OWASP LLM01): email content and rule evidence only as escaped data; the AI must not lower
+      a rule's danger finding
 - [ ] Fri 20.11. – Result UI: traffic light 🟢🟡🔴, reasons, highlighted suspicious links
       (show the link's domain prominently, shorten long URLs); test end to end
 
@@ -55,6 +60,8 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 ## Phase 6 · Submission
 
 - [ ] Fri 27.11. – README: setup, how it works, how Firebase AI Logic is used
+      (first version with features, privacy, setup and checks written Mon 16.11; finish it
+      with the AI check, the consent flow and judge testing instructions)
 - [ ] Sat 28.11. – Demo video (max 3 min, English, public on YouTube, app running in Chrome;
       warm up the model before recording); Devpost description; thumbnail (3:2)
 - [ ] Sun 29.11. – Submit on Devpost, double-check every requirement

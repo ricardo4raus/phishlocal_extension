@@ -25,7 +25,8 @@
   "author": "Ricardo Kraus",
   "dependencies": {
     "firebase": "^13.3.0",
-    "parse5": "8.0.1"
+    "parse5": "8.0.1",
+    "tldts": "7.4.19"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^3.0.0",

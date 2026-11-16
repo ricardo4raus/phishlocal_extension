@@ -63,7 +63,14 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - "Or paste an email" in the side panel is the fallback when Gmail can't be read (and for the
   demo): the pasted text, plus the links from the clipboard's HTML (parsed with parse5, a runtime
   dependency since 16 Nov 2026), and three made-up sample emails (`src/paste/samples.ts`).
-  Both paths show the email the same way; there is no phishing check of the email yet.
+  Both paths show the email the same way.
+- Rule checks (`src/rules/`, `checkEmail()`): pure functions, no DOM, no network. They flag
+  dangerous links, link text vs real target (also behind forwarding parameters), lookalike
+  domains, sender name vs address, pressure phrases (en/de/fr/es), invisible characters and
+  mixed alphabets, and the side panel lists the findings. Registrable domains
+  come from tldts (Public Suffix List, runtime dependency since 16 Nov 2026). `brands.ts` lists
+  real brands as reference data only. No AI check of the email yet. Every rule is documented in
+  `docs/rules.md`; keep it in sync when a rule changes.
 - The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow
@@ -154,6 +161,12 @@ explain every red flag, and work offline, with a cloud only as fallback."
   `createContextualFragment`, `setHTMLUnsafe`, `document.write`, `DOMParser`). Parse untrusted
   HTML with parse5 only: `DOMParser` can load `<img>` and `<iframe>` URLs (tracking pixels).
 - Sample emails use made-up brands and `.example` domains only; a test rejects real brands.
+- No invisible characters (zero-width, bidi controls) in `src/` or `tests/`: write escapes such
+  as `\u200b` or `String.fromCodePoint(0x200b)`. Watch out: editing tools may turn `\u200b`
+  in their input into the real character.
+- Rule finding messages contain only limited email content (hostnames, our own phrases); raw
+  attacker text (link texts, sender names) stays in `evidence`. In the AI prompt, pass evidence
+  only as escaped data, and never let the AI lower a rule's danger finding (OWASP LLM01).
 
 ## Privacy and contest rules (mostly not enforced by tests)
 
