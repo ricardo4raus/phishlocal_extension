@@ -1,50 +1,5 @@
-import {
-  type AuthResults,
-  type Email,
-  isReadEmailResponse,
-  type Mailbox,
-  READ_EMAIL,
-  type ReadEmailRequest,
-} from '../email';
+import type { AuthResults, Email, Mailbox } from '../email';
 import { revealOverrides } from '../rules/unicode';
-
-export type ReadResult = { ok: true; email: Email } | { ok: false; message: string };
-
-const NOT_GMAIL =
-  'Open an email in Gmail in this tab, then click again. If Gmail was already open before ' +
-  'PhishLocal was installed or updated, reload the Gmail tab first.';
-
-/**
- * Asks the Gmail content script in the active tab for the open email. Reads only on request:
- * nothing is read from Gmail unless the user clicks.
- */
-export async function readOpenEmail(): Promise<ReadResult> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab?.id === undefined) return { ok: false, message: NOT_GMAIL };
-
-  let response: unknown;
-  try {
-    const request: ReadEmailRequest = { type: READ_EMAIL };
-    response = await chrome.tabs.sendMessage(tab.id, request);
-  } catch {
-    // No content script in this tab: not Gmail, or Gmail was opened before the extension loaded.
-    return { ok: false, message: NOT_GMAIL };
-  }
-  if (!isReadEmailResponse(response)) {
-    return {
-      ok: false,
-      message: 'Unexpected answer from the Gmail tab. Reload Gmail and try again.',
-    };
-  }
-  if (!response.ok) {
-    const message =
-      response.reason === 'unreadable'
-        ? 'Could not read this email. Gmail may have changed its page; please report it.'
-        : 'No email is open. Open an email in Gmail, then click again.';
-    return { ok: false, message };
-  }
-  return { ok: true, email: response.email };
-}
 
 /** Number of body characters shown in the panel (the full text is kept for the check). */
 const BODY_PREVIEW_CHARS = 1_000;
@@ -90,13 +45,20 @@ const setText = (element: HTMLElement, text: string): void => {
   element.textContent = revealOverrides(text);
 };
 
-/** Shows the email. */
-export function showEmail(email: Email, elements: EmailElements): void {
+/**
+ * Shows the email. `headersNote` replaces the hint in "Sender checks" while an email has no
+ * headers (e.g. "Loading from Gmail…").
+ */
+export function showEmail(
+  email: Email,
+  elements: EmailElements,
+  headersNote: string = HEADERS_HINT,
+): void {
   setText(elements.sender, mailbox(email.sender));
   setText(elements.subject, email.subject || '–');
 
   const { headers } = email;
-  elements.auth.textContent = headers ? authSummary(headers.auth) : HEADERS_HINT;
+  elements.auth.textContent = headers ? authSummary(headers.auth) : headersNote;
   elements.headerRows.hidden = !headers;
   setText(elements.replyTo, headers?.replyTo.map(mailbox).join(', ') || '–');
   setText(elements.returnPath, headers?.returnPath || '–');

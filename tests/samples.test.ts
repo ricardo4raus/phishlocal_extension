@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isReadEmailResponse } from '../src/email';
+import { isEmail } from '../src/email';
 import { readPaste } from '../src/paste/read-paste';
 import { SAMPLE_EMAILS } from '../src/paste/samples';
 
@@ -51,7 +51,7 @@ describe('sample emails', () => {
       const email = READ.get(sample.id)!;
 
       it('becomes a valid email with sender, subject, text and links', () => {
-        expect(isReadEmailResponse({ ok: true, email })).toBe(true);
+        expect(isEmail(email)).toBe(true);
         expect(email.sender.address).not.toBe('');
         expect(email.subject).not.toBe('');
         expect(email.bodyText).not.toBe('');

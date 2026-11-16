@@ -1,6 +1,6 @@
 /*
- * The email as PhishLocal sees it, and the message the side panel uses to ask the Gmail content
- * script for it. Shared by both, so they agree on the shape.
+ * The email as PhishLocal sees it. Shared by the Gmail content script, the paste area and the
+ * rules, so they agree on the shape; `isEmail()` checks it where it crosses from Gmail's tab.
  *
  * Email content is written by whoever sent the email, i.e. possibly an attacker. Treat every
  * string here as untrusted data: show it only as text, never as HTML.
@@ -88,23 +88,8 @@ export const cutLink = ({ text, href }: EmailLink): EmailLink => ({
   href: cut(href, FIELD_LIMITS.href),
 });
 
-export const READ_EMAIL = 'phishlocal/read-email';
-
-export interface ReadEmailRequest {
-  type: typeof READ_EMAIL;
-}
-
-/** `unreadable`: an email is open, but reading it failed (e.g. Gmail changed its page). */
-export type ReadEmailFailure = 'no-email-open' | 'unreadable';
-
-export type ReadEmailResponse =
-  { ok: true; email: Email } | { ok: false; reason: ReadEmailFailure };
-
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
-
-export const isReadEmailRequest = (value: unknown): value is ReadEmailRequest =>
-  isRecord(value) && value.type === READ_EMAIL;
 
 const isText = (value: unknown, max: number): value is string =>
   typeof value === 'string' && value.length <= max;
@@ -130,11 +115,4 @@ export function isEmail(value: unknown): value is Email {
     value.links.every(isEmailLink) &&
     typeof value.truncated === 'boolean'
   );
-}
-
-/** Checks the content script's answer before the side panel uses it. */
-export function isReadEmailResponse(value: unknown): value is ReadEmailResponse {
-  if (!isRecord(value)) return false;
-  if (value.ok === true) return isEmail(value.email);
-  return value.ok === false && (value.reason === 'no-email-open' || value.reason === 'unreadable');
 }

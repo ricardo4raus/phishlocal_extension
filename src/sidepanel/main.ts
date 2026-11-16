@@ -3,9 +3,11 @@ import { runPrompt, warmUpOnDevice, type WarmUpResult } from '../ai';
 import { appCheckEnabled } from '../firebase';
 import type { Email } from '../email';
 import { checkEmail } from '../rules';
-import { readOpenEmail, showEmail } from './email-view';
+import { showEmail } from './email-view';
+import { createGmailView } from './gmail-view';
 import { showRuleCheck } from './findings-view';
 import { setUpPaste } from './paste-view';
+import { watchActiveTab } from './watch';
 
 function byId<T extends HTMLElement>(id: string): T {
   const element = document.querySelector<T>(`#${id}`);
@@ -117,31 +119,30 @@ function setEmailStatus(text: string, isError = false): void {
   emailStatus.classList.toggle('error', isError);
 }
 
-/** Shows an email from Gmail or the paste area with its rule findings; long texts get a note. */
-function displayEmail(email: Email, message: string): void {
+/**
+ * Shows an email from Gmail or the paste area with its rule findings; long texts get a note.
+ * `headersNote` stands in for the sender checks while an email has no headers.
+ */
+function displayEmail(email: Email, message: string, headersNote?: string): void {
   showRuleCheck(() => checkEmail(email), findingsList);
-  showEmail(email, emailElements);
+  showEmail(email, emailElements, headersNote);
   setEmailStatus(email.truncated ? `${message} The text is long and was cut.` : message);
 }
 
-/** Reads the open Gmail email when the user clicks (never automatically). */
-async function readEmail(): Promise<void> {
-  readEmailButton.disabled = true;
-  emailElements.details.hidden = true;
-  setEmailStatus('Reading the open email…');
-  try {
-    const result = await readOpenEmail();
-    if (result.ok) displayEmail(result.email, 'Email read. Nothing left your browser.');
-    else setEmailStatus(result.message, true);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    setEmailStatus(`Could not read the email: ${message}`, true);
-  } finally {
-    readEmailButton.disabled = false;
-  }
-}
+// While the panel is open, every email opened in Gmail is checked automatically.
+const gmailView = createGmailView({
+  show: displayEmail,
+  hide: () => {
+    emailElements.details.hidden = true;
+  },
+  setStatus: setEmailStatus,
+});
+const watch = watchActiveTab({
+  onMessage: (message) => gmailView.handle(message),
+  onDisconnected: () => gmailView.disconnected(),
+});
 
-readEmailButton.addEventListener('click', () => void readEmail());
+readEmailButton.addEventListener('click', () => watch.scan());
 
 setUpPaste(
   {
@@ -154,12 +155,17 @@ setUpPaste(
     loadSample: byId<HTMLButtonElement>('sample-load'),
   },
   {
-    onEmail: displayEmail,
+    onEmail: (email, message) => {
+      gmailView.pasted();
+      displayEmail(email, message);
+    },
     onError: (message) => {
+      gmailView.pasted();
       emailElements.details.hidden = true;
       setEmailStatus(message, true);
     },
     onClear: () => {
+      gmailView.cleared();
       emailElements.details.hidden = true;
       setEmailStatus('');
     },
