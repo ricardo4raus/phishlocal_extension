@@ -15,6 +15,7 @@ export type RuleId =
   | 'sender-name-brand'
   | 'hidden-characters'
   | 'mixed-script'
+  | 'direction-override'
   | 'reply-to-mismatch'
   | 'dmarc-fail'
   | 'auth-fail'

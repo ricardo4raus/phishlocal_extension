@@ -6,6 +6,7 @@ import {
   READ_EMAIL,
   type ReadEmailRequest,
 } from '../email';
+import { revealOverrides } from '../rules/unicode';
 
 export type ReadResult = { ok: true; email: Email } | { ok: false; message: string };
 
@@ -80,21 +81,30 @@ export function authSummary(auth: AuthResults | undefined): string {
   return `SPF ${auth.spf ?? 'none'} · DKIM ${dkim} · DMARC ${auth.dmarc ?? 'none'}, checked by ${auth.server}`;
 }
 
-/** Shows the email. Only as text (`textContent`): email content may come from an attacker. */
+/**
+ * Puts email content into the page. Only as text (`textContent`): the content may come from an
+ * attacker. Direction overrides are shown as `<U+202E>`, so "moc.lapyap" is not displayed as
+ * "paypal.com" in the panel either.
+ */
+const setText = (element: HTMLElement, text: string): void => {
+  element.textContent = revealOverrides(text);
+};
+
+/** Shows the email. */
 export function showEmail(email: Email, elements: EmailElements): void {
-  elements.sender.textContent = mailbox(email.sender);
-  elements.subject.textContent = email.subject || '–';
+  setText(elements.sender, mailbox(email.sender));
+  setText(elements.subject, email.subject || '–');
 
   const { headers } = email;
   elements.auth.textContent = headers ? authSummary(headers.auth) : HEADERS_HINT;
   elements.headerRows.hidden = !headers;
-  elements.replyTo.textContent = headers?.replyTo.map(mailbox).join(', ') || '–';
-  elements.returnPath.textContent = headers?.returnPath || '–';
+  setText(elements.replyTo, headers?.replyTo.map(mailbox).join(', ') || '–');
+  setText(elements.returnPath, headers?.returnPath || '–');
 
   elements.links.replaceChildren(
     ...email.links.map((link) => {
       const item = document.createElement('li');
-      item.textContent = `${link.text || '(no text)'} → ${link.href}`;
+      setText(item, `${link.text || '(no text)'} → ${link.href}`);
       return item;
     }),
   );
@@ -106,6 +116,6 @@ export function showEmail(email: Email, elements: EmailElements): void {
 
   const preview = email.bodyText.slice(0, BODY_PREVIEW_CHARS);
   const cut = email.bodyText.length > BODY_PREVIEW_CHARS || email.truncated;
-  elements.body.textContent = cut ? `${preview}…` : preview || '–';
+  setText(elements.body, cut ? `${preview}…` : preview || '–');
   elements.details.hidden = false;
 }

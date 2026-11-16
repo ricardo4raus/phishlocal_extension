@@ -148,4 +148,11 @@ describe('showEmail', () => {
     showEmail({ ...email, headers: { replyTo: [] } }, els);
     expect(els.auth.textContent).toBe('None in the headers: the sender cannot be verified.');
   });
+
+  it('shows direction overrides visibly, so reversed text reads as written', () => {
+    const els = emailElements();
+    const rlo = String.fromCodePoint(0x202e);
+    showEmail({ ...email, sender: { name: `${rlo}moc.lapyap`, address: 'x@evil.example' } }, els);
+    expect(els.sender.textContent).toBe('<U+202E>moc.lapyap <x@evil.example>');
+  });
 });
