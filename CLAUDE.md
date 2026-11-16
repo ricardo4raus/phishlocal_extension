@@ -176,6 +176,10 @@ explain every red flag, and work offline, with a cloud only as fallback."
   `createContextualFragment`, `setHTMLUnsafe`, `document.write`, `DOMParser`). Parse untrusted
   HTML with parse5 only: `DOMParser` can load `<img>` and `<iframe>` URLs (tracking pixels).
 - Sample emails use made-up brands and `.example` domains only; a test rejects real brands.
+- Read email HTML only through `readHtml()` (parse5 with a 1,000-level depth limit and a 2 MB
+  limit), and walk parse5 trees without recursion: deep nesting crashed and froze the panel.
+- Every email source cuts fields to `FIELD_LIMITS` (`src/email.ts`), and the validator rejects
+  longer ones. Show email text in the panel through `setText()`, which reveals direction overrides.
 - No invisible characters (zero-width, bidi controls) in `src/` or `tests/`: write escapes such
   as `\u200b` or `String.fromCodePoint(0x200b)`. Watch out: editing tools may turn `\u200b`
   in their input into the real character.

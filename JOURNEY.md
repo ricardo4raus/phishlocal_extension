@@ -220,6 +220,12 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   (RFC 8601); `ARC-Authentication-Results` is a different header and is not used.
 - One passing sender check is enough without DMARC: forwarding breaks SPF but keeps the DKIM
   signature.
+- A parser can be safe and still be a denial-of-service: parse5 never runs scripts, but its time
+  grows with the square of the nesting depth. Measure with hostile input, not only real emails.
+- A multipart email has two bodies; the mail app shows the HTML one. Checking the other one is a
+  gap an attacker can use.
+- The tricks we flag in emails can fool our own UI: a right-to-left override reversed text in
+  the side panel too, so the panel now shows it as `<U+202E>`.
 
 ## Accomplishments we're proud of
 
@@ -388,3 +394,12 @@ _To fill in near the submission._
   `chessable.us14.list-manage.com` was a warning ("chessable" in front of another domain). Known
   mailing services are now listed; the email's own name in front of them is not flagged, a real
   brand's name still is.
+- Security review of the raw-email PR and every input (paste field, clipboard HTML, raw source,
+  Gmail page, sender and subject fields) against OWASP Top 10, OWASP ASVS, CWE and MITRE ATT&CK,
+  with a probe through the real code. No injection or code execution; seven issues, all fixed with
+  tests that fail without the fix: deeply nested HTML crashed the check and, because parse5 slows
+  down with the square of the depth, could freeze the panel for minutes; HTML over 2 MB was
+  skipped silently; a harmless plain-text part hid a phishing HTML part; a right-to-left override
+  ("moc.lapyap" shown as "paypal.com") had no finding and fooled our own panel; Clear during
+  reading brought the old email back; fields had no length limits; raw-source detection stopped
+  at 64 KB while the parser accepted 256 KB.

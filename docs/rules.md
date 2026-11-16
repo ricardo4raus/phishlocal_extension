@@ -16,7 +16,8 @@ The code is in [`src/rules/`](../src/rules/); the entry point is `checkEmail(ema
 2. **Normalization:** every text is folded the same way before matching: NFKC (full-width and
    ligature letters become plain ones), invisible formatting characters removed, the ideographic
    full stop read as a dot, lowercase, typographic apostrophes as `'`.
-3. **Rules:** headers, sender, lookalike domains, links, pressure phrases and Unicode tricks.
+3. **Rules:** completeness, headers, sender, lookalike domains, links, pressure phrases and
+   Unicode tricks.
 4. **Result:** each finding once, the most severe first, at most 30 per email.
 
 A finding has a rule id, a severity, one English sentence and the evidence (the link, domain or
@@ -138,16 +139,29 @@ would also flag harmless sentences such as "we will never ask for your card numb
 
 ### Unicode tricks ([`unicode.ts`](../src/rules/unicode.ts))
 
-| Rule                | Severity | Flags                                                       | Example                                |
-| ------------------- | -------- | ----------------------------------------------------------- | -------------------------------------- |
-| `hidden-characters` | warning  | Invisible characters inside a Latin, Cyrillic or Greek word | "con<U+200B>firm" (a zero-width space) |
-| `mixed-script`      | warning  | Words that mix Latin with Cyrillic or Greek letters         | "paypal" written with a Cyrillic "a"   |
+| Rule                 | Severity | Flags                                                       | Example                                |
+| -------------------- | -------- | ----------------------------------------------------------- | -------------------------------------- |
+| `hidden-characters`  | warning  | Invisible characters inside a Latin, Cyrillic or Greek word | "con<U+200B>firm" (a zero-width space) |
+| `mixed-script`       | warning  | Words that mix Latin with Cyrillic or Greek letters         | "paypal" written with a Cyrillic "a"   |
+| `direction-override` | warning  | A hidden direction switch (U+202E, U+202D)                  | "moc.lapyap" displayed as "paypal.com" |
 
 - Both tricks hide a word from filters while the reader sees a normal word, so they are red flags
   of their own. The normalization step also removes them, so the other rules still see the word.
 - Soft hyphens are not flagged (newsletters use them to hyphenate), nor are joiners in scripts
   that need them (Arabic, Persian, Indic) or in emoji.
 - The evidence shows invisible characters as `<U+200B>`.
+- Direction overrides (MITRE ATT&CK T1036.002) are also shown visibly in the side panel itself, as
+  `<U+202E>`, so the panel never displays reversed text. Other direction marks stay, because
+  Arabic and Hebrew text needs them.
+
+### Incomplete check ([`index.ts`](../src/rules/index.ts))
+
+| Rule               | Severity | Flags                                                              |
+| ------------------ | -------- | ------------------------------------------------------------------ |
+| `incomplete-check` | warning  | Part of the HTML was not read: over 2 MB or over 1,000 levels deep |
+
+Hostile emails pad or nest their HTML to slip past checks, so an email that could not be read
+completely is a red flag of its own. Real emails stay far below both limits.
 
 ## Security design
 
@@ -160,6 +174,13 @@ would also flag harmless sentences such as "we will never ask for your card numb
   without nested repetition that could backtrack. Inputs, domains per text (100), parameters per
   link (20), findings (30) and evidence (200 characters) are capped. The worst case at the input
   limits takes about 180 ms.
+- **HTML is read with limits:** parse5 slows down with the square of the nesting depth (40,000
+  nested `<div>` take about 5 s), so a tree adapter stops at 1,000 levels and only the first 2 MB
+  are read; the tree is walked without recursion. 400,000 levels now take a few milliseconds.
+- **Field limits:** sender name 500, address 320, subject 1,000, link text 1,000 and link target
+  4,000 characters, enforced in every source and in the message validator.
+- **What the reader sees is checked:** for raw emails the body text comes from the HTML part,
+  because mail apps show it; a harmless plain-text part cannot hide a phishing HTML part.
 - **Fail visibly:** if a rule throws, the side panel says "The rule check failed. Treat this
   email with care." and still shows the email.
 
