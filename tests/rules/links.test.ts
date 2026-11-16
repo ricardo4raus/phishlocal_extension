@@ -41,6 +41,15 @@ describe('checkLinks', () => {
     });
   });
 
+  it('reads full-width and ideographic link texts', () => {
+    expect(rulesFor('ｐａｙｐａｌ．ｃｏｍ', 'https://evil.example/')).toEqual([
+      'link-text-mismatch:warning',
+    ]);
+    expect(rulesFor('paypal。com', 'https://evil.example/')).toEqual([
+      'link-text-mismatch:warning',
+    ]);
+  });
+
   it('accepts other parts of the same domain', () => {
     expect(rulesFor('google.com', 'https://accounts.google.com/x')).toEqual([]);
     expect(rulesFor('www.bank.example', 'https://bank.example/')).toEqual([]);

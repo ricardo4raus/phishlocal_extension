@@ -56,6 +56,14 @@ describe('domainsInText', () => {
     ).toEqual(['www.bank.example', 'shop.example', 'help.example']);
   });
 
+  it('reads full-width letters, other dots and invisible characters like the browser', () => {
+    expect(domains('ｐａｙｐａｌ．ｃｏｍ, paypal。de and pay\u200bpal.ch')).toEqual([
+      'paypal.com',
+      'paypal.de',
+      'paypal.ch',
+    ]);
+  });
+
   it('ignores words that only look like domains', () => {
     expect(domains('Node.js costs CHF 1.99, e.g. in index.html or vite.config.ts')).toEqual([]);
   });

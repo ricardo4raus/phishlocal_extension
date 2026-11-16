@@ -7,6 +7,7 @@
  * phishing pages on exactly such shared hosts.
  */
 import { parse } from 'tldts';
+import { normalizeText } from './words';
 
 export interface Host {
   /** Lowercase hostname; international names in punycode (`xn--…`), as `URL` returns them. */
@@ -72,11 +73,12 @@ export const MAX_DOMAINS_IN_TEXT = 100;
 
 /**
  * Domains named in a text (link text, sender name, body), unique, in order of appearance. Only
- * words with a real suffix count, so `Node.js`, `1.99` or `e.g.` are not domains.
+ * words with a real suffix count, so `Node.js`, `1.99` or `e.g.` are not domains. The text is
+ * normalized first, so `ｐａｙｐａｌ．ｃｏｍ` and `paypal。com` count as `paypal.com`.
  */
 export function domainsInText(text: string): Host[] {
   const hosts = new Map<string, Host>();
-  for (const [word] of text.matchAll(DOMAIN_WORD)) {
+  for (const [word] of normalizeText(text).matchAll(DOMAIN_WORD)) {
     const url = parseUrl(`https://${word}`);
     const host = url && hostOf(url.hostname);
     if (host?.domain && !hosts.has(host.hostname)) {

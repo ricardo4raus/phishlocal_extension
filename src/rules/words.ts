@@ -15,11 +15,21 @@ export function wordsPattern(words: readonly string[], flags = 'giu'): RegExp {
 }
 
 /**
- * Text in one comparable form: compatibility characters folded (NFKC turns full-width or
- * ligature letters into plain ones), lowercase, typographic apostrophes as `'`.
+ * Invisible formatting characters: zero-width space and joiners, soft hyphen, word joiner,
+ * direction marks. Attackers put them inside words to slip past filters ("con\u200bfirm").
+ */
+export const INVISIBLE = /\p{Cf}/gu;
+
+/**
+ * Text in one comparable form, used by every rule: compatibility characters folded (NFKC turns
+ * full-width or ligature letters into plain ones), invisible characters removed, the ideographic
+ * full stop read as a dot (browsers do the same in domain names), lowercase, typographic
+ * apostrophes as `'`.
  */
 export const normalizeText = (text: string): string =>
   text
     .normalize('NFKC')
+    .replaceAll(INVISIBLE, '')
+    .replaceAll('。', '.')
     .toLowerCase()
     .replaceAll(/[‘’ʼ`´]/g, "'");

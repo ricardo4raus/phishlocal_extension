@@ -55,6 +55,13 @@ describe('checkPhrases', () => {
     expect(check('ＰＡＹ ＮＯＷ')).toEqual(['payment']);
   });
 
+  it('is not fooled by invisible characters inside words', () => {
+    expect(check('con\u200bfirm your iden\u00adtity within 2\u200d4 hours')).toEqual([
+      'urgency',
+      'credentials',
+    ]);
+  });
+
   it.each([
     'We will never ask for your password by email.',
     'Your November statement is ready in online banking.',
