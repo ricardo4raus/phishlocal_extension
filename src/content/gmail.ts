@@ -5,7 +5,9 @@
  * email") does it read the open email and answer. The email is not stored and not sent anywhere.
  */
 import { isReadEmailRequest, type ReadEmailResponse } from '../email';
+import { WATCH_PORT } from '../messages';
 import { extractEmail } from './gmail-extract';
+import { watchGmail } from './gmail-watch';
 
 function readEmail(): ReadEmailResponse {
   try {
@@ -16,6 +18,16 @@ function readEmail(): ReadEmailResponse {
     return { ok: false, reason: 'unreadable' };
   }
 }
+
+// While the side panel is open, it connects and the email is checked automatically.
+chrome.runtime.onConnect.addListener((port) => {
+  // Only our own extension may connect.
+  if (port.name !== WATCH_PORT || port.sender?.id !== chrome.runtime.id) {
+    port.disconnect();
+    return;
+  }
+  watchGmail(port);
+});
 
 chrome.runtime.onMessage.addListener(
   (message: unknown, sender, sendResponse: (response: ReadEmailResponse) => void) => {

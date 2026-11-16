@@ -8,6 +8,21 @@ import { READ_EMAIL, type ReadEmailResponse } from '../src/email';
 
 const extractEmail = vi.hoisted(() => vi.fn<() => unknown>());
 vi.mock('../src/content/gmail-extract', () => ({ extractEmail }));
+const watchGmail = vi.hoisted(() => vi.fn<(port: unknown) => void>());
+vi.mock('../src/content/gmail-watch', () => ({ watchGmail }));
+
+interface FakePort {
+  name: string;
+  sender?: { id?: string };
+  disconnect: () => void;
+}
+let onConnect: (port: FakePort) => void;
+
+const watchPort = (id?: string): FakePort => ({
+  name: 'phishlocal/watch',
+  sender: { id },
+  disconnect: vi.fn<() => void>(),
+});
 
 type Listener = (
   message: unknown,
@@ -21,9 +36,15 @@ let listener: Listener;
 beforeEach(async () => {
   vi.resetModules();
   extractEmail.mockReset();
+  watchGmail.mockReset();
   vi.stubGlobal('chrome', {
     runtime: {
       id: OWN_ID,
+      onConnect: {
+        addListener: (registered: (port: FakePort) => void) => {
+          onConnect = registered;
+        },
+      },
       onMessage: {
         addListener: (registered: Listener) => {
           listener = registered;
@@ -77,5 +98,22 @@ describe('Gmail content script', () => {
   ])('ignores %s and reads nothing', (_label, message, sender) => {
     expect(ask(message, sender)).toBeUndefined();
     expect(extractEmail).not.toHaveBeenCalled();
+  });
+
+  it('watches Gmail only for a connection from our own extension', () => {
+    const own = watchPort(OWN_ID);
+    onConnect(own);
+    expect(watchGmail).toHaveBeenCalledWith(own);
+
+    for (const foreign of [
+      watchPort('other-extension'),
+      watchPort(undefined),
+      { ...own, name: 'other' },
+    ]) {
+      watchGmail.mockClear();
+      onConnect(foreign);
+      expect(watchGmail).not.toHaveBeenCalled();
+      expect(foreign.disconnect).toHaveBeenCalled();
+    }
   });
 });
