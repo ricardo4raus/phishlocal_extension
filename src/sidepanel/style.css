@@ -31,6 +31,43 @@ h2 {
   gap: 8px;
 }
 
+.paste {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.paste[open] {
+  padding-bottom: 4px;
+}
+
+.paste summary {
+  cursor: pointer;
+}
+
+.paste input,
+.paste select {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+}
+
+.paste .row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.paste .row select {
+  flex: 1;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 .email-status {
   margin: 0;
 }

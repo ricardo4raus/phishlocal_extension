@@ -14,6 +14,35 @@
       <section class="email" aria-labelledby="email-heading">
         <h2 id="email-heading">Email</h2>
         <button id="read-email" type="button">Read open email</button>
+
+        <details class="paste">
+          <summary>Or paste an email</summary>
+          <p class="hint">Stays on your device. Nothing is saved.</p>
+          <label for="paste-sender">From (optional)</label>
+          <input
+            id="paste-sender"
+            type="text"
+            placeholder="Name &lt;address&gt;"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <label for="paste-subject">Subject (optional)</label>
+          <input id="paste-subject" type="text" autocomplete="off" spellcheck="false" />
+          <label for="paste-text">Email text</label>
+          <textarea id="paste-text" rows="6" spellcheck="false"></textarea>
+          <div class="row">
+            <button id="paste-use" type="button">Use pasted email</button>
+            <button id="paste-clear" type="button">Clear</button>
+          </div>
+          <label for="sample-select">Or load a made-up sample</label>
+          <div class="row">
+            <select id="sample-select">
+              <option value="">Choose a sample…</option>
+            </select>
+            <button id="sample-load" type="button">Load sample</button>
+          </div>
+        </details>
+
         <p id="email-status" class="email-status" role="status"></p>
         <dl id="email-details" class="email-details" hidden>
           <dt>From</dt>

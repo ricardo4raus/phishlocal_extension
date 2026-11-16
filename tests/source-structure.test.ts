@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   fileExistsExactCase,
   findApiKeys,
+  findHtmlSinks,
   findRemoteCodeInFile,
   fromRoot,
   parseEnv,
@@ -138,6 +139,19 @@ describe('no remote code in src/', () => {
     'src/%s loads no remote scripts or modules',
     (name, file) => {
       expect(findRemoteCodeInFile(name, readText(file))).toEqual([]);
+    },
+  );
+});
+
+describe('no HTML injection sinks in src/', () => {
+  const srcDir = fromRoot('src');
+  const scripts = walkFiles(srcDir).filter((file) => /\.[cm]?tsx?$/.test(file));
+
+  // Email content is attacker-controlled: show it with textContent, parse it with parse5.
+  it.each(scripts.map((file) => [toPosixRelative(srcDir, file), file]))(
+    'src/%s turns no strings into HTML',
+    (name, file) => {
+      expect(findHtmlSinks(readText(file), name)).toEqual([]);
     },
   );
 });

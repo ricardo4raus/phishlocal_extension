@@ -60,6 +60,10 @@ explain every red flag, and work offline, with a cloud only as fallback."
   `src/content/gmail.ts`, only on click. Gmail's selectors live in `SELECTORS` in
   `src/content/gmail-extract.ts` (measured 15 Nov 2026). If Gmail changes its page, measure
   again with a DevTools snippet that prints only counts and class names, never email content.
+- "Or paste an email" in the side panel is the fallback when Gmail can't be read (and for the
+  demo): the pasted text, plus the links from the clipboard's HTML (parsed with parse5, a runtime
+  dependency since 16 Nov 2026), and three made-up sample emails (`src/paste/samples.ts`).
+  Both paths show the email the same way; there is no phishing check of the email yet.
 - The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow
@@ -145,6 +149,11 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - The App Check debug token is a secret: read it only behind `import.meta.env.DEV`, so release
   builds never contain it. The `dist` test fails if the token is in the build.
 - No custom `content_security_policy` in the manifest; the MV3 default is what we want.
+- Email content is attacker-controlled: show it only with `textContent`. `src/` must not turn
+  strings into HTML (no `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `srcdoc`,
+  `createContextualFragment`, `setHTMLUnsafe`, `document.write`, `DOMParser`). Parse untrusted
+  HTML with parse5 only: `DOMParser` can load `<img>` and `<iframe>` URLs (tracking pixels).
+- Sample emails use made-up brands and `.example` domains only; a test rejects real brands.
 
 ## Privacy and contest rules (mostly not enforced by tests)
 

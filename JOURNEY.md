@@ -41,6 +41,10 @@ _Current state, updated as features land._
 - "Read open email" in the side panel reads the email open in Gmail (sender, subject, visible
   text, links with their text and real target) through a content script, only on click. Nothing
   leaves the browser. No phishing check of the email yet.
+- "Or paste an email" is the fallback for other mail apps and for the demo: paste an email
+  (optionally with sender and subject) and the panel shows its text and links, including the
+  real target behind each link text. Three made-up sample emails (two phishing, one harmless)
+  load with one click.
 
 ## How we built it
 
@@ -97,6 +101,11 @@ _Current state, updated as features land._
 - **No `innerText` in tests:** jsdom has no layout, so `innerText` is undefined there. The code
   keeps the real `innerText` (which skips hidden text, a common phishing trick); the tests use a
   small stand-in. Hidden text in a real Gmail email still has to be checked in Chrome.
+- **Pasted text has no links:** a plain-text paste shows only the link text ("paypal.com"), not
+  where the link goes, which is the most important phishing signal. The clipboard also carries an
+  HTML version with the real targets, but that HTML comes from the attacker. The panel reads it
+  with parse5 (a parser that only builds a tree, never loads anything) and never puts it into
+  the page.
 
 ## What we learned
 
@@ -158,6 +167,13 @@ _Current state, updated as features land._
   if the side panel ever renders it as HTML.
 - `npm install --before=<date>` resolves a new package's dependencies only to releases older
   than that date, which keeps fresh (riskier) releases out of the lockfile.
+- The browser's own `DOMParser` is not safe for untrusted HTML: MDN warns that it can download
+  `<img>` and `<iframe>` resources, so a tracking pixel in a pasted email would tell the sender
+  that it was opened. parse5 does not load anything.
+- Chrome's enhanced spell check sends typed text to Google. The paste fields turn spell check
+  off (`spellcheck="false"`), otherwise "nothing leaves your browser" would not be true.
+- Sample emails use made-up brands and `.example` domains (reserved, they can never resolve):
+  a real bank's name in a phishing sample could look like a real attack or a trademark problem.
 
 ## Accomplishments we're proud of
 
@@ -268,3 +284,22 @@ _To fill in near the submission._
   tests. Tested in Chrome on an open email, the inbox list and a non-Gmail tab; all three gave
   the expected result. Decided: automatic scanning when an email opens becomes an optional
   setting (off by default) on 23 Nov.
+
+### Mon 16 Nov 2026
+
+**Session with Claude Code:**
+
+- Paste fallback (planned for Tue 17 Nov): researched safe ways to read pasted HTML, then built
+  it in four small commits on `feat/paste-email`. A new structure test fails if `src/` ever turns
+  a string into HTML. `parsePastedEmail()` takes the text, the sender and subject fields, and
+  the links from the clipboard's HTML (parse5) and from URLs in the text. Three made-up samples,
+  checked by a test against real brand names. The side panel got a collapsible "Or paste an
+  email" area that shares the display with "Read open email".
+- parse5 moved from a development to a runtime dependency; the side panel bundle grew from
+  69 KB to 226 KB, which is fine for a local extension.
+- Tested in Chrome: the samples load and show the real link targets; an email copied from Gmail
+  and pasted shows its links with the real `c.gle` targets; Clear empties everything. The side
+  panel's Network tab stayed empty during a paste with images, so no tracking pixel fired. The long
+  tracking URLs make the link list hard to read; shortening them is planned for 20 Nov.
+- Review of the branch: links from an earlier paste stuck to new text when the field was emptied
+  and refilled. Fixed, with a test that fails without the fix.

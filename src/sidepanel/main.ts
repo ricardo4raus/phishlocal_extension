@@ -1,7 +1,9 @@
 import { InferenceSource } from 'firebase/ai';
 import { runPrompt, warmUpOnDevice, type WarmUpResult } from '../ai';
 import { appCheckEnabled } from '../firebase';
+import type { Email } from '../email';
 import { readOpenEmail, showEmail } from './email-view';
+import { setUpPaste } from './paste-view';
 
 function byId<T extends HTMLElement>(id: string): T {
   const element = document.querySelector<T>(`#${id}`);
@@ -103,32 +105,58 @@ const emailElements = {
   body: byId<HTMLElement>('email-body'),
 };
 
+function setEmailStatus(text: string, isError = false): void {
+  emailStatus.textContent = text;
+  emailStatus.classList.toggle('error', isError);
+}
+
+/** Shows an email from Gmail or from the paste area; long texts get a note. */
+function displayEmail(email: Email, message: string): void {
+  showEmail(email, emailElements);
+  setEmailStatus(email.truncated ? `${message} The text is long and was cut.` : message);
+}
+
 /** Reads the open Gmail email when the user clicks (never automatically). */
 async function readEmail(): Promise<void> {
   readEmailButton.disabled = true;
   emailElements.details.hidden = true;
-  emailStatus.classList.remove('error');
-  emailStatus.textContent = 'Reading the open email…';
+  setEmailStatus('Reading the open email…');
   try {
     const result = await readOpenEmail();
-    if (result.ok) {
-      showEmail(result.email, emailElements);
-      emailStatus.textContent = result.email.truncated
-        ? 'Email read (long text, cut to the first part).'
-        : 'Email read. Nothing left your browser.';
-    } else {
-      emailStatus.textContent = result.message;
-      emailStatus.classList.add('error');
-    }
+    if (result.ok) displayEmail(result.email, 'Email read. Nothing left your browser.');
+    else setEmailStatus(result.message, true);
   } catch (error) {
-    emailStatus.textContent = `Could not read the email: ${error instanceof Error ? error.message : String(error)}`;
-    emailStatus.classList.add('error');
+    const message = error instanceof Error ? error.message : String(error);
+    setEmailStatus(`Could not read the email: ${message}`, true);
   } finally {
     readEmailButton.disabled = false;
   }
 }
 
 readEmailButton.addEventListener('click', () => void readEmail());
+
+setUpPaste(
+  {
+    sender: byId<HTMLInputElement>('paste-sender'),
+    subject: byId<HTMLInputElement>('paste-subject'),
+    text: byId<HTMLTextAreaElement>('paste-text'),
+    use: byId<HTMLButtonElement>('paste-use'),
+    clear: byId<HTMLButtonElement>('paste-clear'),
+    sample: byId<HTMLSelectElement>('sample-select'),
+    loadSample: byId<HTMLButtonElement>('sample-load'),
+  },
+  {
+    onEmail: displayEmail,
+    onError: (message) => {
+      emailElements.details.hidden = true;
+      setEmailStatus(message, true);
+    },
+    onClear: () => {
+      emailElements.details.hidden = true;
+      setEmailStatus('');
+    },
+  },
+);
 
 /** Loads the on-device model as soon as the panel opens, so the first check does not wait. */
 async function warmUp(): Promise<void> {
