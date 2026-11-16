@@ -100,7 +100,7 @@ export type ReadEmailFailure = 'no-email-open' | 'unreadable';
 export type ReadEmailResponse =
   { ok: true; email: Email } | { ok: false; reason: ReadEmailFailure };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
 export const isReadEmailRequest = (value: unknown): value is ReadEmailRequest =>
@@ -117,7 +117,8 @@ function isEmailLink(value: unknown): value is EmailLink {
   );
 }
 
-function isEmail(value: unknown): value is Email {
+/** True if `value` is a complete, size-checked `Email` (headers are added in the side panel only). */
+export function isEmail(value: unknown): value is Email {
   if (!isRecord(value) || !isRecord(value.sender)) return false;
   return (
     isText(value.sender.name, FIELD_LIMITS.name) &&
