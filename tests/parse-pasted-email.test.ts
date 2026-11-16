@@ -1,8 +1,13 @@
 // Runs in Node without a DOM on purpose: the parser must work with parse5 alone, so it cannot
 // create elements, load images or run scripts from a pasted email.
 import { describe, expect, it } from 'vitest';
-import { MAX_BODY_CHARS, MAX_LINKS } from '../src/email';
-import { MAX_PASTE_HTML_CHARS, parsePastedEmail } from '../src/paste/parse-pasted-email';
+import { FIELD_LIMITS, MAX_BODY_CHARS, MAX_LINKS } from '../src/email';
+import {
+  MAX_HTML_DEPTH,
+  MAX_PASTE_HTML_CHARS,
+  parsePastedEmail,
+  readHtml,
+} from '../src/paste/parse-pasted-email';
 
 describe('parsePastedEmail', () => {
   it('runs without a DOM', () => {
@@ -83,11 +88,52 @@ describe('parsePastedEmail', () => {
     expect(email.links).toHaveLength(MAX_LINKS);
   });
 
-  it('ignores HTML over the size limit and still finds URLs in the text', () => {
-    const html = `<a href="https://x.example/html">x</a>${' '.repeat(MAX_PASTE_HTML_CHARS)}`;
+  it('reads nesting up to the depth limit completely', () => {
+    const depth = MAX_HTML_DEPTH - 10;
+    const content = readHtml(
+      `${'<div>'.repeat(depth)}<a href="https://evil.example/">bank.example</a>`,
+    );
+    expect(content.complete).toBe(true);
+    expect(content.links).toEqual([{ text: 'bank.example', href: 'https://evil.example/' }]);
+  });
+
+  it('stops quickly at the depth limit and says the email is incomplete', () => {
+    const start = performance.now();
+    const email = parsePastedEmail({
+      text: 'x',
+      html: `<a href="https://first.example/">first</a>${'<div>'.repeat(400_000)}<a href="https://later.example/">later</a>`,
+    });
+    expect(performance.now() - start).toBeLessThan(2_000);
+    expect(email.incomplete).toBe(true);
+    expect(email.links.map((link) => link.href)).toEqual(['https://first.example/']);
+  });
+
+  it('reads the first part of HTML over the size limit and says the email is incomplete', () => {
+    const html = `<a href="https://x.example/html">x</a>${' '.repeat(MAX_PASTE_HTML_CHARS)}<a href="https://x.example/late">late</a>`;
     const email = parsePastedEmail({ text: 'see https://x.example/text', html });
-    expect(email.links).toEqual([
-      { text: 'https://x.example/text', href: 'https://x.example/text' },
+    expect(email.incomplete).toBe(true);
+    expect(email.links.map((link) => link.href)).toEqual([
+      'https://x.example/html',
+      'https://x.example/text',
     ]);
+  });
+
+  it('reads the visible text of HTML, without scripts and styles', () => {
+    expect(
+      readHtml(
+        '<html><head><title>T</title><style>p{}</style></head><body><p>Line one</p><p>Line <b>two</b></p><script>x()</script></body></html>',
+      ).text,
+    ).toBe('Line one\nLine two');
+  });
+
+  it('cuts fields that are longer than any real email has', () => {
+    const email = parsePastedEmail({
+      text: `https://x.example/${'p'.repeat(FIELD_LIMITS.href)}`,
+      sender: `${'N'.repeat(FIELD_LIMITS.name + 50)} <a@x.example>`,
+      subject: 'S'.repeat(FIELD_LIMITS.subject + 50),
+    });
+    expect(email.sender.name).toHaveLength(FIELD_LIMITS.name);
+    expect(email.subject).toHaveLength(FIELD_LIMITS.subject);
+    expect(email.links[0]?.href).toHaveLength(FIELD_LIMITS.href);
   });
 });

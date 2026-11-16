@@ -26,6 +26,7 @@
   "dependencies": {
     "firebase": "^13.3.0",
     "parse5": "8.0.1",
+    "postal-mime": "4.2.0",
     "tldts": "7.4.19"
   },
   "devDependencies": {

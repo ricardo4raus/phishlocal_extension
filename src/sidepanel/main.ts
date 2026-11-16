@@ -103,6 +103,10 @@ const emailElements = {
   details: byId<HTMLDListElement>('email-details'),
   sender: byId<HTMLElement>('email-sender'),
   subject: byId<HTMLElement>('email-subject'),
+  auth: byId<HTMLElement>('email-auth'),
+  headerRows: byId<HTMLElement>('email-header-rows'),
+  replyTo: byId<HTMLElement>('email-reply-to'),
+  returnPath: byId<HTMLElement>('email-return-path'),
   links: byId<HTMLUListElement>('email-links'),
   body: byId<HTMLElement>('email-body'),
 };

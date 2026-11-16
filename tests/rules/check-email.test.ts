@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { Email } from '../../src/email';
-import { parsePastedEmail } from '../../src/paste/parse-pasted-email';
+import { readPaste } from '../../src/paste/read-paste';
 import { SAMPLE_EMAILS } from '../../src/paste/samples';
 import { checkEmail, MAX_FINDINGS } from '../../src/rules';
 
+/** Each sample read like the paste area reads it (raw samples with their headers). */
+const SAMPLES = new Map(
+  await Promise.all(
+    SAMPLE_EMAILS.map(async ({ id, email }) => [id, (await readPaste(email)).email] as const),
+  ),
+);
+
 const sample = (id: string): Email => {
-  const found = SAMPLE_EMAILS.find((candidate) => candidate.id === id);
+  const found = SAMPLES.get(id);
   if (!found) throw new Error(`no sample ${id}`);
-  return parsePastedEmail(found.email);
+  return found;
 };
 
 const rules = (email: Email): string[] =>
@@ -28,15 +35,25 @@ describe('checkEmail on the samples', () => {
     expect(rules(sample('phishing-parcel-de'))).toEqual(['payment:warning', 'threat:info']);
   });
 
+  it('flags the forged sender in the raw sample through its headers', () => {
+    expect(rules(sample('phishing-raw-dmarc-en'))).toEqual([
+      'dmarc-fail:danger',
+      'reply-to-mismatch:warning',
+      'brand-in-subdomain:warning',
+      'link-text-mismatch:warning',
+      'credentials:warning',
+      'urgency:info',
+      'threat:info',
+    ]);
+  });
+
   it('finds no warning in the harmless sample', () => {
     expect(rules(sample('harmless-newsletter-en'))).toEqual([]);
   });
 
   it('flags every phishing sample and no harmless one', () => {
-    for (const { id, email } of SAMPLE_EMAILS) {
-      const serious = checkEmail(parsePastedEmail(email)).some(
-        (finding) => finding.severity !== 'info',
-      );
+    for (const [id, email] of SAMPLES) {
+      const serious = checkEmail(email).some((finding) => finding.severity !== 'info');
       expect(serious, id).toBe(id.startsWith('phishing-'));
     }
   });
@@ -76,6 +93,10 @@ describe('checkEmail', () => {
       href: `https://other${i}.example/`,
     }));
     expect(checkEmail({ ...base, links: many })).toHaveLength(MAX_FINDINGS);
+  });
+
+  it('warns when part of the email could not be read', () => {
+    expect(rules({ ...base, incomplete: true })).toEqual(['incomplete-check:warning']);
   });
 
   it('finds nothing in an empty email', () => {

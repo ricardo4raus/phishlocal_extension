@@ -119,6 +119,21 @@ describe('checkLookalikes', () => {
     expect(finding).toMatchObject({ rule: 'brand-in-subdomain', severity: 'warning' });
   });
 
+  it("accepts the email's own name at a known mailing service, but not a brand's", () => {
+    // Mailchimp builds click-tracking hosts like this for its customers (found in a real
+    // newsletter during the Chrome test).
+    expect(
+      found(
+        email('promotions@chessable.example', [
+          link('https://chessable.us14.list-manage.com/track/click?u=1'),
+        ]),
+      ),
+    ).toEqual([]);
+    expect(
+      found(email('x@news.example', [link('https://paypal.us14.list-manage.com/track/click')])),
+    ).toEqual(['brand-in-subdomain:paypal.us14.list-manage.com']);
+  });
+
   it('accepts the real domains of a brand and other parts of a domain', () => {
     expect(
       found(

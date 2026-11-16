@@ -1,4 +1,12 @@
-import { type Email, isReadEmailResponse, READ_EMAIL, type ReadEmailRequest } from '../email';
+import {
+  type AuthResults,
+  type Email,
+  isReadEmailResponse,
+  type Mailbox,
+  READ_EMAIL,
+  type ReadEmailRequest,
+} from '../email';
+import { revealOverrides } from '../rules/unicode';
 
 export type ReadResult = { ok: true; email: Email } | { ok: false; message: string };
 
@@ -45,20 +53,58 @@ export interface EmailElements {
   details: HTMLElement;
   sender: HTMLElement;
   subject: HTMLElement;
+  auth: HTMLElement;
+  headerRows: HTMLElement;
+  replyTo: HTMLElement;
+  returnPath: HTMLElement;
   links: HTMLUListElement;
   body: HTMLElement;
 }
 
-/** Shows the email. Only as text (`textContent`): email content may come from an attacker. */
+/** Where to get the headers when the email was read without them. */
+export const HEADERS_HINT =
+  'Not available. For the full check with SPF, DKIM and DMARC: in Gmail, open ⋮ → Show original → ' +
+  'Copy to clipboard, then paste it under "Or paste an email".';
+
+const mailbox = ({ name, address }: Mailbox): string =>
+  name && address ? `${name} <${address}>` : name || address || '–';
+
+/** "SPF pass · DKIM pass (shop.example) · DMARC pass, checked by mx.example". */
+export function authSummary(auth: AuthResults | undefined): string {
+  if (!auth) return 'None in the headers: the sender cannot be verified.';
+  const dkim =
+    auth.dkim.length === 0
+      ? 'none'
+      : auth.dkim
+          .map((entry) => (entry.domain ? `${entry.result} (${entry.domain})` : entry.result))
+          .join(', ');
+  return `SPF ${auth.spf ?? 'none'} · DKIM ${dkim} · DMARC ${auth.dmarc ?? 'none'}, checked by ${auth.server}`;
+}
+
+/**
+ * Puts email content into the page. Only as text (`textContent`): the content may come from an
+ * attacker. Direction overrides are shown as `<U+202E>`, so "moc.lapyap" is not displayed as
+ * "paypal.com" in the panel either.
+ */
+const setText = (element: HTMLElement, text: string): void => {
+  element.textContent = revealOverrides(text);
+};
+
+/** Shows the email. */
 export function showEmail(email: Email, elements: EmailElements): void {
-  const { name, address } = email.sender;
-  elements.sender.textContent = name && address ? `${name} <${address}>` : name || address || '–';
-  elements.subject.textContent = email.subject || '–';
+  setText(elements.sender, mailbox(email.sender));
+  setText(elements.subject, email.subject || '–');
+
+  const { headers } = email;
+  elements.auth.textContent = headers ? authSummary(headers.auth) : HEADERS_HINT;
+  elements.headerRows.hidden = !headers;
+  setText(elements.replyTo, headers?.replyTo.map(mailbox).join(', ') || '–');
+  setText(elements.returnPath, headers?.returnPath || '–');
 
   elements.links.replaceChildren(
     ...email.links.map((link) => {
       const item = document.createElement('li');
-      item.textContent = `${link.text || '(no text)'} → ${link.href}`;
+      setText(item, `${link.text || '(no text)'} → ${link.href}`);
       return item;
     }),
   );
@@ -70,6 +116,6 @@ export function showEmail(email: Email, elements: EmailElements): void {
 
   const preview = email.bodyText.slice(0, BODY_PREVIEW_CHARS);
   const cut = email.bodyText.length > BODY_PREVIEW_CHARS || email.truncated;
-  elements.body.textContent = cut ? `${preview}…` : preview || '–';
+  setText(elements.body, cut ? `${preview}…` : preview || '–');
   elements.details.hidden = false;
 }

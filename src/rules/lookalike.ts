@@ -16,6 +16,7 @@ import {
   hostOfAddress,
   parseUrl,
 } from './domains';
+import { MAILING_SERVICES } from './services';
 import { clip, type Finding, type Severity } from './types';
 
 /** Shorter names match too much by chance ("post", "mail"). */
@@ -107,6 +108,8 @@ function compare(candidate: Host, reference: Reference): Finding | undefined {
   const { domain, label } = reference.host;
   if (!candidate.domain || !candidate.label || candidate.domain === domain) return undefined;
   if (BRAND_DOMAINS.has(candidate.domain)) return undefined;
+  // "shop.us14.list-manage.com" for a newsletter from shop.example: normal click tracking.
+  if (!reference.isBrand && MAILING_SERVICES.has(candidate.domain)) return undefined;
   const name = skeleton(label);
   const evidence = [clip(candidate.hostname)];
 

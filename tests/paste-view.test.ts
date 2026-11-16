@@ -44,12 +44,21 @@ function paste(text: string, html?: string): void {
 
 const lastEmail = (): Email | undefined => onEmail.mock.calls.at(-1)?.[0];
 
+/** Clicks and waits until the (asynchronous) handler has reported an email or an error. */
+async function click(button: HTMLButtonElement): Promise<void> {
+  const before = onEmail.mock.calls.length + onError.mock.calls.length;
+  button.click();
+  await vi.waitFor(() => {
+    expect(onEmail.mock.calls.length + onError.mock.calls.length).toBeGreaterThan(before);
+  });
+}
+
 describe('paste area', () => {
-  it('uses the pasted text and the links from the pasted HTML', () => {
+  it('uses the pasted text and the links from the pasted HTML', async () => {
     paste('Confirm: paypal.com', 'Confirm: <a href="https://evil.example/login">paypal.com</a>');
     elements.sender.value = 'Bank <a@bank.example>';
     elements.subject.value = 'Locked';
-    elements.use.click();
+    await click(elements.use);
     expect(lastEmail()).toMatchObject({
       sender: { name: 'Bank', address: 'a@bank.example' },
       subject: 'Locked',
@@ -59,60 +68,112 @@ describe('paste area', () => {
     expect(onEmail.mock.calls.at(-1)?.[1]).toMatch(/Nothing left your browser/);
   });
 
-  it('never puts the pasted HTML into the page', () => {
+  it('never puts the pasted HTML into the page', async () => {
     paste('Hi', '<img src="https://tracker.example/p.gif"><script>parent.pwned = 1</script>');
-    elements.use.click();
+    await click(elements.use);
     expect(document.querySelector('img, script')).toBeNull();
   });
 
-  it('asks for text when the field is empty', () => {
-    elements.use.click();
+  it('asks for text when the field is empty', async () => {
+    await click(elements.use);
     expect(onError).toHaveBeenCalledWith('Paste the email text first.');
     expect(onEmail).not.toHaveBeenCalled();
   });
 
-  it('says when the HTML was too large to use', () => {
+  it('marks the email incomplete when the HTML is too large', async () => {
     paste(
       'see https://x.example/a',
       `<a href="https://x.example/b">b</a>${' '.repeat(MAX_PASTE_HTML_CHARS)}`,
     );
-    elements.use.click();
-    expect(lastEmail()?.links.map((link) => link.href)).toEqual(['https://x.example/a']);
-    expect(onEmail.mock.calls.at(-1)?.[1]).toMatch(/too large/);
+    await click(elements.use);
+    expect(lastEmail()?.incomplete).toBe(true);
+    expect(lastEmail()?.links.map((link) => link.href)).toEqual([
+      'https://x.example/b',
+      'https://x.example/a',
+    ]);
   });
 
-  it('lists the samples and loads one into the fields', () => {
+  it('lists the samples and loads one into the fields', async () => {
     const sample = SAMPLE_EMAILS[0]!;
     expect(elements.sample.options).toHaveLength(SAMPLE_EMAILS.length + 1);
     elements.sample.value = sample.id;
-    elements.loadSample.click();
+    await click(elements.loadSample);
     expect(elements.text.value).toBe(sample.email.text);
     expect(elements.sender.value).toBe(sample.email.sender);
     expect(lastEmail()?.links.length).toBeGreaterThan(0);
     expect(onEmail.mock.calls.at(-1)?.[1]).toMatch(/made up/);
   });
 
-  it('asks to choose a sample first', () => {
-    elements.loadSample.click();
+  it('reads pasted raw source with its headers and ignores the fields', async () => {
+    paste(
+      [
+        'Authentication-Results: mx.receiver.example; spf=pass; dkim=none; dmarc=fail',
+        'From: Lumora Bank <security@lumorabank.example>',
+        'Reply-To: help@freemail.example',
+        'Subject: Card blocked',
+        '',
+        'Confirm your identity.',
+      ].join('\r\n'),
+    );
+    elements.sender.value = 'typed <typed@other.example>';
+    await click(elements.use);
+    expect(lastEmail()).toMatchObject({
+      sender: { name: 'Lumora Bank', address: 'security@lumorabank.example' },
+      subject: 'Card blocked',
+      headers: { auth: { dmarc: 'fail' }, replyTo: [{ address: 'help@freemail.example' }] },
+    });
+    expect(onEmail.mock.calls.at(-1)?.[1]).toMatch(/with its headers/);
+  });
+
+  it('reports raw source it cannot read and enables the buttons again', async () => {
+    // 30 nested parts: more than the parser's limit of 20.
+    const nested = Array.from(
+      { length: 30 },
+      (_, i) => `Content-Type: multipart/mixed; boundary="b${i}"\r\n\r\n--b${i}\r\n`,
+    ).join('');
+    paste(`From: a@x.example\r\nReceived: x\r\n${nested}`);
+    await click(elements.use);
+    expect(onError.mock.calls.at(-1)?.[0]).toMatch(/could not be read/);
+    expect(elements.use.disabled).toBe(false);
+  });
+
+  it('drops a reading that finishes after Clear', async () => {
+    paste(['From: a@x.example', 'Received: x', 'Subject: Old', '', 'Old email'].join('\r\n'));
+    elements.use.click();
+    elements.clear.click();
+    expect(elements.use.disabled).toBe(false);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(onEmail).not.toHaveBeenCalled();
+    expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads the raw sample with its headers', async () => {
+    elements.sample.value = 'phishing-raw-dmarc-en';
+    await click(elements.loadSample);
+    expect(lastEmail()?.headers?.auth?.dmarc).toBe('fail');
+  });
+
+  it('asks to choose a sample first', async () => {
+    await click(elements.loadSample);
     expect(onError).toHaveBeenCalledWith('Choose a sample first.');
   });
 
-  it('forgets the pasted HTML when the text field is emptied', () => {
+  it('forgets the pasted HTML when the text field is emptied', async () => {
     paste('Hi', '<a href="https://x.example/old">old link</a>');
     elements.text.value = '';
     elements.text.dispatchEvent(new Event('input'));
     elements.text.value = 'a different email, typed';
-    elements.use.click();
+    await click(elements.use);
     expect(lastEmail()?.links).toEqual([]);
   });
 
-  it('clears the fields and forgets the pasted HTML', () => {
+  it('clears the fields and forgets the pasted HTML', async () => {
     paste('Hi', '<a href="https://x.example/html">html link</a>');
     elements.clear.click();
     expect(elements.text.value).toBe('');
     expect(onClear).toHaveBeenCalled();
     elements.text.value = 'typed later';
-    elements.use.click();
+    await click(elements.use);
     expect(lastEmail()?.links).toEqual([]);
   });
 });

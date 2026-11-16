@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Email } from '../../src/email';
-import { checkUnicode } from '../../src/rules/unicode';
+import { checkUnicode, revealOverrides } from '../../src/rules/unicode';
 
 // Built from code points, so the source itself has no invisible or lookalike characters.
 const ZWSP = String.fromCodePoint(0x200b);
@@ -9,6 +9,8 @@ const SOFT_HYPHEN = String.fromCodePoint(0xad);
 const CYRILLIC_A = String.fromCodePoint(0x430);
 const CYRILLIC_O = String.fromCodePoint(0x43e);
 const GREEK_ALPHA = String.fromCodePoint(0x3b1);
+const RLO = String.fromCodePoint(0x202e);
+const LRO = String.fromCodePoint(0x202d);
 
 const email = (bodyText: string, extra: Partial<Email> = {}): Email => ({
   sender: { name: '', address: 'a@news.example' },
@@ -47,6 +49,28 @@ describe('checkUnicode', () => {
       'hidden-characters',
       'mixed-script',
     ]);
+  });
+
+  it('flags a direction override and shows it in the evidence', () => {
+    const findings = checkUnicode(
+      email('', { sender: { name: `${RLO}moc.lapyap`, address: 'x@evil.example' } }),
+    );
+    expect(findings).toEqual([
+      {
+        rule: 'direction-override',
+        severity: 'warning',
+        message:
+          'Text contains a hidden direction switch (U+202E or U+202D) that makes it display differently than it is written, e.g. "moc.lapyap" shows as "paypal.com".',
+        evidence: ['<U+202E>moc.lapyap'],
+      },
+    ]);
+    expect(rules(email('', { subject: `Invoice ${LRO}fdp.exe` }))).toContain('direction-override');
+  });
+
+  it('shows direction overrides visibly, but leaves other direction marks for RTL text', () => {
+    expect(revealOverrides(`a${RLO}b${LRO}c`)).toBe('a<U+202E>b<U+202D>c');
+    const rightToLeftMark = String.fromCodePoint(0x200f);
+    expect(revealOverrides(`abc${rightToLeftMark}`)).toBe(`abc${rightToLeftMark}`);
   });
 
   it.each([

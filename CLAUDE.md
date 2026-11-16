@@ -62,7 +62,7 @@ explain every red flag, and work offline, with a cloud only as fallback."
   again with a DevTools snippet that prints only counts and class names, never email content.
 - "Or paste an email" in the side panel is the fallback when Gmail can't be read (and for the
   demo): the pasted text, plus the links from the clipboard's HTML (parsed with parse5, a runtime
-  dependency since 16 Nov 2026), and three made-up sample emails (`src/paste/samples.ts`).
+  dependency since 16 Nov 2026), and four made-up sample emails (`src/paste/samples.ts`).
   Both paths show the email the same way.
 - Rule checks (`src/rules/`, `checkEmail()`): pure functions, no DOM, no network. They flag
   dangerous links, link text vs real target (also behind forwarding parameters), lookalike
@@ -71,6 +71,21 @@ explain every red flag, and work offline, with a cloud only as fallback."
   come from tldts (Public Suffix List, runtime dependency since 16 Nov 2026). `brands.ts` lists
   real brands as reference data only. No AI check of the email yet. Every rule is documented in
   `docs/rules.md`; keep it in sync when a rule changes.
+- Raw emails (`src/raw/`): pasted raw source ("Show original", "View source") is recognized and
+  parsed with postal-mime (runtime dependency since 16 Nov 2026, tight limits) into the email
+  plus its headers. Header rules (`src/rules/headers.ts`) trust only the topmost
+  `Authentication-Results` header. Raw headers hold the user's address and server IPs: never
+  send them to the cloud. The fourth sample is raw source.
+- Gmail internals for the automatic header loading (measured 16 Nov 2026, undocumented): "Show
+  original" is `/mail/u/<n>/?ik=<ik>&view=om&permmsgid=msg-f:<decimal id>` and fails (404)
+  without `ik`. `ik` (10 hex characters) is only in Gmail's inline scripts, as the 10th entry of
+  `GLOBALS` (9 commas after `GLOBALS`), never in links. The open message `div.adn` has the ID in
+  `data-message-id` and, as hex, in `data-legacy-message-id`. The page has exactly one `<pre>`
+  with the raw email. A same-site fetch from the Gmail tab returns it (200, `text/html`). Measure
+  again with a snippet that prints only counts and yes/no if it stops working.
+- Automatic reading via the Gmail API was ruled out: `gmail.metadata` and `gmail.readonly` are
+  restricted scopes, so every user would see Google's "unverified app" warning until a weeks-long
+  verification.
 - The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow
@@ -161,6 +176,10 @@ explain every red flag, and work offline, with a cloud only as fallback."
   `createContextualFragment`, `setHTMLUnsafe`, `document.write`, `DOMParser`). Parse untrusted
   HTML with parse5 only: `DOMParser` can load `<img>` and `<iframe>` URLs (tracking pixels).
 - Sample emails use made-up brands and `.example` domains only; a test rejects real brands.
+- Read email HTML only through `readHtml()` (parse5 with a 1,000-level depth limit and a 2 MB
+  limit), and walk parse5 trees without recursion: deep nesting crashed and froze the panel.
+- Every email source cuts fields to `FIELD_LIMITS` (`src/email.ts`), and the validator rejects
+  longer ones. Show email text in the panel through `setText()`, which reveals direction overrides.
 - No invisible characters (zero-width, bidi controls) in `src/` or `tests/`: write escapes such
   as `\u200b` or `String.fromCodePoint(0x200b)`. Watch out: editing tools may turn `\u200b`
   in their input into the real character.

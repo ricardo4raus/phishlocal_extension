@@ -11,11 +11,13 @@ The code is in [`src/rules/`](../src/rules/); the entry point is `checkEmail(ema
 
 1. **Input:** the email from Gmail or from the paste area: sender name and address, subject,
    visible body text (at most 20,000 characters) and links (at most 200, each with its text and
-   real target).
+   real target). A raw email ("Show original", "View source") also brings its headers: Reply-To,
+   Return-Path and the receiving server's sender checks.
 2. **Normalization:** every text is folded the same way before matching: NFKC (full-width and
    ligature letters become plain ones), invisible formatting characters removed, the ideographic
    full stop read as a dot, lowercase, typographic apostrophes as `'`.
-3. **Rules:** sender, lookalike domains, links, pressure phrases and Unicode tricks.
+3. **Rules:** completeness, headers, sender, lookalike domains, links, pressure phrases and
+   Unicode tricks.
 4. **Result:** each finding once, the most severe first, at most 30 per email.
 
 A finding has a rule id, a severity, one English sentence and the evidence (the link, domain or
@@ -52,7 +54,8 @@ catch known tricks.
   its final target: the text is compared with it, and the final target gets the IP,
   international-letter and lookalike checks too. Up to 20 parameters per link are read.
 - **Redirect services** (`c.gle`, `t.co`, `bit.ly`, `tinyurl.com`, `ow.ly`, `lnkd.in`, Outlook
-  safe links, Proofpoint URL Defense) hide the final target. Real emails use them (Google's own
+  safe links, Proofpoint URL Defense; listed in [`services.ts`](../src/rules/services.ts)) hide
+  the final target. Real emails use them (Google's own
   emails link "debattr.com" through `c.gle`), so a mismatch behind one is only a note.
 
 ### Lookalike domains ([`lookalike.ts`](../src/rules/lookalike.ts))
@@ -75,8 +78,12 @@ short list of often-imitated real brands in [`brands.ts`](../src/rules/brands.ts
   `microsoftonline.com`) are never flagged.
 - The same name with another ending, taken from the email itself (`shop.de` and `shop.ch`), is
   not flagged: companies often use several country domains.
-- Mailing services build click-tracking hosts such as `shop.mailer.example` for their customers,
-  so a name from the email in front of another domain is only a warning.
+- Mailing services build click-tracking hosts such as `shop.us14.list-manage.com` (Mailchimp)
+  for their customers. For the known ones in [`services.ts`](../src/rules/services.ts)
+  (Mailchimp, SendGrid, Mailgun, SparkPost, HubSpot, Salesforce, Mailjet, Klaviyo, Constant
+  Contact) the email's own name in front is not flagged; a listed brand's name still is danger,
+  because anyone can open an account under any name. For unknown domains, a name from the email
+  in front of another domain is a warning.
 - One finding per domain: the strongest one.
 
 ### Sender ([`sender.ts`](../src/rules/sender.ts))
@@ -90,8 +97,30 @@ short list of often-imitated real brands in [`brands.ts`](../src/rules/brands.ts
 
 - Two domains of one listed brand count as the same company (`PayPal.de <service@paypal.com>`).
 - Brands also send from domains the list does not know, so a brand name is only a warning.
-- Gmail's page does not show the Reply-To address, so there is no Reply-To rule yet. It comes with
-  reading the raw email (headers), the next task in [`TIMETABLE.md`](../TIMETABLE.md).
+- Reply-To is not in Gmail's page; it is checked with the headers (next section).
+
+### Headers ([`headers.ts`](../src/rules/headers.ts))
+
+Only for emails read from their raw source (parsed by
+[`parse-raw-email.ts`](../src/raw/parse-raw-email.ts) with postal-mime).
+
+| Rule                | Severity                            | Flags                                              | Example                                                            |
+| ------------------- | ----------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------ |
+| `dmarc-fail`        | danger                              | The sender's domain does not confirm the email     | `dmarc=fail header.from=lumorabank.example`                        |
+| `auth-fail`         | warning                             | SPF or DKIM failed and neither passed              | `spf=softfail; dkim=none`                                          |
+| `reply-to-mismatch` | warning, or info for another ending | Replies go to another company than the sender      | From `lumorabank.example`, Reply-To `lumora.help@freemail.example` |
+| `dkim-other-domain` | info                                | Signed only by another domain, and no DMARC result | signed by `mailer.example` for `shop.example`                      |
+| `no-auth-results`   | info                                | A raw email without any sender checks              | pasted source from a provider that adds none                       |
+
+- **Only the topmost `Authentication-Results` header counts.** The receiving server adds it last,
+  above everything the sender wrote, so a fake `dmarc=pass` further down is ignored, and so is
+  `ARC-Authentication-Results`. A raw email from a provider that adds no results of its own can
+  still contain a fake one: the messages always name the server that checked.
+- One passing check is enough when there is no DMARC result: forwarding breaks SPF but keeps DKIM.
+- Return-Path is shown but not checked: mailing services almost always use their own bounce
+  domain, so a rule would mostly produce noise.
+- Two domains of one listed brand, or of the same registrable domain, count as the same company,
+  like in the sender rules.
 
 ### Pressure phrases ([`phrases.ts`](../src/rules/phrases.ts))
 
@@ -110,16 +139,29 @@ would also flag harmless sentences such as "we will never ask for your card numb
 
 ### Unicode tricks ([`unicode.ts`](../src/rules/unicode.ts))
 
-| Rule                | Severity | Flags                                                       | Example                                |
-| ------------------- | -------- | ----------------------------------------------------------- | -------------------------------------- |
-| `hidden-characters` | warning  | Invisible characters inside a Latin, Cyrillic or Greek word | "con<U+200B>firm" (a zero-width space) |
-| `mixed-script`      | warning  | Words that mix Latin with Cyrillic or Greek letters         | "paypal" written with a Cyrillic "a"   |
+| Rule                 | Severity | Flags                                                       | Example                                |
+| -------------------- | -------- | ----------------------------------------------------------- | -------------------------------------- |
+| `hidden-characters`  | warning  | Invisible characters inside a Latin, Cyrillic or Greek word | "con<U+200B>firm" (a zero-width space) |
+| `mixed-script`       | warning  | Words that mix Latin with Cyrillic or Greek letters         | "paypal" written with a Cyrillic "a"   |
+| `direction-override` | warning  | A hidden direction switch (U+202E, U+202D)                  | "moc.lapyap" displayed as "paypal.com" |
 
 - Both tricks hide a word from filters while the reader sees a normal word, so they are red flags
   of their own. The normalization step also removes them, so the other rules still see the word.
 - Soft hyphens are not flagged (newsletters use them to hyphenate), nor are joiners in scripts
   that need them (Arabic, Persian, Indic) or in emoji.
 - The evidence shows invisible characters as `<U+200B>`.
+- Direction overrides (MITRE ATT&CK T1036.002) are also shown visibly in the side panel itself, as
+  `<U+202E>`, so the panel never displays reversed text. Other direction marks stay, because
+  Arabic and Hebrew text needs them.
+
+### Incomplete check ([`index.ts`](../src/rules/index.ts))
+
+| Rule               | Severity | Flags                                                              |
+| ------------------ | -------- | ------------------------------------------------------------------ |
+| `incomplete-check` | warning  | Part of the HTML was not read: over 2 MB or over 1,000 levels deep |
+
+Hostile emails pad or nest their HTML to slip past checks, so an email that could not be read
+completely is a red flag of its own. Real emails stay far below both limits.
 
 ## Security design
 
@@ -132,6 +174,13 @@ would also flag harmless sentences such as "we will never ask for your card numb
   without nested repetition that could backtrack. Inputs, domains per text (100), parameters per
   link (20), findings (30) and evidence (200 characters) are capped. The worst case at the input
   limits takes about 180 ms.
+- **HTML is read with limits:** parse5 slows down with the square of the nesting depth (40,000
+  nested `<div>` take about 5 s), so a tree adapter stops at 1,000 levels and only the first 2 MB
+  are read; the tree is walked without recursion. 400,000 levels now take a few milliseconds.
+- **Field limits:** sender name 500, address 320, subject 1,000, link text 1,000 and link target
+  4,000 characters, enforced in every source and in the message validator.
+- **What the reader sees is checked:** for raw emails the body text comes from the HTML part,
+  because mail apps show it; a harmless plain-text part cannot hide a phishing HTML part.
 - **Fail visibly:** if a rule throws, the side panel says "The rule check failed. Treat this
   email with care." and still shows the email.
 
@@ -144,7 +193,8 @@ would also flag harmless sentences such as "we will never ask for your card numb
 - International domains are flagged but not decoded (the browser has no punycode decoder). The
   mixed-script rule catches them where the email has the raw letters.
 - Words that legitimately mix alphabets (e.g. "μg") get a mixed-script warning.
-- No header checks yet (Reply-To, SPF, DKIM, DMARC): they need the raw email.
+- Header checks need the raw email. For now the user pastes it (Gmail: Show original → Copy to
+  clipboard; other mail apps: View source). Reading it automatically from Gmail is the next task.
 
 ## Adding or changing a rule
 
