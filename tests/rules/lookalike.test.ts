@@ -53,6 +53,26 @@ describe('checkLookalikes', () => {
     ]);
   });
 
+  it('warns about a brand name with a different ending', () => {
+    expect(
+      checkLookalikes(
+        email('x@paypal-help.example', [
+          link('https://www.paypal.support/'),
+          link('https://paypal.com.co/login'),
+        ]),
+      ).map((finding) => `${finding.rule}:${finding.severity}:${finding.message}`),
+    ).toEqual([
+      'brand-in-domain:warning:paypal-help.example contains the name "paypal", but it is not paypal.com.',
+      'brand-in-domain:warning:paypal.support uses the name "paypal" with a different ending; the real domain is paypal.com.',
+      'brand-in-domain:warning:paypal.com.co uses the name "paypal" with a different ending; the real domain is paypal.com.',
+    ]);
+  });
+
+  it('accepts the same name with another ending when it comes from the email', () => {
+    // Companies use several country domains (shop.de, shop.ch).
+    expect(found(email('news@lumorabank.example', [link('https://lumorabank.ch/')]))).toEqual([]);
+  });
+
   it('flags a brand in front of a different domain, also short brand names', () => {
     expect(
       found(

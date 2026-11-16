@@ -9,7 +9,7 @@
 import type { Email } from '../email';
 import { BRAND_DOMAINS, BRANDS } from './brands';
 import { domainsInText, type Host, hostOf, hostOfAddress, parseUrl } from './domains';
-import { clip, type Finding } from './types';
+import { clip, type Finding, type Severity } from './types';
 
 /** Shorter names match too much by chance ("post", "mail"). */
 const MIN_NAME_LENGTH = 5;
@@ -96,7 +96,7 @@ function candidatesOf(email: Email, sender: Host | undefined): Host[] {
 /** The first way `candidate` imitates `reference`, as a finding. */
 function compare(candidate: Host, reference: Reference): Finding | undefined {
   const { domain, label } = reference.host;
-  if (!candidate.domain || !candidate.label || candidate.label === label) return undefined;
+  if (!candidate.domain || !candidate.label || candidate.domain === domain) return undefined;
   if (BRAND_DOMAINS.has(candidate.domain)) return undefined;
   const name = skeleton(label);
   const evidence = [clip(candidate.hostname)];
@@ -111,6 +111,18 @@ function compare(candidate: Host, reference: Reference): Finding | undefined {
       message: `${clip(candidate.hostname)} puts "${label}" in front of a different domain (${candidate.domain}).`,
       evidence,
     };
+  }
+  if (candidate.label === label) {
+    // Same name, other ending: "paypal.support", "paypal.com.co". Companies also use several
+    // country domains, so this counts only for listed brands, and only as a warning.
+    return reference.isBrand
+      ? {
+          rule: 'brand-in-domain',
+          severity: 'warning',
+          message: `${candidate.domain} uses the name "${label}" with a different ending; the real domain is ${domain}.`,
+          evidence,
+        }
+      : undefined;
   }
   if (label.length < MIN_NAME_LENGTH) return undefined;
 
@@ -134,8 +146,7 @@ function compare(candidate: Host, reference: Reference): Finding | undefined {
   return undefined;
 }
 
-const RANK = { 'brand-in-subdomain': 0, 'lookalike-domain': 1, 'brand-in-domain': 2 } as const;
-const rank = (finding: Finding): number => RANK[finding.rule as keyof typeof RANK] ?? 3;
+const STRENGTH: Record<Severity, number> = { danger: 2, warning: 1, info: 0 };
 
 export function checkLookalikes(email: Email): Finding[] {
   const sender = hostOfAddress(email.sender.address);
@@ -148,7 +159,9 @@ export function checkLookalikes(email: Email): Finding[] {
       // One finding per candidate domain: the strongest one.
       const key = candidate.domain ?? candidate.hostname;
       const known = findings.get(key);
-      if (!known || rank(finding) < rank(known)) findings.set(key, finding);
+      if (!known || STRENGTH[finding.severity] > STRENGTH[known.severity]) {
+        findings.set(key, finding);
+      }
     }
   }
   return [...findings.values()];
