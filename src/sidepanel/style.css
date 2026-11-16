@@ -99,6 +99,24 @@ h2 {
   padding-left: 18px;
 }
 
+.findings .danger strong {
+  color: #c62828;
+}
+
+.findings .warning strong {
+  color: #b26a00;
+}
+
+@media (prefers-color-scheme: dark) {
+  .findings .danger strong {
+    color: #ef9a9a;
+  }
+
+  .findings .warning strong {
+    color: #ffcc80;
+  }
+}
+
 .email-body {
   white-space: pre-wrap;
   max-height: 200px;
