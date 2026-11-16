@@ -97,6 +97,15 @@ describe('paste area', () => {
     expect(onError).toHaveBeenCalledWith('Choose a sample first.');
   });
 
+  it('forgets the pasted HTML when the text field is emptied', () => {
+    paste('Hi', '<a href="https://x.example/old">old link</a>');
+    elements.text.value = '';
+    elements.text.dispatchEvent(new Event('input'));
+    elements.text.value = 'a different email, typed';
+    elements.use.click();
+    expect(lastEmail()?.links).toEqual([]);
+  });
+
   it('clears the fields and forgets the pasted HTML', () => {
     paste('Hi', '<a href="https://x.example/html">html link</a>');
     elements.clear.click();

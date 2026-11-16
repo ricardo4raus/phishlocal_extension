@@ -36,6 +36,10 @@ export function setUpPaste(elements: PasteElements, callbacks: PasteCallbacks): 
   elements.text.addEventListener('paste', (event: ClipboardEvent) => {
     pastedHtml = event.clipboardData?.getData('text/html') || undefined;
   });
+  // An emptied field starts a new email: links from the old paste must not stick to new text.
+  elements.text.addEventListener('input', () => {
+    if (elements.text.value.trim() === '') pastedHtml = undefined;
+  });
 
   for (const sample of SAMPLE_EMAILS) {
     const option = document.createElement('option');
