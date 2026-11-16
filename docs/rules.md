@@ -167,8 +167,8 @@ would also flag harmless sentences such as "we will never ask for your card numb
 - International domains are flagged but not decoded (the browser has no punycode decoder). The
   mixed-script rule catches them where the email has the raw letters.
 - Words that legitimately mix alphabets (e.g. "μg") get a mixed-script warning.
-- Header checks need the raw email. For Gmail it is read from "Show original"; for other mail
-  apps the user pastes the raw source.
+- Header checks need the raw email. For now the user pastes it (Gmail: Show original → Copy to
+  clipboard; other mail apps: View source). Reading it automatically from Gmail is the next task.
 
 ## Adding or changing a rule
 

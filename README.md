@@ -14,8 +14,12 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 - **Side panel** (Chrome Manifest V3): click the toolbar icon to open it.
 - **Read the open Gmail email** on click: sender, subject, visible text, and every link with its
   text and real target. Nothing is read unless you click, and nothing leaves the browser.
-- **Paste an email** from any other mail app, or load one of three made-up sample emails. Links
+- **Paste an email** from any other mail app, or load one of four made-up sample emails. Links
   keep their real targets from the copied formatting.
+- **Sender checks from the headers:** paste the raw source (Gmail: ⋮ → Show original → Copy to
+  clipboard) and PhishLocal also reads the headers: whether SPF, DKIM and DMARC passed, and where
+  replies go. A forged sender whose domain says "not from us" (DMARC failed) is flagged as
+  danger.
 - **Red flags without AI:** rule checks list what is suspicious and why, in one sentence each.
   Dangerous links, link text that names a different domain than the real target, lookalike
   domains such as `paypa1.com`, a sender name that claims another domain or brand, invisible
@@ -88,6 +92,7 @@ the extension:
 | `src/sidepanel/`               | Side panel UI                    |
 | `src/content/`                 | Gmail content script             |
 | `src/paste/`                   | Pasted-email parsing and samples |
+| `src/raw/`                     | Raw email and header parsing     |
 | `src/rules/`                   | Rule checks                      |
 | `src/ai.ts`, `src/firebase.ts` | Firebase AI Logic and App Check  |
 | `tests/`                       | Vitest tests                     |

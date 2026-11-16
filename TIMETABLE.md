@@ -28,10 +28,13 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
       lookalike domains (e.g. paypa1.com), reply-to ≠ sender, urgency words (en/de/fr/es).
       (done Mon 16.11; Reply-To is not in the Gmail page, so a sender-name rule replaces it
       until the raw email task below; redirect services such as `c.gle` are only noted)
-- [ ] Wed 18.11. – Raw email: read the headers (Reply-To, Return-Path, SPF/DKIM/DMARC results)
-      for header rules. Gmail: fetch the "Show original" page in the background when reading the
-      open email (undocumented URL: measure first). Other mail apps: paste the raw source.
-      Parsed with postal-mime 4.2.0 (no dependencies, MIT-0).
+- [x] Wed 18.11. – Raw email: read the headers (Reply-To, Return-Path, SPF/DKIM/DMARC results)
+      and add header rules; paste raw source from any mail app; parsed with postal-mime 4.2.0
+      (done Mon 16.11)
+- [ ] Wed 18.11. – Automatic scan: while the side panel is open, every email opened in Gmail is
+      read and checked without a click; its headers are loaded from Gmail's "Show original" page
+      in the background (undocumented, measured 16.11; if it fails, the panel says so and pasting
+      still works). Decided 16.11 instead of the optional setting planned for 23.11.
 
 ## Phase 3 · AI & result
 
@@ -46,13 +49,14 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 
 - [ ] Sat 21.11. – Cloud "deep check": only with explicit user consent; personal data
       (names, emails, phone numbers, IBANs) removed ON-DEVICE first; user sees what is sent;
-      unsupported on-device languages (e.g. Italian) go to the cloud the same way
+      unsupported on-device languages (e.g. Italian) go to the cloud the same way. Never send raw
+      headers (they hold the user's address and server IP addresses), only the rule findings
 - [ ] Sun 22.11. – Remote Config for prompt & thresholds; App Check working → FEATURE FREEZE
 
 ## Phase 5 · Polish & test
 
-- [ ] Mon 23.11. – UI polish: loading states, error messages, design; optional setting
-      "scan automatically when an email opens" (off by default; reading stays on click otherwise)
+- [ ] Mon 23.11. – UI polish: loading states, error messages, design (automatic scanning moved
+      to 18.11)
 - [ ] Tue 24.11. – Collect test emails (phishing samples + normal emails; private only, no company data)
 - [ ] Wed 25.11. – Test and tune prompt/thresholds; note results
 - [ ] Thu 26.11. – Fix bugs; test in a fresh Chrome profile and the cloud-only path

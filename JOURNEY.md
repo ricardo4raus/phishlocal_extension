@@ -52,6 +52,9 @@ _Current state, updated as features land._
   another domain or brand, invisible characters and lookalike letters from other alphabets, and
   pressure phrases in English, German, French and Spanish. All rules are listed in
   [`docs/rules.md`](docs/rules.md).
+- Raw source pasted from any mail app ("Show original", "View source") is read with its headers:
+  the side panel shows whether SPF, DKIM and DMARC passed and where replies go, and the rules
+  flag a forged sender (DMARC failed) as danger and replies to another company as a warning.
 
 ## How we built it
 
@@ -121,6 +124,13 @@ _Current state, updated as features land._
   The three samples are tests: both phishing samples must get warnings, the harmless one none.
 - **No Reply-To in Gmail's page:** Gmail shows Reply-To only in its details box. The rules use
   the sender name instead for now; the raw email (headers) is the next task.
+- **No official way to read the headers automatically:** the Gmail API is official, but every
+  scope that reads headers (`gmail.metadata`, `gmail.readonly`) is "restricted": without Google's
+  weeks-long verification, every user sees an "unverified app" warning. A Gmail add-on runs on
+  Google's servers, not in Chrome. The official manual way is Gmail's own "Show original" →
+  "Copy to clipboard", so pasting raw source came first. For automatic scanning, Ricardo measured
+  Gmail's undocumented "Show original" URL with content-free snippets: it needs an account key
+  (`ik`) that only Gmail's own scripts contain, and a same-site request returns the raw email.
 
 ## What we learned
 
@@ -205,6 +215,11 @@ _Current state, updated as features land._
 - A "no findings" message is a security statement: "no red flags" must not sound like "safe".
 - The same library can be twice as large depending on which of its builds the bundler picks:
   tldts' ES module build adds 267 KB to the side panel, its prebuilt file only 130 KB.
+- Email headers can be forged by the sender, including a fake `Authentication-Results:
+dmarc=pass`. Only the topmost one, which the receiving server adds last, can be trusted
+  (RFC 8601); `ARC-Authentication-Results` is a different header and is not used.
+- One passing sender check is enough without DMARC: forwarding breaks SPF but keeps the DKIM
+  signature.
 
 ## Accomplishments we're proud of
 
@@ -357,4 +372,13 @@ _To fill in near the submission._
   sender and brand in front of another domain, a forwarding link through google.com, a German
   email with an IP link and a fake sender name) and the real Google email. Every result matched
   the expected list line by line; the Google email with its `c.gle` links got only one note.
-  Danger and warning labels are readable in dark mode.
+  Danger and warning labels are readable in dark mode. PR #10 merged.
+- Ricardo wanted automatic scanning with header checks. Compared the options (Gmail API with a
+  restricted scope and Google's warning, a Gmail add-on, Gmail's undocumented "Show original"
+  page, pasting raw source); Ricardo measured the undocumented page and chose it plus automatic
+  scanning while the side panel is open. Split into two PRs: raw source and header rules first.
+- Raw source and header rules (`feat/raw-email`): postal-mime 4.2.0 with tight limits,
+  an `Authentication-Results` reader for nested comments and quotes, header rules (DMARC
+  failed = danger, failed SPF/DKIM and Reply-To to another company = warning), raw-source
+  detection in the paste field, a fourth sample (forged sender, raw source) and a "Sender checks"
+  row in the side panel. A test proves that a fake `dmarc=pass` below the real result is ignored.
