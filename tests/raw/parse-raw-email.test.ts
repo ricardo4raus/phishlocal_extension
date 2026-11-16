@@ -159,6 +159,11 @@ describe('looksLikeRawEmail', () => {
     expect(looksLikeRawEmail(`\n\n${MULTIPART}`)).toBe(true);
   });
 
+  it('recognizes raw source with large headers, up to the parser limit', () => {
+    const headers = Array.from({ length: 2_000 }, (_, i) => `X-Trace-${i}: ${'v'.repeat(40)}`);
+    expect(looksLikeRawEmail(raw('From: a@x.example', ...headers, '', 'body'))).toBe(true);
+  });
+
   it.each([
     'Dear customer,\n\nYour account is locked.',
     'Note: this is plain text\nAlso: with colons\nAnd: more\n\nbody',

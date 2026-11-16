@@ -13,6 +13,12 @@ import { parseAuthResults } from './auth-results';
 /** Larger input is refused: postal-mime holds the whole message in memory. */
 export const MAX_RAW_CHARS = 5_000_000;
 
+/**
+ * Largest header block that is read, for both recognizing and parsing raw source. Gmail's own
+ * headers (ARC, several Received lines) take 10–20 KB.
+ */
+export const MAX_RAW_HEADER_CHARS = 256 * 1024;
+
 /** At most this many Reply-To addresses are kept. */
 const MAX_REPLY_TO = 10;
 
@@ -22,7 +28,7 @@ const MAX_REPLY_TO = 10;
  */
 const LIMITS: PostalMimeOptions = {
   maxNestingDepth: 20,
-  maxHeadersSize: 256 * 1024,
+  maxHeadersSize: MAX_RAW_HEADER_CHARS,
   maxPartCount: 500,
   maxRfc822NestingDepth: 0,
   maxForwardedAddresses: 100,
@@ -42,7 +48,7 @@ function mailboxes(addresses: Address[] | undefined): Mailbox[] {
  * lines allowed), a blank line, and one of the headers every raw email has.
  */
 export function looksLikeRawEmail(text: string): boolean {
-  const start = text.trimStart().slice(0, 64_000);
+  const start = text.trimStart().slice(0, MAX_RAW_HEADER_CHARS + 4);
   const end = start.search(/\r?\n\r?\n/);
   if (end < 0) return false;
   const lines = start
