@@ -1,0 +1,72 @@
+import { describe, expect, it } from 'vitest';
+import { checkLinks } from '../../src/rules/links';
+import { MAX_EVIDENCE_CHARS } from '../../src/rules/types';
+
+const rulesFor = (text: string, href: string): string[] =>
+  checkLinks([{ text, href }]).map((finding) => `${finding.rule}:${finding.severity}`);
+
+describe('checkLinks', () => {
+  it.each([
+    'javascript:alert(1)',
+    ' JavaScript:alert(1)',
+    'data:text/html,<script>x</script>',
+    'file:///C:/x.exe',
+  ])('flags %s as dangerous', (href) => {
+    expect(rulesFor('Open', href)).toEqual(['dangerous-link:danger']);
+  });
+
+  it('flags a fake domain in front of an @', () => {
+    const [finding] = checkLinks([
+      { text: 'Log in', href: 'https://bank.example@evil.example/login' },
+    ]);
+    expect(finding).toMatchObject({ rule: 'hidden-link-target', severity: 'danger' });
+    expect(finding?.message).toContain('really goes to evil.example');
+  });
+
+  it('flags IP addresses and international domains', () => {
+    expect(rulesFor('Log in', 'http://192.168.10.5/login')).toEqual(['ip-link:warning']);
+    expect(rulesFor('Log in', 'https://päypal.com/')).toEqual(['international-domain:warning']);
+  });
+
+  it('flags link text that names a different domain', () => {
+    const [finding] = checkLinks([
+      { text: 'lumorabank.example/secure', href: 'https://lumora-bank-verify.example/login' },
+    ]);
+    expect(finding).toEqual({
+      rule: 'link-text-mismatch',
+      severity: 'warning',
+      message:
+        'The link text says lumorabank.example, but the link goes to lumora-bank-verify.example.',
+      evidence: ['lumorabank.example/secure', 'https://lumora-bank-verify.example/login'],
+    });
+  });
+
+  it('accepts other parts of the same domain', () => {
+    expect(rulesFor('google.com', 'https://accounts.google.com/x')).toEqual([]);
+    expect(rulesFor('www.bank.example', 'https://bank.example/')).toEqual([]);
+  });
+
+  it('only notes a redirect service (real emails use them too)', () => {
+    expect(rulesFor('debattr.com', 'https://c.gle/AGSJx')).toEqual(['redirect-link:info']);
+    expect(
+      rulesFor('bank.example', 'https://eur01.safelinks.protection.outlook.com/?url=x'),
+    ).toEqual(['redirect-link:info']);
+  });
+
+  it.each([
+    ['Google-Konto aufrufen', 'https://c.gle/AGSJx'],
+    ['Click here', 'https://evil.example/'],
+    ['Write to us', 'mailto:help@bank.example'],
+    ['Call', 'tel:+41000000000'],
+    ['broken', 'https://'],
+    ['relative', '/inbox'],
+  ])('does not flag %j → %s', (text, href) => {
+    expect(rulesFor(text, href)).toEqual([]);
+  });
+
+  it('caps the evidence', () => {
+    const href = `https://evil.example/${'x'.repeat(5_000)}`;
+    const [finding] = checkLinks([{ text: 'bank.example', href }]);
+    expect(finding?.evidence.every((item) => item.length <= MAX_EVIDENCE_CHARS)).toBe(true);
+  });
+});
