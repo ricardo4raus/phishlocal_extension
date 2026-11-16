@@ -4,7 +4,7 @@ import { appCheckEnabled } from '../firebase';
 import type { Email } from '../email';
 import { checkEmail } from '../rules';
 import { readOpenEmail, showEmail } from './email-view';
-import { showFindings } from './findings-view';
+import { showRuleCheck } from './findings-view';
 import { setUpPaste } from './paste-view';
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -115,7 +115,7 @@ function setEmailStatus(text: string, isError = false): void {
 
 /** Shows an email from Gmail or the paste area with its rule findings; long texts get a note. */
 function displayEmail(email: Email, message: string): void {
-  showFindings(checkEmail(email), findingsList);
+  showRuleCheck(() => checkEmail(email), findingsList);
   showEmail(email, emailElements);
   setEmailStatus(email.truncated ? `${message} The text is long and was cut.` : message);
 }
