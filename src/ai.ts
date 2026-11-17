@@ -5,6 +5,8 @@ import {
   type LanguageModelCreateOptions,
   type LanguageModelExpected,
 } from 'firebase/ai';
+import { SYSTEM_PROMPT } from './ai/prompt';
+import { type AiVerdict, parseVerdict, VERDICT_SCHEMA } from './ai/verdict';
 import { ai } from './firebase';
 
 /** Languages Gemini Nano handles on-device. Chrome warns if a session is created without them. */
@@ -27,6 +29,23 @@ const createOptions = (): LanguageModelCreateOptions => ({
 const hybridModel = getGenerativeModel(ai, {
   mode: InferenceMode.PREFER_ON_DEVICE,
   onDeviceParams: { createOptions: createOptions() },
+});
+
+/**
+ * The AI check of real emails: on-device only, so no email ever reaches the cloud without the
+ * user's consent (the consent step is planned for 21 Nov). The system message goes in as the
+ * session's first prompt, because the SDK does not pass `systemInstruction` to the on-device
+ * model; the answer is constrained to the verdict JSON schema.
+ */
+const checkModel = getGenerativeModel(ai, {
+  mode: InferenceMode.ONLY_ON_DEVICE,
+  onDeviceParams: {
+    createOptions: {
+      ...createOptions(),
+      initialPrompts: [{ role: 'system', content: [{ type: 'text', value: SYSTEM_PROMPT }] }],
+    },
+    promptOptions: { responseConstraint: VERDICT_SCHEMA },
+  },
 });
 
 /** Cloud only. Used to test the cloud path on a machine where Gemini Nano is available. */
@@ -53,6 +72,29 @@ export async function runPrompt(prompt: string, forceCloud = false): Promise<Pro
     source: response.inferenceSource,
     durationMs: performance.now() - start,
   };
+}
+
+export type AiCheckResult =
+  | { ok: true; verdict: AiVerdict; durationMs: number }
+  /** `no-model`: Gemini Nano is not ready on this device, so there is no AI check (rules only). */
+  | { ok: false; reason: 'no-model' | 'unreadable-answer' | 'failed'; detail?: string };
+
+/** Runs the AI check of one email on-device and reads its answer strictly. */
+export async function runAiCheck(userPrompt: string): Promise<AiCheckResult> {
+  const model = await warmUpOnDevice().catch(() => undefined);
+  if (model?.state !== 'ready') return { ok: false, reason: 'no-model' };
+  const start = performance.now();
+  let text: string;
+  try {
+    const { response } = await checkModel.generateContent(userPrompt);
+    text = response.text();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { ok: false, reason: 'failed', detail };
+  }
+  const verdict = parseVerdict(text);
+  if (!verdict) return { ok: false, reason: 'unreadable-answer' };
+  return { ok: true, verdict, durationMs: performance.now() - start };
 }
 
 export type WarmUpResult =
