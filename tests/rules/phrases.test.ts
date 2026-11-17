@@ -45,6 +45,8 @@ describe('checkPhrases', () => {
     ['de', 'Ihr Konto wurde gesperrt. Bestätigen Sie Ihre Identität umgehend.'],
     ['fr', 'Activité inhabituelle : confirmez votre identité dans les 24 heures.'],
     ['es', 'Actividad inusual: confirme su identidad lo antes posible.'],
+    ['it', 'Attività insolita: conferma la tua identità entro 24 ore.'],
+    ['pt', 'Atividade incomum: confirme sua identidade o mais rápido possível.'],
   ])('works in %s', (_language, text) => {
     expect(check(text)).toEqual(['urgency', 'threat', 'credentials']);
   });
@@ -79,6 +81,8 @@ describe('checkPhrases', () => {
     'Wir fragen nie nach Ihrer Kartennummer oder Ihren Zugangsdaten.',
     'Nous ne demandons jamais vos identifiants ni votre numéro de carte.',
     'Nunca le pediremos sus datos de acceso ni su número de tarjeta.',
+    'Non ti chiederemo mai la password o il numero della carta.',
+    'Nunca pediremos a sua senha ou o número do cartão.',
     'Your November statement is ready in online banking.',
     'Sofortbildkamera im Angebot', // "sofort" inside a longer word
     'The insurgent group', // "urgent" inside a longer word
