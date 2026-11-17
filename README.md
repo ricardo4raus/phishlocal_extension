@@ -12,12 +12,14 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 ## What it does today
 
 - **Side panel** (Chrome Manifest V3): click the toolbar icon to open it.
-- **Read the open Gmail email** on click: sender, subject, visible text, and every link with its
-  text and real target. Nothing is read unless you click, and nothing leaves the browser.
+- **Automatic check in Gmail:** while the side panel is open, every email you open in Gmail is
+  read and checked at once: sender, subject, visible text, and every link with its text and real
+  target. Its headers (SPF, DKIM, DMARC, Reply-To) are loaded in the background from Gmail's own
+  "Show original" page. When the panel is closed, nothing is read. Nothing leaves the browser.
 - **Paste an email** from any other mail app, or load one of four made-up sample emails. Links
   keep their real targets from the copied formatting.
-- **Sender checks from the headers:** paste the raw source (Gmail: ⋮ → Show original → Copy to
-  clipboard) and PhishLocal also reads the headers: whether SPF, DKIM and DMARC passed, and where
+- **Sender checks from the headers:** for Gmail automatically; for other mail apps, paste the
+  raw source ("View source") and PhishLocal also reads the headers: whether SPF, DKIM and DMARC passed, and where
   replies go. A forged sender whose domain says "not from us" (DMARC failed) is flagged as
   danger.
 - **Red flags without AI:** rule checks list what is suspicious and why, in one sentence each.
@@ -32,7 +34,9 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 
 ## Privacy
 
-- Emails are read only on click and processed in the browser.
+- Gmail emails are read only while the side panel is open, and processed in the browser. The
+  headers come from Gmail itself (the same page as ⋮ → Show original), with your normal login;
+  no other server is involved.
 - The rule checks run locally, without network access.
 - No email is stored: everything is gone when the side panel closes.
 - Email content is shown only as text, never rendered as HTML, so pasted emails can't load

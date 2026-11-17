@@ -56,8 +56,12 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - `PREFER_ON_DEVICE` falls back to the cloud silently; consent before cloud is the 21 Nov task.
   Until the consent step exists, never run a prompt on a real email (only test text). Reading
   and showing an email in the side panel is fine: it stays local.
-- "Read open email" in the side panel reads the open Gmail email through the content script
-  `src/content/gmail.ts`, only on click. Gmail's selectors live in `SELECTORS` in
+- Automatic scan: while the side panel is open, it keeps a port to the active tab
+  (`src/sidepanel/watch.ts`, `src/messages.ts`); the content script (`src/content/gmail-watch.ts`)
+  reports every opened email and loads its "Show original" page for the headers
+  (`gmail-original.ts`), which the panel parses (`src/raw/gmail-original-page.ts`, sender checks
+  only from `mx.google.com`). Closing the panel stops all reading. "Check the open email again"
+  uses the same port. Gmail's selectors live in `SELECTORS` in
   `src/content/gmail-extract.ts` (measured 15 Nov 2026). If Gmail changes its page, measure
   again with a DevTools snippet that prints only counts and class names, never email content.
 - "Or paste an email" in the side panel is the fallback when Gmail can't be read (and for the

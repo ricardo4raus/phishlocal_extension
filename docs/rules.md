@@ -101,8 +101,10 @@ short list of often-imitated real brands in [`brands.ts`](../src/rules/brands.ts
 
 ### Headers ([`headers.ts`](../src/rules/headers.ts))
 
-Only for emails read from their raw source (parsed by
-[`parse-raw-email.ts`](../src/raw/parse-raw-email.ts) with postal-mime).
+Only for emails read with their raw source: automatically from Gmail's "Show original" page
+([`gmail-original-page.ts`](../src/raw/gmail-original-page.ts)), or pasted (parsed by
+[`parse-raw-email.ts`](../src/raw/parse-raw-email.ts) with postal-mime). For Gmail, the sender
+checks count only if the topmost result comes from Gmail's own server, `mx.google.com`.
 
 | Rule                | Severity                            | Flags                                              | Example                                                            |
 | ------------------- | ----------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------ |
@@ -193,8 +195,9 @@ completely is a red flag of its own. Real emails stay far below both limits.
 - International domains are flagged but not decoded (the browser has no punycode decoder). The
   mixed-script rule catches them where the email has the raw letters.
 - Words that legitimately mix alphabets (e.g. "μg") get a mixed-script warning.
-- Header checks need the raw email. For now the user pastes it (Gmail: Show original → Copy to
-  clipboard; other mail apps: View source). Reading it automatically from Gmail is the next task.
+- Header checks need the raw email. For Gmail it is loaded automatically from the undocumented
+  "Show original" page; if Gmail changes that page, the panel says that the sender checks are not
+  available. For other mail apps the user pastes the raw source ("View source").
 
 ## Adding or changing a rule
 

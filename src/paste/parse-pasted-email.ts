@@ -202,6 +202,23 @@ function visibleText(document: HtmlNode): string {
     .trim();
 }
 
+/**
+ * Text of the first `<pre>`, with entities decoded and whitespace kept. Gmail's "Show original"
+ * page has exactly one, holding the raw email (measured 16 Nov 2026).
+ */
+export function preText(html: string): string | undefined {
+  const { document } = parseLimited(html);
+  let pre: HtmlNode | undefined;
+  walk(document, (node) => {
+    if (pre) return false;
+    if (isElement(node) && node.tagName === 'pre') {
+      pre = node;
+      return false;
+    }
+  });
+  return pre && textOf(pre);
+}
+
 /** What an email's HTML contains, read once. `complete` is false if part was too large or deep. */
 export interface HtmlContent {
   text: string;

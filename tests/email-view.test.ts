@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { type Email, READ_EMAIL } from '../src/email';
-import { HEADERS_HINT, readOpenEmail, showEmail } from '../src/sidepanel/email-view';
+import { describe, expect, it } from 'vitest';
+import type { Email } from '../src/email';
+import { HEADERS_HINT, showEmail } from '../src/sidepanel/email-view';
 
 const email: Email = {
   sender: { name: 'PayPal', address: 'service@paypa1-secure.example' },
@@ -10,19 +10,6 @@ const email: Email = {
   links: [{ text: 'paypal.com', href: 'https://paypa1-secure.example/login' }],
   truncated: false,
 };
-
-/** Replaces the parts of the chrome API that readOpenEmail uses. `tabs`: the active tabs found. */
-function stubChrome(
-  sendMessage: () => Promise<unknown>,
-  tabs: { id?: number }[] = [{ id: 7 }],
-): void {
-  vi.stubGlobal('chrome', {
-    tabs: {
-      query: vi.fn<() => Promise<{ id?: number }[]>>(async () => tabs),
-      sendMessage: vi.fn<() => Promise<unknown>>(sendMessage),
-    },
-  });
-}
 
 const get = (id: string) => document.getElementById(id) as HTMLElement;
 
@@ -44,51 +31,6 @@ function emailElements() {
     body: get('body'),
   };
 }
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
-describe('readOpenEmail', () => {
-  it('asks the active tab and returns the email', async () => {
-    stubChrome(async () => ({ ok: true, email }));
-    expect(await readOpenEmail()).toEqual({ ok: true, email });
-    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(7, { type: READ_EMAIL });
-  });
-
-  it('explains what to do if the tab has no Gmail content script', async () => {
-    stubChrome(async () => {
-      throw new Error('Could not establish connection. Receiving end does not exist.');
-    });
-    const result = await readOpenEmail();
-    expect(result.ok).toBe(false);
-    expect(!result.ok && result.message).toMatch(/Open an email in Gmail/);
-  });
-
-  it('reports when no email is open', async () => {
-    stubChrome(async () => ({ ok: false, reason: 'no-email-open' }));
-    const result = await readOpenEmail();
-    expect(!result.ok && result.message).toMatch(/No email is open/);
-  });
-
-  it('reports when Gmail could not be read', async () => {
-    stubChrome(async () => ({ ok: false, reason: 'unreadable' }));
-    const result = await readOpenEmail();
-    expect(!result.ok && result.message).toMatch(/Could not read this email/);
-  });
-
-  it('rejects an answer with the wrong shape', async () => {
-    stubChrome(async () => ({ ok: true, email: { subject: 1 } }));
-    const result = await readOpenEmail();
-    expect(!result.ok && result.message).toMatch(/Unexpected answer/);
-  });
-
-  it.each([[[]], [[{}]]])('handles a missing active tab (%j)', async (tabs) => {
-    stubChrome(async () => ({ ok: true, email }), tabs);
-    expect((await readOpenEmail()).ok).toBe(false);
-    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
-  });
-});
 
 describe('showEmail', () => {
   it('shows email content as text, never as HTML', () => {

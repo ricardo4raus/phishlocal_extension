@@ -1,13 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  type Email,
-  FIELD_LIMITS,
-  isReadEmailRequest,
-  isReadEmailResponse,
-  MAX_BODY_CHARS,
-  MAX_LINKS,
-  READ_EMAIL,
-} from '../src/email';
+import { type Email, FIELD_LIMITS, isEmail, MAX_BODY_CHARS, MAX_LINKS } from '../src/email';
 
 const email: Email = {
   sender: { name: 'PayPal', address: 'service@paypa1-secure.example' },
@@ -17,66 +9,45 @@ const email: Email = {
   truncated: false,
 };
 
-describe('isReadEmailRequest', () => {
-  it('accepts the read-email request', () => {
-    expect(isReadEmailRequest({ type: READ_EMAIL })).toBe(true);
-  });
-
-  it.each([null, undefined, 'phishlocal/read-email', {}, { type: 'other' }])(
-    'rejects %j',
-    (value) => {
-      expect(isReadEmailRequest(value)).toBe(false);
-    },
-  );
-});
-
-describe('isReadEmailResponse', () => {
-  it('accepts an email and "no email open"', () => {
-    expect(isReadEmailResponse({ ok: true, email })).toBe(true);
-    expect(isReadEmailResponse({ ok: false, reason: 'no-email-open' })).toBe(true);
-    expect(isReadEmailResponse({ ok: false, reason: 'unreadable' })).toBe(true);
+describe('isEmail', () => {
+  it('accepts a complete email', () => {
+    expect(isEmail(email)).toBe(true);
   });
 
   it.each([
     ['nothing', undefined],
     ['a string', 'ok'],
-    ['ok without email', { ok: true }],
-    ['an unknown reason', { ok: false, reason: 'other' }],
-    ['a missing sender', { ok: true, email: { ...email, sender: undefined } }],
-    ['a non-string subject', { ok: true, email: { ...email, subject: 42 } }],
-    ['links that are not a list', { ok: true, email: { ...email, links: 'x' } }],
-    ['a link without href', { ok: true, email: { ...email, links: [{ text: 'x' }] } }],
-    [
-      'a body over the limit',
-      { ok: true, email: { ...email, bodyText: 'x'.repeat(MAX_BODY_CHARS + 1) } },
-    ],
+    ['a missing sender', { ...email, sender: undefined }],
+    ['a non-string subject', { ...email, subject: 42 }],
+    ['links that are not a list', { ...email, links: 'x' }],
+    ['a link without href', { ...email, links: [{ text: 'x' }] }],
+    ['a body over the limit', { ...email, bodyText: 'x'.repeat(MAX_BODY_CHARS + 1) }],
     [
       'too many links',
-      {
-        ok: true,
-        email: { ...email, links: Array.from({ length: MAX_LINKS + 1 }, () => email.links[0]) },
-      },
+      { ...email, links: Array.from({ length: MAX_LINKS + 1 }, () => email.links[0]) },
     ],
-    ['a missing truncated flag', { ok: true, email: { ...email, truncated: undefined } }],
-    [
-      'a subject over the limit',
-      { ok: true, email: { ...email, subject: 'x'.repeat(FIELD_LIMITS.subject + 1) } },
-    ],
+    ['a missing truncated flag', { ...email, truncated: undefined }],
+    ['a subject over the limit', { ...email, subject: 'x'.repeat(FIELD_LIMITS.subject + 1) }],
     [
       'a sender name over the limit',
+      { ...email, sender: { name: 'x'.repeat(FIELD_LIMITS.name + 1), address: '' } },
+    ],
+    [
+      'an address over the limit',
+      { ...email, sender: { name: '', address: 'x'.repeat(FIELD_LIMITS.address + 1) } },
+    ],
+    [
+      'a link text over the limit',
       {
-        ok: true,
-        email: { ...email, sender: { name: 'x'.repeat(FIELD_LIMITS.name + 1), address: '' } },
+        ...email,
+        links: [{ text: 'x'.repeat(FIELD_LIMITS.linkText + 1), href: 'https://x.example' }],
       },
     ],
     [
       'a link target over the limit',
-      {
-        ok: true,
-        email: { ...email, links: [{ text: 'x', href: 'x'.repeat(FIELD_LIMITS.href + 1) }] },
-      },
+      { ...email, links: [{ text: 'x', href: 'x'.repeat(FIELD_LIMITS.href + 1) }] },
     ],
   ])('rejects %s', (_label, value) => {
-    expect(isReadEmailResponse(value)).toBe(false);
+    expect(isEmail(value)).toBe(false);
   });
 });

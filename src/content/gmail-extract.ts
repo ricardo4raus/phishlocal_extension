@@ -56,14 +56,19 @@ function linksOf(body: Element): EmailLink[] {
     });
 }
 
+/** The open message: the last one of the thread whose body is expanded. */
+export function findOpenMessage(document: Document): Element | undefined {
+  return allMatches(document, SELECTORS.message)
+    .filter((candidate) => firstMatch(candidate, SELECTORS.body) !== null)
+    .at(-1);
+}
+
 /**
  * The email open in Gmail: the last message of the thread whose body is expanded.
  * `undefined` if no email is open (e.g. the inbox list is shown).
  */
 export function extractEmail(document: Document): Email | undefined {
-  const message = allMatches(document, SELECTORS.message)
-    .filter((candidate) => firstMatch(candidate, SELECTORS.body) !== null)
-    .at(-1);
+  const message = findOpenMessage(document);
   if (!message) return undefined;
 
   const body = firstMatch(message, SELECTORS.body) as Element;

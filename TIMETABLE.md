@@ -31,10 +31,11 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 - [x] Wed 18.11. – Raw email: read the headers (Reply-To, Return-Path, SPF/DKIM/DMARC results)
       and add header rules; paste raw source from any mail app; parsed with postal-mime 4.2.0
       (done Mon 16.11)
-- [ ] Wed 18.11. – Automatic scan: while the side panel is open, every email opened in Gmail is
+- [x] Wed 18.11. – Automatic scan: while the side panel is open, every email opened in Gmail is
       read and checked without a click; its headers are loaded from Gmail's "Show original" page
       in the background (undocumented, measured 16.11; if it fails, the panel says so and pasting
       still works). Decided 16.11 instead of the optional setting planned for 23.11.
+      (done Tue 17.11)
 
 ## Phase 3 · AI & result
 

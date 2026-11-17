@@ -38,9 +38,10 @@ _Current state, updated as features land._
   The panel shows where the prompt ran and how long it took.
 - When the side panel opens, it loads the on-device model in the background and shows its state
   (loading, ready, not downloaded, not available).
-- "Read open email" in the side panel reads the email open in Gmail (sender, subject, visible
-  text, links with their text and real target) through a content script, only on click. Nothing
-  leaves the browser. No AI check of the email yet.
+- While the side panel is open, every email opened in Gmail is read (sender, subject, visible
+  text, links with their text and real target) and checked automatically, and its headers are
+  loaded from Gmail's own "Show original" page in the background. Closing the panel stops all
+  reading. Nothing leaves the browser. No AI check of the email yet.
 - "Or paste an email" is the fallback for other mail apps and for the demo: paste an email
   (optionally with sender and subject) and the panel shows its text and links, including the
   real target behind each link text. Three made-up sample emails (two phishing, one harmless)
@@ -224,6 +225,9 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   grows with the square of the nesting depth. Measure with hostile input, not only real emails.
 - A multipart email has two bodies; the mail app shows the HTML one. Checking the other one is a
   gap an attacker can use.
+- A side panel can watch a tab without the `tabs` permission: `chrome.tabs.connect` reaches only
+  our own content script, a closed panel closes the port, and the content script stops with it.
+  That makes "read only while the panel is open" a property of the code, not a promise.
 - The tricks we flag in emails can fool our own UI: a right-to-left override reversed text in
   the side panel too, so the panel now shows it as `<U+202E>`.
 
@@ -403,3 +407,30 @@ _To fill in near the submission._
   ("moc.lapyap" shown as "paypal.com") had no finding and fooled our own panel; Clear during
   reading brought the old email back; fields had no length limits; raw-source detection stopped
   at 64 KB while the parser accepted 256 KB.
+
+### Tue 17 Nov 2026
+
+**Session with Claude Code (continued from Mon 16 Nov):**
+
+- PR #11 (raw emails and header rules) merged after a short Chrome test.
+- Automatic scanning (`feat/auto-scan`, planned for Wed 18 Nov), in small commits:
+  - a port protocol between side panel and Gmail tab, with validators on both sides;
+  - the content script finds Gmail's account key and the message ID (both strictly checked) and
+    loads the "Show original" page same-origin, without redirects, with a 1 MB and 10 s limit;
+  - a watcher reports each opened email while the panel is connected, at most every 300 ms,
+    skips the same message by its ID, aborts the request of an email that is no longer open,
+    and stops when the panel closes;
+  - the side panel parses the page with parse5 (only the header block) and trusts the sender
+    checks only from `mx.google.com`; it shows the email at once and again with the headers;
+  - the old one-off "read on click" request is gone: the button asks over the same port.
+- Self-review found three issues, fixed with tests: "unreadable" was sent on every Gmail page
+  change, the old email stayed visible after "unreadable", and connecting to a `chrome://` tab
+  could throw. The content script stays at about 6 KB, without parse5 or postal-mime; no new
+  permissions.
+- Tested in Chrome: an opened newsletter was checked without a click and showed the same sender
+  checks as Gmail's own table; several emails in a row, the inbox, tab switches, closing and
+  reopening the panel, and a sample followed by a Gmail email all worked.
+- Second review of the PR found four more issues, fixed with tests: overlapping connects left an
+  old port (and its watcher) running in the background; content Gmail rendered after the first
+  check was never checked; a stopped request still sent a failure; an unexpected error left the
+  status at "Loading…".
