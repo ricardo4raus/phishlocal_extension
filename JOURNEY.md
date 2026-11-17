@@ -469,3 +469,8 @@ _To fill in near the submission._
   that Gmail's repeated display of one email ran the same check twice, and that a hanging or
   failing run could block the queue for good. Now one run serves the same email, runs stop after
   60 s, and the status shows the seconds while a check runs or waits.
+- Review of the model and answer path (Ricardo asked for it): in a fresh Chrome profile the model
+  could never be downloaded (Chrome needs a click, and there was no button), loading the model
+  counted against the 60 s limit, and Gmail's repeated display of an email still wasted runs.
+  Fixed: a download button with progress, a separate wait for the model, and a check that starts
+  only once the email has not changed for half a second.

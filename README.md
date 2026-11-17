@@ -71,7 +71,8 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
    Only development builds (`npm run dev`) use it; release builds leave it out, so their cloud
    requests fail until App Check is set up for them.
 4. **Enable Gemini Nano:** open `chrome://flags/#prompt-api-for-gemini-nano`, set it to "Enabled
-   Multilingual", and restart Chrome. The model downloads on first use.
+   Multilingual", and restart Chrome. If the model is not on the device yet, the side panel shows
+   "Download the on-device model" (about 4 GB, once).
 5. **Build:** `npm run dev` (development build that rebuilds on changes) or `npm run build`
    (release build). Both write to `dist/`.
 6. **Load the extension:** open `chrome://extensions`, turn on developer mode, click "Load

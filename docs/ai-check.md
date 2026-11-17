@@ -47,9 +47,12 @@ are its input and its lower limit.
 5. **When:**
    - one check at a time; while one runs, only the newest email waits, and results for an email
      that is no longer shown are dropped;
-   - the same email with the same findings (Gmail shows an email several times) uses the running
-     check's answer instead of running again;
-   - a run is given up after 60 s; the status shows the seconds while it runs or waits;
+   - a check starts once the shown email has not changed for 0.5 s (Gmail shows an email several
+     times within a moment); the same email with the same findings uses a running check's answer;
+   - the panel first waits for the model to load (that can take minutes in a bad Chrome state);
+     the run's 60 s limit starts when it asks the model; the status shows the seconds;
+   - without the model, the panel offers "Download the on-device model": Chrome starts the
+     download (about 4 GB, once) only after a user action;
    - a Gmail email waits for its headers, but at most 3 s;
    - without a ready on-device model there is no AI check; the panel says so and the rules stand
      alone.
