@@ -92,7 +92,9 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       const note =
         result.reason === 'no-model'
           ? 'AI check not available: the on-device model is not ready. Rule checks only.'
-          : 'The AI answer could not be read. The rule checks still apply.';
+          : result.reason === 'failed'
+            ? `The AI check failed (${result.detail ?? 'unknown error'}). The rule checks still apply.`
+            : 'The AI answer could not be read. The rule checks still apply.';
       showRulesOnly(request, note);
       return;
     }

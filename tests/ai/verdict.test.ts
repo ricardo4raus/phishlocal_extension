@@ -89,8 +89,22 @@ describe('rules as the lower limit', () => {
     expect(overallRisk(undefined, 'suspicious')).toBe('suspicious');
   });
 
-  it('has a schema that requires exactly the three fields', () => {
+  it('has a schema with only the basic keywords Chrome supports', () => {
     expect(VERDICT_SCHEMA.required).toEqual(['risk', 'reasons', 'advice']);
     expect(VERDICT_SCHEMA.properties.risk.enum).toEqual(['safe', 'suspicious', 'dangerous']);
+    // Every key in the schema: the three field names and the basic keywords, nothing else.
+    const keys = new Set(JSON.stringify(VERDICT_SCHEMA).match(/"\w+":/g));
+    expect(keys).toEqual(
+      new Set([
+        '"type":',
+        '"properties":',
+        '"risk":',
+        '"enum":',
+        '"reasons":',
+        '"items":',
+        '"advice":',
+        '"required":',
+      ]),
+    );
   });
 });

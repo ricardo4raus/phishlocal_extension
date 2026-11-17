@@ -137,6 +137,11 @@ describe('AI check view', () => {
     await answer({ ok: false, reason: 'unreadable-answer' });
     expect(text('overall')).toBe('Suspicious (rule checks)');
     expect(text('status')).toMatch(/could not be read/);
+    check.shown(email, [], true);
+    await answer({ ok: false, reason: 'failed', detail: 'The input is too large.' });
+    expect(text('status')).toBe(
+      'The AI check failed (The input is too large.). The rule checks still apply.',
+    );
   });
 
   it('clears the view and drops a late result when the email is hidden', async () => {

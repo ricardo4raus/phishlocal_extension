@@ -14,16 +14,19 @@ export const MAX_REASONS = 5;
 /** Longest reason or advice that is shown. */
 export const MAX_AI_TEXT = 300;
 
-/** JSON Schema for the answer: on-device `responseConstraint`, later the cloud's schema too. */
+/**
+ * JSON Schema for the answer: on-device `responseConstraint`, later the cloud's schema too. Only
+ * basic keywords (type, properties, required, enum, items), because Chrome's Prompt API supports
+ * only part of JSON Schema; parseVerdict() enforces the limits.
+ */
 export const VERDICT_SCHEMA = {
   type: 'object',
   properties: {
     risk: { type: 'string', enum: [...RISKS] },
-    reasons: { type: 'array', items: { type: 'string' }, maxItems: MAX_REASONS },
+    reasons: { type: 'array', items: { type: 'string' } },
     advice: { type: 'string' },
   },
   required: ['risk', 'reasons', 'advice'],
-  additionalProperties: false,
 };
 
 export interface AiVerdict {
