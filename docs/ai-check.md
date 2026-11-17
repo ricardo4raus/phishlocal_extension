@@ -79,5 +79,9 @@ the prompt's structure, but the model still reads the text.
 - **Speed:** the first check after loading the model can take longer; inference on a loaded model
   took about 1 s for short answers in earlier measurements.
 - **Language quality:** the AI's reasons are only as good as Gemini Nano in that language.
+- **Forged "confirmed sender" in pasted raw source:** raw source from a provider that adds no
+  check result of its own can contain a forged `dmarc=pass`. That only removes the AI's extra
+  raise for a sender without rule warnings; the rules still apply. Gmail is not affected: only
+  results from `mx.google.com` count there.
 - **No cloud yet:** the cloud "deep check" with consent and on-device removal of personal data is
   planned for 21 Nov.
