@@ -154,4 +154,13 @@ describe('watchActiveTab', () => {
     expect(ports).toEqual([]);
     expect(disconnects).toBe(1);
   });
+
+  it('opens only one port when connects overlap', async () => {
+    watchActiveTab({ onMessage: () => {}, onDisconnected: () => {} });
+    activeTab = { id: 9, windowId: 1 };
+    onActivated({ tabId: 9, windowId: 1 });
+    onUpdated(9, { status: 'complete' });
+    await settle();
+    expect(ports.map((port) => port.tabId)).toEqual([9]);
+  });
 });

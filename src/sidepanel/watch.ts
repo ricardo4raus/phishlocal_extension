@@ -22,11 +22,17 @@ export function watchActiveTab(callbacks: WatchCallbacks): Watch {
   let port: chrome.runtime.Port | undefined;
   let tabId: number | undefined;
   let windowId: number | undefined;
+  /** Counts connect attempts; only the newest may open a port. */
+  let attempts = 0;
 
   async function connect(): Promise<void> {
+    const attempt = ++attempts;
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    // A newer attempt started meanwhile (tab switch, reload, click): it opens the port.
+    if (attempt !== attempts) return;
+    // Close the old port: its content script stops reading.
     port?.disconnect();
     port = undefined;
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     tabId = tab?.id;
     windowId = tab?.windowId;
     if (tabId === undefined) {

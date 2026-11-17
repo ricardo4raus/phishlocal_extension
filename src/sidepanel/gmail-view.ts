@@ -56,7 +56,12 @@ export function createGmailView(ui: GmailViewUi): GmailView {
   };
 
   async function addHeaders(target: { key: string; email: Email }, html: string): Promise<void> {
-    const headers = await headersFromOriginalPage(html);
+    let headers;
+    try {
+      headers = await headersFromOriginalPage(html);
+    } catch {
+      headers = undefined;
+    }
     if (current !== target) return;
     if (headers) {
       ui.show({ ...target.email, headers }, `${CHECKED} Sender checks read from Gmail.`);

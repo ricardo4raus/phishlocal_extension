@@ -204,4 +204,40 @@ describe('watchGmail', () => {
     await settle();
     expect(types()).toEqual(['unreadable', 'email:msg-f:1', 'original:msg-f:1']);
   });
+
+  it('reports the same message again when Gmail renders more of it, not for other changes', async () => {
+    openEmail('msg-f:1');
+    connect();
+    await settle();
+    document.querySelector('.a3s')?.append(' and more: https://later.example/x');
+    await settle();
+    document.body.append(document.createElement('span'));
+    await settle();
+    expect(types()).toEqual([
+      'email:msg-f:1',
+      'original:msg-f:1',
+      'email:msg-f:1',
+      'original:msg-f:1',
+    ]);
+    const last = posted.filter((message) => message.type === 'email').at(-1);
+    expect(last).toMatchObject({ email: { bodyText: 'Hello and more: https://later.example/x' } });
+    expect(loadOriginal).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends nothing for a request it stopped when the inbox was opened', async () => {
+    loadOriginal.mockImplementationOnce(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () =>
+            reject(new OriginalError('request-failed')),
+          );
+        }),
+    );
+    openEmail('msg-f:1');
+    connect();
+    await settle();
+    openEmail();
+    await settle();
+    expect(types()).toEqual(['email:msg-f:1', 'no-email']);
+  });
 });

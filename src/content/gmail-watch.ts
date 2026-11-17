@@ -40,6 +40,10 @@ export function watchGmail(
 ): void {
   /** Key of the email last reported; `null` after "no email", `UNREADABLE` after a failure. */
   let reported: string | null | typeof UNREADABLE | undefined;
+  /** Size of the reported message's content, to notice when Gmail renders more of it. */
+  let reportedSize: number | undefined;
+  /** The email last reported, to report it again only if its content changed. */
+  let reportedEmail: string | undefined;
   let loading: AbortController | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let connected = true;
@@ -53,6 +57,12 @@ export function watchGmail(
     } catch {
       stop();
     }
+  };
+
+  /** Stops the running page request; its result is dropped. */
+  const cancelLoading = (): void => {
+    loading?.abort();
+    loading = undefined;
   };
 
   const remember = (messageId: string, html: string): void => {
@@ -90,17 +100,21 @@ export function watchGmail(
     let message: Element | undefined;
     let email: Email | undefined;
     let messageId: string | undefined;
+    let size: number | undefined;
     try {
       message = findOpenMessage(page.document);
       messageId = message && readMessageId(message);
-      // Reading the email is the expensive part, so it is skipped for the same message.
-      if (!force && messageId !== undefined && messageId === reported) return;
+      size = message?.textContent?.length;
+      // Reading the email (innerText) is the expensive part: skip it for the same message,
+      // unless Gmail has rendered more of it since (cheap to notice with textContent).
+      const same = messageId !== undefined && messageId === reported && size === reportedSize;
+      if (!force && same) return;
       email = message && extractEmail(page.document);
     } catch {
       // Reported once: Gmail keeps changing its page, and each change would try again.
       if (force || reported !== UNREADABLE) {
         reported = UNREADABLE;
-        loading?.abort();
+        cancelLoading();
         post({ type: 'unreadable' });
       }
       return;
@@ -108,18 +122,23 @@ export function watchGmail(
     if (!message || !email) {
       if (force || reported !== null) {
         reported = null;
-        loading?.abort();
+        cancelLoading();
         post({ type: 'no-email' });
       }
       return;
     }
     const key = messageId ?? fallbackKey(email);
-    if (!force && key === reported) return;
+    const content = JSON.stringify(email);
+    reportedSize = size;
+    // Same message, same content (e.g. only Gmail's "5 minutes ago" changed): nothing to report.
+    if (!force && key === reported && content === reportedEmail) return;
+    const sameMessage = key === reported;
     reported = key;
-    loading?.abort();
-    loading = undefined;
+    reportedEmail = content;
+    if (!sameMessage) cancelLoading();
     post({ type: 'email', key, email });
-    void loadHeaders(key, messageId);
+    // The page of the same message is cached or still loading; its result follows.
+    if (!sameMessage || !loading) void loadHeaders(key, messageId);
   }
 
   const schedule = (): void => {
@@ -138,7 +157,7 @@ export function watchGmail(
     observer.disconnect();
     view?.removeEventListener('hashchange', schedule);
     clearTimeout(timer);
-    loading?.abort();
+    cancelLoading();
   }
 
   observer.observe(page.document.body, { childList: true, subtree: true });

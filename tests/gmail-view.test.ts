@@ -1,6 +1,7 @@
 // What the side panel shows for the messages from the Gmail tab (UI replaced by a recorder).
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Email } from '../src/email';
+import * as originalPage from '../src/raw/gmail-original-page';
 import { HEADERS_HINT } from '../src/sidepanel/email-view';
 import { createGmailView, type GmailView } from '../src/sidepanel/gmail-view';
 
@@ -109,5 +110,16 @@ describe('Gmail view', () => {
       'hide',
       'status error: Could not read this email. Gmail may have changed its page.',
     ]);
+  });
+
+  it('ends the loading state when reading the headers fails unexpectedly', async () => {
+    const failing = vi
+      .spyOn(originalPage, 'headersFromOriginalPage')
+      .mockRejectedValue(new Error('broken'));
+    view.handle({ type: 'email', key: 'msg-f:1', email });
+    view.handle({ type: 'original', key: 'msg-f:1', html: PAGE });
+    await settle();
+    expect(shown.at(-1)?.status).toMatch(/Gmail's page could not be read/);
+    failing.mockRestore();
   });
 });
