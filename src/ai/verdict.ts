@@ -49,11 +49,26 @@ const BARE_DOMAIN = /\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,24}\b(?:\/\S*)?/gi;
 /** Model output is short; longer text is cut before the patterns run. */
 const MAX_RAW_AI_TEXT = 2_000;
 
-export function cleanAiText(text: string, { keepDomains = true } = {}): string {
+export interface CleanOptions {
+  /** Keep bare domains (reasons: yes; advice: no). */
+  keepDomains?: boolean;
+  /**
+   * Email addresses of the email itself (sender, Reply-To), lowercase. They stay readable: the
+   * user sees them anyway, and "the sender address x is unusual" needs them.
+   */
+  knownAddresses?: ReadonlySet<string>;
+}
+
+export function cleanAiText(
+  text: string,
+  { keepDomains = true, knownAddresses = new Set() }: CleanOptions = {},
+): string {
   let cleaned = text
     .slice(0, MAX_RAW_AI_TEXT)
     .replaceAll(FULL_URL, '[removed]')
-    .replaceAll(EMAIL_ADDRESS, '[removed]')
+    .replaceAll(EMAIL_ADDRESS, (address) =>
+      knownAddresses.has(address.toLowerCase()) ? address : '[removed]',
+    )
     .replaceAll(PHONE_NUMBER, '[removed]');
   if (!keepDomains) cleaned = cleaned.replaceAll(BARE_DOMAIN, '[removed]');
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
@@ -63,8 +78,14 @@ export function cleanAiText(text: string, { keepDomains = true } = {}): string {
 const isRisk = (value: unknown): value is Risk =>
   typeof value === 'string' && (RISKS as readonly string[]).includes(value);
 
-/** Reads the model's answer, or undefined if it is not the expected JSON. */
-export function parseVerdict(text: string): AiVerdict | undefined {
+/**
+ * Reads the model's answer, or undefined if it is not the expected JSON. `knownAddresses`: the
+ * email's own addresses, which may stay in the reasons.
+ */
+export function parseVerdict(
+  text: string,
+  knownAddresses: ReadonlySet<string> = new Set(),
+): AiVerdict | undefined {
   // Models sometimes wrap JSON in a code fence despite the constraint.
   const json = text
     .trim()
@@ -84,7 +105,7 @@ export function parseVerdict(text: string): AiVerdict | undefined {
     risk,
     reasons: (reasons as string[])
       .slice(0, MAX_REASONS)
-      .map((reason) => cleanAiText(reason))
+      .map((reason) => cleanAiText(reason, { knownAddresses }))
       .filter((reason) => reason !== ''),
     advice: cleanAiText(advice, { keepDomains: false }),
   };

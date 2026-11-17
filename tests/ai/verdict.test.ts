@@ -108,3 +108,20 @@ describe('rules as the lower limit', () => {
     );
   });
 });
+
+describe("the email's own addresses", () => {
+  it('stay readable in reasons, while planted ones and the advice are cleaned', () => {
+    const verdict = parseVerdict(
+      JSON.stringify({
+        risk: 'suspicious',
+        reasons: ['The sender No-Reply@Accounts.Google.com differs from help@evil.example.'],
+        advice: 'Write to no-reply@accounts.google.com.',
+      }),
+      new Set(['no-reply@accounts.google.com']),
+    );
+    expect(verdict?.reasons).toEqual([
+      'The sender No-Reply@Accounts.Google.com differs from [removed].',
+    ]);
+    expect(verdict?.advice).toBe('Write to [removed].');
+  });
+});
