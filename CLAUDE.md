@@ -25,7 +25,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
   git-ignored; `.env.example` with empty values is committed.
 - License: **Apache-2.0** (hackathon requirement: public repo with visible open-source license).
 - Supported email languages: the rule checks cover en, de, fr, es, it, pt; the on-device AI
-  answers in en, de, fr, es (it and pt only if Chrome's Gemini Nano supports them: measure).
+  answers in all six, with it and pt marked experimental (Chrome: "output quality cannot be
+  guaranteed"; supported are de, en, es, fr, ja; measured 17 Nov 2026).
 - Privacy is the core selling point: never send email content anywhere without explicit user
   consent.
 - Keep it simple. No frameworks (React etc.) unless I ask. Plain TypeScript + HTML + CSS.

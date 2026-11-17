@@ -17,6 +17,8 @@ are its input and its lower limit.
      - one JSON data block between markers with a random value per request.
    - **The data block holds:**
      - the rule findings (rule, severity and message; no raw evidence);
+     - the sender checks from the headers (SPF, DKIM, DMARC, "sender domain confirmed"), so the
+       AI knows when the email really comes from the sender's domain;
      - sender and subject;
      - up to 20 links as text plus target domain;
      - up to 3,000 characters of body text.
@@ -29,8 +31,9 @@ are its input and its lower limit.
 3. **Answer** (`parseVerdict()`):
    - checked field by field: risk, at most 5 reasons, advice, at most 300 characters each;
    - accepted also inside a code fence;
-   - full links, email addresses and phone numbers are removed from it, and bare domains from the
-     advice. Anything else means "the AI answer could not be read".
+   - full links, planted email addresses and phone numbers are removed from it, and bare domains
+     from the advice. The email's own addresses (sender, Reply-To) stay readable in the reasons.
+     Anything else means "the AI answer could not be read".
 4. **Verdict** ([`src/sidepanel/ai-view.ts`](../src/sidepanel/ai-view.ts)):
    - The overall risk is the higher of AI and rules. A rule danger finding means at least
      "dangerous", a warning at least "suspicious".
@@ -42,9 +45,10 @@ are its input and its lower limit.
    - a Gmail email waits for its headers, but at most 3 s;
    - without a ready on-device model there is no AI check; the panel says so and the rules stand
      alone.
-6. **Language:** Chrome's UI language if the AI supports it (`AI_LANGUAGES`: en, de, fr, es),
-   otherwise English. Italian and Portuguese are added once Gemini Nano is measured to support
-   them.
+6. **Language:** Chrome's UI language if the AI supports it (`AI_LANGUAGES`: en, de, fr, es, it,
+   pt), otherwise English. Each answer language gets its own on-device model with exactly that
+   output language. Gemini Nano accepts Italian and Portuguese but marks them experimental
+   (measured 17 Nov 2026; supported are de, en, es, fr, ja), so the panel says so.
 
 ## Prompt injection (OWASP LLM01) and unsafe output (LLM05)
 

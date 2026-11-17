@@ -453,3 +453,10 @@ _To fill in near the submission._
   with a newest-only queue, Italian and Portuguese pressure phrases, and a sample that tries to
   talk the AI into "safe". Ricardo asked for Italian and Portuguese; whether Gemini Nano can
   answer in them is measured in Chrome.
+- Chrome test of the AI check: Ricardo measured the languages (Italian and Portuguese work but
+  are "experimental" in Gemini Nano) and found a false alarm: a real Google security notice with
+  SPF, DKIM and DMARC pass was "suspicious" for the AI. Causes: the AI never saw the sender
+  checks, the cleanup hid the sender's own address ("'[removed]' is unusual"), and Gemini Nano is
+  cautious with account notices. Fixed: the AI now gets the sender checks and a rule about
+  confirmed senders, the email's own addresses stay readable, each reason is one sentence, and
+  the AI answers in Italian and Portuguese with an "experimental" note.
