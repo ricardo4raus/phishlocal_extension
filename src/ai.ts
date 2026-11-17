@@ -164,3 +164,24 @@ export function warmUpOnDevice(): Promise<WarmUpResult> {
   });
   return warmUp;
 }
+
+/**
+ * Downloads Gemini Nano (about 4 GB, once) and loads it. Chrome starts the download only after a
+ * user action, so this must run from a click. `onProgress` gets the share downloaded (0 to 1).
+ * Without it, a fresh Chrome profile never gets the model and the AI check never runs.
+ */
+export async function downloadOnDeviceModel(
+  onProgress: (loaded: number) => void,
+): Promise<WarmUpResult> {
+  if (typeof LanguageModel === 'undefined') return { state: 'unavailable' };
+  const start = performance.now();
+  warmSession = await LanguageModel.create({
+    ...createOptions(),
+    monitor: (monitor) => {
+      monitor.addEventListener('downloadprogress', (event) => onProgress(event.loaded));
+    },
+  });
+  const result: WarmUpResult = { state: 'ready', durationMs: performance.now() - start };
+  warmUp = Promise.resolve(result);
+  return result;
+}

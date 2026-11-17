@@ -109,4 +109,30 @@ describe('runAiCheck', () => {
       detail: 'The input is too large.',
     });
   });
+
+  it('downloads the model on request, reports progress, and then counts it as ready', async () => {
+    availability = 'downloadable';
+    const created: { monitor?: (monitor: { addEventListener: unknown }) => void }[] = [];
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => availability,
+      create: async (options: (typeof created)[number]) => {
+        created.push(options);
+        options.monitor?.({
+          addEventListener: (_type: string, listener: (event: { loaded: number }) => void) => {
+            listener({ loaded: 0.5 });
+            listener({ loaded: 1 });
+          },
+        });
+        return { destroy: () => {} };
+      },
+    });
+    const { downloadOnDeviceModel, warmUpOnDevice } = await import('../../src/ai');
+    const progress: number[] = [];
+    const result = await downloadOnDeviceModel((loaded) => progress.push(loaded));
+    expect(result.state).toBe('ready');
+    expect(progress).toEqual([0.5, 1]);
+    // The warm-up now reports ready without loading again.
+    expect((await warmUpOnDevice()).state).toBe('ready');
+    expect(created).toHaveLength(1);
+  });
 });

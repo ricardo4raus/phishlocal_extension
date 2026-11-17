@@ -76,6 +76,11 @@ export interface AiCheckDeps {
   ) => Promise<AiCheckResult>;
   /** Chrome's UI language, e.g. "de-CH". */
   uiLanguage: () => string;
+  /**
+   * Waits until the on-device model is loaded (that can take minutes in a bad Chrome state) and
+   * says whether it is ready. The run's time limit starts only after that.
+   */
+  modelReady: () => Promise<boolean>;
   headersWaitMs?: number;
 }
 
@@ -98,7 +103,16 @@ interface Request {
   key: string;
   /** When the request was queued or started (ms), for the waiting time shown. */
   since: number;
+  /** While running: still waiting for the model to load, or already asking it. */
+  phase?: 'model' | 'run';
 }
+
+/**
+ * Gmail shows an email several times within a moment (without headers, with headers, more
+ * rendered). A check starts only once the shown email has not changed for this long, so no run is
+ * wasted on a version that is replaced right away.
+ */
+export const STABLE_MS = 500;
 
 /** A run that has not answered after this long is given up (the queue moves on). */
 export const RUN_TIMEOUT_MS = 60_000;
@@ -121,7 +135,12 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   const tick = (): void => {
     const now = performance.now();
     if (current?.id === shownId) {
-      set(elements.status, `AI check running on this device… ${seconds(now - current.since)}`);
+      set(
+        elements.status,
+        current.phase === 'model'
+          ? `AI check waits for the on-device model to load… ${seconds(now - current.since)}`
+          : `AI check running on this device… ${seconds(now - current.since)}`,
+      );
     } else if (waiting?.id === shownId && current) {
       set(
         elements.status,
@@ -218,9 +237,19 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     for (let request = waiting; request; request = waiting) {
       waiting = undefined;
       if (request.id !== shownId) continue;
-      current = { ...request, since: performance.now() };
+      current = { ...request, since: performance.now(), phase: 'model' };
       startTicker();
-      const result = await runOnce(current);
+      // Loading the model does not count against the run's time limit.
+      const ready = await deps.modelReady().catch(() => false);
+      let result: AiCheckResult;
+      if (ready) {
+        current.phase = 'run';
+        current.since = performance.now();
+        tick();
+        result = await runOnce(current);
+      } else {
+        result = { ok: false, reason: 'no-model' };
+      }
       experimental = EXPERIMENTAL_LANGUAGES.has(current.language);
       const finished = current;
       current = undefined;
@@ -254,8 +283,13 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
         since: performance.now(),
       };
       showRulesOnly(request, final ? 'AI check waiting…' : 'AI check waits for the sender checks…');
-      if (final) enqueue(request);
-      else timer = setTimeout(() => enqueue(request), waitMs);
+      // The same email is already being checked: use that run's answer.
+      if (current?.key === request.key) {
+        current.id = request.id;
+        startTicker();
+        return;
+      }
+      timer = setTimeout(() => enqueue(request), final ? STABLE_MS : waitMs);
     },
     hidden() {
       clearTimeout(timer);

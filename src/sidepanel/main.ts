@@ -1,5 +1,11 @@
 import { InferenceSource } from 'firebase/ai';
-import { runAiCheck, runPrompt, warmUpOnDevice, type WarmUpResult } from '../ai';
+import {
+  downloadOnDeviceModel,
+  runAiCheck,
+  runPrompt,
+  warmUpOnDevice,
+  type WarmUpResult,
+} from '../ai';
 import { appCheckEnabled } from '../firebase';
 import type { Email } from '../email';
 import { checkEmail } from '../rules';
@@ -17,6 +23,7 @@ function byId<T extends HTMLElement>(id: string): T {
 }
 
 const modelStatus = byId<HTMLParagraphElement>('model-status');
+const modelDownload = byId<HTMLButtonElement>('model-download');
 const promptInput = byId<HTMLTextAreaElement>('prompt');
 const forceCloudRow = byId<HTMLLabelElement>('force-cloud-row');
 const forceCloudInput = byId<HTMLInputElement>('force-cloud');
@@ -123,7 +130,11 @@ const aiCheck = createAiCheck(
     reasons: byId<HTMLUListElement>('ai-reasons'),
     advice: byId<HTMLElement>('ai-advice'),
   },
-  { run: runAiCheck, uiLanguage: () => chrome.i18n.getUILanguage() },
+  {
+    run: runAiCheck,
+    uiLanguage: () => chrome.i18n.getUILanguage(),
+    modelReady: async () => (await warmUpOnDevice().catch(() => undefined))?.state === 'ready',
+  },
 );
 
 function setEmailStatus(text: string, isError = false): void {
@@ -203,7 +214,9 @@ async function warmUp(): Promise<void> {
     if (result.state === 'ready') {
       modelStatus.textContent = `On-device model ready (loaded in ${seconds(result.durationMs)})`;
     } else if (result.state === 'not-downloaded') {
-      modelStatus.textContent = 'On-device model not downloaded yet. Prompts use the cloud.';
+      modelStatus.textContent =
+        'On-device model not downloaded yet. The AI check needs it; the rule checks work without it.';
+      modelDownload.hidden = false;
     } else {
       modelStatus.textContent =
         'On-device model not available on this device. Prompts use the cloud.';
@@ -216,5 +229,30 @@ async function warmUp(): Promise<void> {
     clearInterval(timer);
   }
 }
+
+/** Downloads the model on click: Chrome allows the download only after a user action. */
+async function downloadModel(): Promise<void> {
+  modelDownload.disabled = true;
+  modelStatus.textContent = 'Downloading the on-device model… 0 %';
+  try {
+    const result = await downloadOnDeviceModel((loaded) => {
+      modelStatus.textContent = `Downloading the on-device model… ${Math.round(loaded * 100)} %`;
+    });
+    modelState = result.state;
+    if (result.state === 'ready') {
+      modelStatus.textContent = 'On-device model ready.';
+      modelDownload.hidden = true;
+    } else {
+      modelStatus.textContent = 'On-device model not available on this device.';
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    modelStatus.textContent = `The download failed: ${message}`;
+  } finally {
+    modelDownload.disabled = false;
+  }
+}
+
+modelDownload.addEventListener('click', () => void downloadModel());
 
 void warmUp();
