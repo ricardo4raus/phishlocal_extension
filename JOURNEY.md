@@ -427,3 +427,6 @@ _To fill in near the submission._
   change, the old email stayed visible after "unreadable", and connecting to a `chrome://` tab
   could throw. The content script stays at about 6 KB, without parse5 or postal-mime; no new
   permissions.
+- Tested in Chrome: an opened newsletter was checked without a click and showed the same sender
+  checks as Gmail's own table; several emails in a row, the inbox, tab switches, closing and
+  reopening the panel, and a sample followed by a Gmail email all worked.
