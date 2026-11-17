@@ -175,4 +175,52 @@ describe('AI check view', () => {
     expect([...(calls[0]?.[1] ?? [])]).toEqual(['news@lumorabank.example']);
     expect(text('status')).toMatch(/Answers in this language are experimental/);
   });
+
+  it('shows AI concerns only as notes for a confirmed sender without rule warnings', async () => {
+    const confirmed: Email = {
+      ...email,
+      headers: {
+        replyTo: [],
+        auth: { server: 'mx.google.com', spf: 'pass', dkim: [{ result: 'pass' }], dmarc: 'pass' },
+      },
+    };
+    check.shown(confirmed, [], true);
+    await answer(verdict('suspicious', 'Check the URL carefully.'));
+    expect(text('overall')).toBe(
+      'No signs of phishing (sender confirmed, rule checks found nothing; AI notes below)',
+    );
+    expect(reasons()).toEqual(['AI reason (suspicious)']);
+    expect(text('advice')).toMatch(/^No signs of phishing found/);
+
+    // A rule warning lets the AI raise the verdict again.
+    check.shown(confirmed, [finding('warning')], true);
+    await answer(verdict('dangerous', 'Delete it.'));
+    expect(text('overall')).toBe('Dangerous');
+  });
+
+  it("counts the email's mailto: addresses as its own", async () => {
+    const calls: ReadonlySet<string>[] = [];
+    const view = createAiCheck(
+      {
+        overall: get('overall'),
+        status: get('status'),
+        reasons: get('reasons') as HTMLUListElement,
+        advice: get('advice'),
+      },
+      {
+        run: async (_prompt, _language, known) => {
+          calls.push(known);
+          return verdict('safe');
+        },
+        uiLanguage: () => 'en',
+      },
+    );
+    view.shown(
+      { ...email, links: [{ text: 'Write', href: 'mailto:Support.Me%40gmail.example?subject=x' }] },
+      [],
+      true,
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect([...(calls[0] ?? [])]).toEqual(['news@lumorabank.example', 'support.me@gmail.example']);
+  });
 });

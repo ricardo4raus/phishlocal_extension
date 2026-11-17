@@ -120,8 +120,18 @@ export function ruleRisk(findings: readonly Finding[]): Risk {
 
 const LEVEL: Record<Risk, number> = { safe: 0, suspicious: 1, dangerous: 2 };
 
-/** The overall risk: the higher of AI and rules. The AI can raise it, never lower it. */
-export function overallRisk(ai: Risk | undefined, rules: Risk): Risk {
-  if (ai === undefined) return rules;
+/**
+ * The overall risk: the higher of AI and rules. The AI can raise it, never lower it, with one
+ * exception for false alarms: if the sender is confirmed (DMARC pass) and the rules found no
+ * warning, the AI alone cannot raise it. Gemini Nano flags real security notices from Google and
+ * others as suspicious (measured in Chrome); phishing from a confirmed but hijacked sender almost
+ * always trips the rules too (requests for identity, log-in or card details, payments).
+ */
+export function overallRisk(
+  ai: Risk | undefined,
+  rules: Risk,
+  { senderConfirmed = false }: { senderConfirmed?: boolean } = {},
+): Risk {
+  if (ai === undefined || (senderConfirmed && rules === 'safe')) return rules;
   return LEVEL[ai] > LEVEL[rules] ? ai : rules;
 }

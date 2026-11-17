@@ -9,7 +9,7 @@
  */
 import type { AiCheckResult } from '../ai';
 import { answerLanguage, buildUserPrompt, EXPERIMENTAL_LANGUAGES } from '../ai/prompt';
-import { overallRisk, type Risk, ruleRisk } from '../ai/verdict';
+import { overallRisk, type Risk, RISKS, ruleRisk } from '../ai/verdict';
 import type { Email } from '../email';
 import type { Finding } from '../rules';
 
@@ -43,10 +43,22 @@ const AI_NOTE = 'On-device (Gemini Nano). AI can be wrong.';
 /** The email's own addresses (sender, Reply-To): the AI may name them in its reasons. */
 const ownAddresses = (email: Email): ReadonlySet<string> =>
   new Set(
-    [email.sender.address, ...(email.headers?.replyTo.map((box) => box.address) ?? [])]
+    [
+      email.sender.address,
+      ...(email.headers?.replyTo.map((box) => box.address) ?? []),
+      // mailto: links of the email itself.
+      ...email.links.flatMap((link) =>
+        /^mailto:/i.test(link.href)
+          ? [decodeURIComponent(link.href.slice(7).split('?')[0] ?? '')]
+          : [],
+      ),
+    ]
       .filter((address) => address !== '')
       .map((address) => address.toLowerCase()),
   );
+
+/** The sender's domain is confirmed by the receiving server (DMARC pass). */
+const senderConfirmed = (email: Email): boolean => email.headers?.auth?.dmarc === 'pass';
 
 const set = (element: HTMLElement, text: string): void => {
   element.textContent = text;
@@ -114,13 +126,18 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     }
     const rules = rulesRisk(request.findings);
     const { verdict } = result;
-    const overall = overallRisk(verdict.risk, rules);
+    const confirmed = senderConfirmed(request.email);
+    const overall = overallRisk(verdict.risk, rules, { senderConfirmed: confirmed });
     const stricter = overall !== verdict.risk;
+    // The AI was more worried, but the sender is confirmed and the rules found nothing.
+    const onlyNotes = confirmed && RISKS.indexOf(verdict.risk) > RISKS.indexOf(overall);
     set(
       elements.overall,
-      stricter
-        ? `${LABEL[overall]} (rule checks; the AI said: ${LABEL[verdict.risk].toLowerCase()})`
-        : LABEL[overall],
+      onlyNotes
+        ? `${LABEL[overall]} (sender confirmed, rule checks found nothing; AI notes below)`
+        : stricter
+          ? `${LABEL[overall]} (rule checks; the AI said: ${LABEL[verdict.risk].toLowerCase()})`
+          : LABEL[overall],
     );
     const note = experimental ? `${AI_NOTE} Answers in this language are experimental.` : AI_NOTE;
     set(elements.status, `${note} ${(result.durationMs / 1000).toFixed(1)} s.`);

@@ -89,6 +89,15 @@ describe('rules as the lower limit', () => {
     expect(overallRisk(undefined, 'suspicious')).toBe('suspicious');
   });
 
+  it('does not let the AI alone raise the risk of a confirmed sender without rule warnings', () => {
+    const confirmed = { senderConfirmed: true };
+    expect(overallRisk('suspicious', 'safe', confirmed)).toBe('safe');
+    expect(overallRisk('dangerous', 'safe', confirmed)).toBe('safe');
+    // With a rule warning, the AI may still raise it.
+    expect(overallRisk('dangerous', 'suspicious', confirmed)).toBe('dangerous');
+    expect(overallRisk('safe', 'dangerous', confirmed)).toBe('dangerous');
+  });
+
   it('has a schema with only the basic keywords Chrome supports', () => {
     expect(VERDICT_SCHEMA.required).toEqual(['risk', 'reasons', 'advice']);
     expect(VERDICT_SCHEMA.properties.risk.enum).toEqual(['safe', 'suspicious', 'dangerous']);
