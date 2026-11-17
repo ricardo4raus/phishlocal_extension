@@ -430,3 +430,7 @@ _To fill in near the submission._
 - Tested in Chrome: an opened newsletter was checked without a click and showed the same sender
   checks as Gmail's own table; several emails in a row, the inbox, tab switches, closing and
   reopening the panel, and a sample followed by a Gmail email all worked.
+- Second review of the PR found four more issues, fixed with tests: overlapping connects left an
+  old port (and its watcher) running in the background; content Gmail rendered after the first
+  check was never checked; a stopped request still sent a failure; an unexpected error left the
+  status at "Loading…".
