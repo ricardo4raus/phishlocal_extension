@@ -41,7 +41,7 @@ _Current state, updated as features land._
 - While the side panel is open, every email opened in Gmail is read (sender, subject, visible
   text, links with their text and real target) and checked automatically, and its headers are
   loaded from Gmail's own "Show original" page in the background. Closing the panel stops all
-  reading. Nothing leaves the browser. No AI check of the email yet.
+  reading. Nothing leaves the browser.
 - "Or paste an email" is the fallback for other mail apps and for the demo: paste an email
   (optionally with sender and subject) and the panel shows its text and links, including the
   real target behind each link text. Three made-up sample emails (two phishing, one harmless)
@@ -56,6 +56,10 @@ _Current state, updated as features land._
 - Raw source pasted from any mail app ("Show original", "View source") is read with its headers:
   the side panel shows whether SPF, DKIM and DMARC passed and where replies go, and the rules
   flag a forged sender (DMARC failed) as danger and replies to another company as a warning.
+- Every shown email gets an AI verdict from Gemini Nano, on-device only: safe, suspicious or
+  dangerous, with up to five reasons and one piece of advice in the user's language. The rule
+  checks are its lower limit: the AI can raise the verdict, never lower it.
+- The rule checks cover English, German, French, Spanish, Italian and Portuguese.
 
 ## How we built it
 
@@ -225,6 +229,12 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   grows with the square of the nesting depth. Measure with hostile input, not only real emails.
 - A multipart email has two bodies; the mail app shows the HTML one. Checking the other one is a
   gap an attacker can use.
+- Firebase AI Logic's on-device path ignores `systemInstruction`; the system message has to go
+  into the session's `initialPrompts`. The cloud path uses `systemInstruction` as usual.
+- Escaping is not a defense against prompt injection: JSON keeps the email from breaking the
+  prompt's structure, but the model still reads the text. What protects the user is outside the
+  model: the rules as a lower limit, a strict check of the answer, no tools, and our own advice
+  whenever the rules are stricter than the AI.
 - A side panel can watch a tab without the `tabs` permission: `chrome.tabs.connect` reaches only
   our own content script, a closed panel closes the port, and the content script stops with it.
   That makes "read only while the panel is open" a property of the code, not a promise.
@@ -434,3 +444,12 @@ _To fill in near the submission._
   old port (and its watcher) running in the background; content Gmail rendered after the first
   check was never checked; a stopped request still sent a failure; an unexpected error left the
   status at "Loading…".
+- AI check (`feat/ai-check`, planned for Thu 19 Nov), planned and then reviewed again before
+  coding (Ricardo asked for that). The second look changed the plan: links, addresses and phone
+  numbers are removed from AI text, our own advice replaces the AI's when the rules are stricter,
+  the AI waits at most 3 s for Gmail's headers, and only basic JSON Schema keywords are used.
+  Built in small commits: verdict schema and strict reader, prompt builder with random markers,
+  on-device model (`ONLY_ON_DEVICE`, system message as `initialPrompts`), the "Verdict" block
+  with a newest-only queue, Italian and Portuguese pressure phrases, and a sample that tries to
+  talk the AI into "safe". Ricardo asked for Italian and Portuguese; whether Gemini Nano can
+  answer in them is measured in Chrome.

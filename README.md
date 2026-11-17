@@ -25,8 +25,13 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 - **Red flags without AI:** rule checks list what is suspicious and why, in one sentence each.
   Dangerous links, link text that names a different domain than the real target, lookalike
   domains such as `paypa1.com`, a sender name that claims another domain or brand, invisible
-  characters and lookalike letters, and pressure phrases in English, German, French and Spanish.
+  characters and lookalike letters, and pressure phrases in English, German, French, Spanish,
+  Italian and Portuguese.
   All rules: [`docs/rules.md`](docs/rules.md).
+- **AI verdict, on the device:** Gemini Nano rates every shown email (safe, suspicious,
+  dangerous) with up to five reasons and one piece of advice, in your language. The rule checks
+  are its lower limit, so an email that talks the AI into "safe" still shows as dangerous. How it
+  works and how it resists prompt injection: [`docs/ai-check.md`](docs/ai-check.md).
 - **Hybrid AI:** a test prompt runs through Firebase AI Logic with
   `InferenceMode.PREFER_ON_DEVICE`. Gemini Nano answers on the device; the cloud (Gemini
   Developer API) is the fallback. The panel loads the on-device model when it opens and shows
@@ -37,7 +42,8 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 - Gmail emails are read only while the side panel is open, and processed in the browser. The
   headers come from Gmail itself (the same page as ⋮ → Show original), with your normal login;
   no other server is involved.
-- The rule checks run locally, without network access.
+- The rule checks run locally, without network access. The AI check of real emails runs only
+  on the device (Gemini Nano).
 - No email is stored: everything is gone when the side panel closes.
 - Email content is shown only as text, never rendered as HTML, so pasted emails can't load
   tracking pixels or run scripts.
@@ -90,17 +96,18 @@ the extension:
 - contains an API key or the App Check debug token;
 - contains invisible characters.
 
-| Path                           | Contents                         |
-| ------------------------------ | -------------------------------- |
-| `manifest.json`                | Extension manifest               |
-| `src/sidepanel/`               | Side panel UI                    |
-| `src/content/`                 | Gmail content script             |
-| `src/paste/`                   | Pasted-email parsing and samples |
-| `src/raw/`                     | Raw email and header parsing     |
-| `src/rules/`                   | Rule checks                      |
-| `src/ai.ts`, `src/firebase.ts` | Firebase AI Logic and App Check  |
-| `tests/`                       | Vitest tests                     |
-| `docs/`                        | Documentation                    |
+| Path                   | Contents                          |
+| ---------------------- | --------------------------------- |
+| `manifest.json`        | Extension manifest                |
+| `src/sidepanel/`       | Side panel UI                     |
+| `src/content/`         | Gmail content script              |
+| `src/paste/`           | Pasted-email parsing and samples  |
+| `src/ai/`, `src/ai.ts` | AI check (prompt, verdict, model) |
+| `src/raw/`             | Raw email and header parsing      |
+| `src/rules/`           | Rule checks                       |
+| `src/firebase.ts`      | Firebase and App Check            |
+| `tests/`               | Vitest tests                      |
+| `docs/`                | Documentation                     |
 
 How the project is built, and why: [`JOURNEY.md`](JOURNEY.md). Plan:
 [`TIMETABLE.md`](TIMETABLE.md).
