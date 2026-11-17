@@ -460,3 +460,8 @@ _To fill in near the submission._
   cautious with account notices. Fixed: the AI now gets the sender checks and a rule about
   confirmed senders, the email's own addresses stay readable, each reason is one sentence, and
   the AI answers in Italian and Portuguese with an "experimental" note.
+- Second Chrome test: the Google notice was still "suspicious", although the AI itself noted
+  "DMARC pass". As proposed for this case, the AI alone can no longer raise the verdict for a
+  confirmed sender (DMARC pass) without rule warnings; its points appear as notes. Learning: a
+  small on-device model needs guard rails in both directions, against being talked into "safe"
+  and against false alarms on real notices.

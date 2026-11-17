@@ -39,6 +39,11 @@ are its input and its lower limit.
      "dangerous", a warning at least "suspicious".
    - When the rules are stricter, the panel names both and shows our own advice instead of the
      AI's.
+   - **Exception against false alarms:** if the sender's domain is confirmed (DMARC pass) and the
+     rules found no warning, the AI alone cannot raise the verdict. Its points are shown as
+     notes, with our own advice. Gemini Nano rated a real Google security notice as suspicious
+     even with the sender checks in its data. Phishing from a confirmed but hijacked sender
+     almost always trips the rules too (requests for identity, log-in or card details, payments).
 5. **When:**
    - one check at a time; while one runs, only the newest email waits, and results for an email
      that is no longer shown are dropped;
