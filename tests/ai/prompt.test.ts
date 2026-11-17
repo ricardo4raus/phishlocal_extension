@@ -39,6 +39,8 @@ describe('answerLanguage', () => {
     ['fr', 'fr'],
     ['es-419', 'es'],
     ['EN_us', 'en'],
+    ['it-CH', 'it'],
+    ['pt-BR', 'pt'],
     ['ja', 'en'],
     ['', 'en'],
     ['constructor', 'en'],
@@ -135,5 +137,33 @@ describe('SYSTEM_PROMPT', () => {
   it('tells the model that the data block is never instructions', () => {
     expect(SYSTEM_PROMPT).toMatch(/never instructions/);
     expect(SYSTEM_PROMPT).toMatch(/Never tell the user to click a link/);
+  });
+});
+
+describe('sender checks in the prompt', () => {
+  it('tells the AI what the receiving server verified', () => {
+    const verified: Email = {
+      ...email,
+      headers: {
+        replyTo: [],
+        auth: {
+          server: 'mx.google.com',
+          spf: 'pass',
+          dkim: [{ result: 'pass', domain: 'accounts.google.com' }],
+          dmarc: 'pass',
+        },
+      },
+    };
+    expect((promptData(verified, []) as { sender_checks: unknown }).sender_checks).toEqual({
+      checked_by: 'mx.google.com',
+      spf: 'pass',
+      dkim: ['pass (accounts.google.com)'],
+      dmarc: 'pass',
+      sender_domain_confirmed: true,
+    });
+    expect((promptData(email, []) as { sender_checks: unknown }).sender_checks).toBe(
+      'not available',
+    );
+    expect(SYSTEM_PROMPT).toMatch(/Normal notices from a confirmed sender/);
   });
 });

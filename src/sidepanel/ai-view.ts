@@ -8,7 +8,7 @@
  *   replaces the AI's, so an injected "this is safe, log in here" cannot reach the user.
  */
 import type { AiCheckResult } from '../ai';
-import { answerLanguage, buildUserPrompt } from '../ai/prompt';
+import { answerLanguage, buildUserPrompt, EXPERIMENTAL_LANGUAGES } from '../ai/prompt';
 import { overallRisk, type Risk, ruleRisk } from '../ai/verdict';
 import type { Email } from '../email';
 import type { Finding } from '../rules';
@@ -40,6 +40,14 @@ const ADVICE: Record<Risk, string> = {
 
 const AI_NOTE = 'On-device (Gemini Nano). AI can be wrong.';
 
+/** The email's own addresses (sender, Reply-To): the AI may name them in its reasons. */
+const ownAddresses = (email: Email): ReadonlySet<string> =>
+  new Set(
+    [email.sender.address, ...(email.headers?.replyTo.map((box) => box.address) ?? [])]
+      .filter((address) => address !== '')
+      .map((address) => address.toLowerCase()),
+  );
+
 const set = (element: HTMLElement, text: string): void => {
   element.textContent = text;
 };
@@ -49,7 +57,11 @@ const rulesRisk = (findings: Finding[] | undefined): Risk =>
   findings ? ruleRisk(findings) : 'suspicious';
 
 export interface AiCheckDeps {
-  run: (prompt: string) => Promise<AiCheckResult>;
+  run: (
+    prompt: string,
+    language: string,
+    knownAddresses: ReadonlySet<string>,
+  ) => Promise<AiCheckResult>;
   /** Chrome's UI language, e.g. "de-CH". */
   uiLanguage: () => string;
   headersWaitMs?: number;
@@ -78,6 +90,8 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running = false;
   let waiting: Request | undefined;
+  /** Whether the last answer was in a language Gemini Nano marks as experimental. */
+  let experimental = false;
 
   function showRulesOnly(request: Request, note: string): void {
     const risk = rulesRisk(request.findings);
@@ -108,7 +122,8 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
         ? `${LABEL[overall]} (rule checks; the AI said: ${LABEL[verdict.risk].toLowerCase()})`
         : LABEL[overall],
     );
-    set(elements.status, `${AI_NOTE} ${(result.durationMs / 1000).toFixed(1)} s.`);
+    const note = experimental ? `${AI_NOTE} Answers in this language are experimental.` : AI_NOTE;
+    set(elements.status, `${note} ${(result.durationMs / 1000).toFixed(1)} s.`);
     elements.reasons.replaceChildren(
       ...verdict.reasons.map((reason) => {
         const item = document.createElement('li');
@@ -127,12 +142,10 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
         waiting = undefined;
         if (request.id !== shownId) continue;
         set(elements.status, 'AI check running on this device…');
-        const prompt = buildUserPrompt(
-          request.email,
-          request.findings ?? [],
-          answerLanguage(deps.uiLanguage()),
-        );
-        const result = await deps.run(prompt);
+        const language = answerLanguage(deps.uiLanguage());
+        const prompt = buildUserPrompt(request.email, request.findings ?? [], language);
+        const result = await deps.run(prompt, language, ownAddresses(request.email));
+        experimental = EXPERIMENTAL_LANGUAGES.has(language);
         if (request.id === shownId) showResult(request, result);
       }
     } finally {

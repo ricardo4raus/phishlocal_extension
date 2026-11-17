@@ -151,4 +151,28 @@ describe('AI check view', () => {
     expect(text('overall')).toBe('');
     expect(reasons()).toEqual([]);
   });
+
+  it("passes the language and the email's own addresses, and marks experimental languages", async () => {
+    const calls: [string, ReadonlySet<string>][] = [];
+    const italian = createAiCheck(
+      {
+        overall: get('overall'),
+        status: get('status'),
+        reasons: get('reasons') as HTMLUListElement,
+        advice: get('advice'),
+      },
+      {
+        run: async (_prompt, language, known) => {
+          calls.push([language, known]);
+          return verdict('safe');
+        },
+        uiLanguage: () => 'it-IT',
+      },
+    );
+    italian.shown({ ...email, sender: { name: '', address: 'News@Lumorabank.example' } }, [], true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls[0]?.[0]).toBe('it');
+    expect([...(calls[0]?.[1] ?? [])]).toEqual(['news@lumorabank.example']);
+    expect(text('status')).toMatch(/Answers in this language are experimental/);
+  });
 });
