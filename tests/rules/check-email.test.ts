@@ -47,6 +47,15 @@ describe('checkEmail on the samples', () => {
     ]);
   });
 
+  it('flags the sample that tries to fool the AI check as dangerous by the rules alone', () => {
+    expect(rules(sample('phishing-injection-en'))).toEqual([
+      'hidden-link-target:danger',
+      'link-text-mismatch:warning',
+      'credentials:warning',
+      'urgency:info',
+    ]);
+  });
+
   it('finds no warning in the harmless sample', () => {
     expect(rules(sample('harmless-newsletter-en'))).toEqual([]);
   });
