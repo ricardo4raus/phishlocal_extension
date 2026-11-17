@@ -4,7 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiCheckResult } from '../src/ai';
 import type { Email } from '../src/email';
 import type { Finding } from '../src/rules';
-import { type AiCheck, createAiCheck, HEADERS_WAIT_MS } from '../src/sidepanel/ai-view';
+import {
+  type AiCheck,
+  createAiCheck,
+  HEADERS_WAIT_MS,
+  RUN_TIMEOUT_MS,
+} from '../src/sidepanel/ai-view';
 
 const email: Email = {
   sender: { name: 'Lumora Bank', address: 'news@lumorabank.example' },
@@ -222,5 +227,64 @@ describe('AI check view', () => {
     );
     await vi.advanceTimersByTimeAsync(0);
     expect([...(calls[0] ?? [])]).toEqual(['news@lumorabank.example', 'support.me@gmail.example']);
+  });
+
+  it('uses the running check for the same email shown again, instead of running twice', async () => {
+    check.shown(email, [], true);
+    check.shown(email, [], true);
+    check.shown(email, [], true);
+    expect(prompts).toHaveLength(1);
+    await answer(verdict('suspicious'));
+    expect(text('overall')).toBe('Suspicious');
+    expect(prompts).toHaveLength(1);
+  });
+
+  it('shows how long the check runs and how long the next email waits', async () => {
+    check.shown(email, [], true);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(text('status')).toBe('AI check running on this device… 3 s');
+    check.shown({ ...email, subject: 'Next' }, [], true);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(text('status')).toBe("AI check waits for the previous email's check to finish… 2 s");
+  });
+
+  it('gives up a run after the time limit and goes on with the next email', async () => {
+    check.shown(email, [], true);
+    check.shown({ ...email, subject: 'Next' }, [], true);
+    await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS);
+    expect(prompts).toHaveLength(2);
+    pending[1]?.(verdict('dangerous'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(text('overall')).toBe('Dangerous');
+
+    check.shown({ ...email, subject: 'Slow' }, [], true);
+    await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS);
+    expect(text('status')).toBe(
+      'The AI check failed (no answer within 60 s). The rule checks still apply.',
+    );
+  });
+
+  it('keeps going when a run throws', async () => {
+    const failing = createAiCheck(
+      {
+        overall: get('overall'),
+        status: get('status'),
+        reasons: get('reasons') as HTMLUListElement,
+        advice: get('advice'),
+      },
+      {
+        run: async (prompt) => {
+          if (prompt.includes('Broken')) throw new Error('boom');
+          return verdict('suspicious');
+        },
+        uiLanguage: () => 'en',
+      },
+    );
+    failing.shown({ ...email, subject: 'Broken' }, [], true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(text('status')).toBe('The AI check failed (boom). The rule checks still apply.');
+    failing.shown(email, [], true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(text('overall')).toBe('Suspicious');
   });
 });

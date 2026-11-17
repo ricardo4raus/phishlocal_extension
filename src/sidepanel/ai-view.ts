@@ -8,7 +8,7 @@
  *   replaces the AI's, so an injected "this is safe, log in here" cannot reach the user.
  */
 import type { AiCheckResult } from '../ai';
-import { answerLanguage, buildUserPrompt, EXPERIMENTAL_LANGUAGES } from '../ai/prompt';
+import { answerLanguage, buildUserPrompt, EXPERIMENTAL_LANGUAGES, promptData } from '../ai/prompt';
 import { overallRisk, type Risk, RISKS, ruleRisk } from '../ai/verdict';
 import type { Email } from '../email';
 import type { Finding } from '../rules';
@@ -93,17 +93,51 @@ interface Request {
   id: number;
   email: Email;
   findings: Finding[] | undefined;
+  language: string;
+  /** Same email, findings and language give the same key: one run serves them all. */
+  key: string;
+  /** When the request was queued or started (ms), for the waiting time shown. */
+  since: number;
 }
+
+/** A run that has not answered after this long is given up (the queue moves on). */
+export const RUN_TIMEOUT_MS = 60_000;
+
+const seconds = (ms: number): string => `${Math.round(ms / 1000)} s`;
 
 export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck {
   const waitMs = deps.headersWaitMs ?? HEADERS_WAIT_MS;
   /** Id of the email shown now; results for other ids are dropped. */
   let shownId = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let running = false;
+  /** The run in progress, and the newest request waiting for it to finish. */
+  let current: Request | undefined;
   let waiting: Request | undefined;
+  let ticker: ReturnType<typeof setInterval> | undefined;
   /** Whether the last answer was in a language Gemini Nano marks as experimental. */
   let experimental = false;
+
+  /** Shows how long the shown email's check has been running or waiting. */
+  const tick = (): void => {
+    const now = performance.now();
+    if (current?.id === shownId) {
+      set(elements.status, `AI check running on this device… ${seconds(now - current.since)}`);
+    } else if (waiting?.id === shownId && current) {
+      set(
+        elements.status,
+        `AI check waits for the previous email's check to finish… ${seconds(now - waiting.since)}`,
+      );
+    }
+    if (!current && !waiting) {
+      clearInterval(ticker);
+      ticker = undefined;
+    }
+  };
+
+  const startTicker = (): void => {
+    tick();
+    ticker ??= setInterval(tick, 1_000);
+  };
 
   function showRulesOnly(request: Request, note: string): void {
     const risk = rulesRisk(request.findings);
@@ -151,34 +185,74 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     set(elements.advice, stricter || !verdict.advice ? ADVICE[overall] : verdict.advice);
   }
 
-  async function drain(): Promise<void> {
-    if (running) return;
-    running = true;
+  /** Runs one request, never longer than RUN_TIMEOUT_MS, and never throws. */
+  async function runOnce(request: Request): Promise<AiCheckResult> {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const tooLong = new Promise<AiCheckResult>((resolve) => {
+      timeout = setTimeout(
+        () =>
+          resolve({
+            ok: false,
+            reason: 'failed',
+            detail: `no answer within ${seconds(RUN_TIMEOUT_MS)}`,
+          }),
+        RUN_TIMEOUT_MS,
+      );
+    });
     try {
-      for (let request = waiting; request; request = waiting) {
-        waiting = undefined;
-        if (request.id !== shownId) continue;
-        set(elements.status, 'AI check running on this device…');
-        const language = answerLanguage(deps.uiLanguage());
-        const prompt = buildUserPrompt(request.email, request.findings ?? [], language);
-        const result = await deps.run(prompt, language, ownAddresses(request.email));
-        experimental = EXPERIMENTAL_LANGUAGES.has(language);
-        if (request.id === shownId) showResult(request, result);
-      }
+      const prompt = buildUserPrompt(request.email, request.findings ?? [], request.language);
+      return await Promise.race([
+        deps.run(prompt, request.language, ownAddresses(request.email)),
+        tooLong,
+      ]);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      return { ok: false, reason: 'failed', detail };
     } finally {
-      running = false;
+      clearTimeout(timeout);
     }
   }
 
+  async function drain(): Promise<void> {
+    if (current) return;
+    for (let request = waiting; request; request = waiting) {
+      waiting = undefined;
+      if (request.id !== shownId) continue;
+      current = { ...request, since: performance.now() };
+      startTicker();
+      const result = await runOnce(current);
+      experimental = EXPERIMENTAL_LANGUAGES.has(current.language);
+      const finished = current;
+      current = undefined;
+      if (finished.id === shownId) showResult(finished, result);
+    }
+    tick();
+  }
+
   const enqueue = (request: Request): void => {
+    // The same check is already running (e.g. Gmail showed the email again): use its answer.
+    if (current?.key === request.key) {
+      current.id = request.id;
+      startTicker();
+      return;
+    }
     waiting = request;
+    startTicker();
     void drain();
   };
 
   return {
     shown(email, findings, final) {
       clearTimeout(timer);
-      const request: Request = { id: ++shownId, email, findings };
+      const language = answerLanguage(deps.uiLanguage());
+      const request: Request = {
+        id: ++shownId,
+        email,
+        findings,
+        language,
+        key: `${language}|${JSON.stringify(promptData(email, findings ?? []))}`,
+        since: performance.now(),
+      };
       showRulesOnly(request, final ? 'AI check waiting…' : 'AI check waits for the sender checks…');
       if (final) enqueue(request);
       else timer = setTimeout(() => enqueue(request), waitMs);
