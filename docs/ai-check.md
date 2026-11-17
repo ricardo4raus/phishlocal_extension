@@ -47,6 +47,9 @@ are its input and its lower limit.
 5. **When:**
    - one check at a time; while one runs, only the newest email waits, and results for an email
      that is no longer shown are dropped;
+   - the same email with the same findings (Gmail shows an email several times) uses the running
+     check's answer instead of running again;
+   - a run is given up after 60 s; the status shows the seconds while it runs or waits;
    - a Gmail email waits for its headers, but at most 3 s;
    - without a ready on-device model there is no AI check; the panel says so and the rules stand
      alone.

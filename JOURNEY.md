@@ -465,3 +465,7 @@ _To fill in near the submission._
   confirmed sender (DMARC pass) without rule warnings; its points appear as notes. Learning: a
   small on-device model needs guard rails in both directions, against being talked into "safe"
   and against false alarms on real notices.
+- Third Chrome test: the panel stayed at "AI check waiting…" for long. Reading the queue showed
+  that Gmail's repeated display of one email ran the same check twice, and that a hanging or
+  failing run could block the queue for good. Now one run serves the same email, runs stop after
+  60 s, and the status shows the seconds while a check runs or waits.
