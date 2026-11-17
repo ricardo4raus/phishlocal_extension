@@ -1,0 +1,96 @@
+import { describe, expect, it } from 'vitest';
+import {
+  cleanAiText,
+  MAX_AI_TEXT,
+  MAX_REASONS,
+  overallRisk,
+  parseVerdict,
+  ruleRisk,
+  VERDICT_SCHEMA,
+} from '../../src/ai/verdict';
+import type { Finding } from '../../src/rules';
+
+const finding = (severity: Finding['severity']): Finding => ({
+  rule: 'urgency',
+  severity,
+  message: 'x',
+  evidence: [],
+});
+
+describe('parseVerdict', () => {
+  it('reads a valid answer, also inside a code fence', () => {
+    const answer = { risk: 'suspicious', reasons: ['Time pressure.'], advice: 'Do not reply.' };
+    expect(parseVerdict(JSON.stringify(answer))).toEqual(answer);
+    expect(parseVerdict(`\`\`\`json\n${JSON.stringify(answer)}\n\`\`\``)).toEqual(answer);
+  });
+
+  it.each([
+    ['no JSON', 'The email looks fine.'],
+    ['an unknown risk', '{"risk":"fine","reasons":[],"advice":""}'],
+    ['a missing field', '{"risk":"safe","reasons":[]}'],
+    ['reasons that are not text', '{"risk":"safe","reasons":[1],"advice":""}'],
+    ['a list instead of an object', '["safe"]'],
+    ['null', 'null'],
+  ])('rejects %s', (_label, text) => {
+    expect(parseVerdict(text)).toBeUndefined();
+  });
+
+  it('keeps at most five reasons and cuts long text', () => {
+    const verdict = parseVerdict(
+      JSON.stringify({
+        risk: 'dangerous',
+        reasons: Array.from({ length: 8 }, (_, i) => `Reason ${i} ${'x'.repeat(500)}`),
+        advice: 'a'.repeat(1_000),
+      }),
+    );
+    expect(verdict?.reasons).toHaveLength(MAX_REASONS);
+    expect(verdict?.reasons[0]?.length).toBe(MAX_AI_TEXT);
+    expect(verdict?.advice.length).toBe(MAX_AI_TEXT);
+  });
+
+  it('removes links, addresses and phone numbers an injection could plant', () => {
+    const verdict = parseVerdict(
+      JSON.stringify({
+        risk: 'safe',
+        reasons: [
+          'The link goes to paypa1.com, see https://evil.example/login or call +41 44 123 45 67',
+        ],
+        advice: 'Verify your account at secure-verify.example or write to help@evil.example.',
+      }),
+    );
+    expect(verdict?.reasons).toEqual([
+      'The link goes to paypa1.com, see [removed] or call [removed]',
+    ]);
+    expect(verdict?.advice).toBe('Verify your account at [removed] or write to [removed].');
+  });
+});
+
+describe('cleanAiText', () => {
+  it('stays fast on long hostile output', () => {
+    const start = performance.now();
+    cleanAiText(`${'a.'.repeat(50_000)}x`, { keepDomains: false });
+    expect(performance.now() - start).toBeLessThan(200);
+  });
+});
+
+describe('rules as the lower limit', () => {
+  it('maps findings to a risk', () => {
+    expect(ruleRisk([])).toBe('safe');
+    expect(ruleRisk([finding('info')])).toBe('safe');
+    expect(ruleRisk([finding('info'), finding('warning')])).toBe('suspicious');
+    expect(ruleRisk([finding('warning'), finding('danger')])).toBe('dangerous');
+  });
+
+  it('lets the AI raise the risk, never lower it', () => {
+    expect(overallRisk('safe', 'dangerous')).toBe('dangerous');
+    expect(overallRisk('suspicious', 'dangerous')).toBe('dangerous');
+    expect(overallRisk('dangerous', 'safe')).toBe('dangerous');
+    expect(overallRisk('suspicious', 'safe')).toBe('suspicious');
+    expect(overallRisk(undefined, 'suspicious')).toBe('suspicious');
+  });
+
+  it('has a schema that requires exactly the three fields', () => {
+    expect(VERDICT_SCHEMA.required).toEqual(['risk', 'reasons', 'advice']);
+    expect(VERDICT_SCHEMA.properties.risk.enum).toEqual(['safe', 'suspicious', 'dangerous']);
+  });
+});
