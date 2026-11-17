@@ -26,10 +26,14 @@ export function showFindings(findings: readonly Finding[], list: HTMLUListElemen
 }
 
 /**
- * Runs the rule check and lists its findings. If a rule fails, the panel says so instead of
- * showing a wrong error or nothing at all; the email itself is still shown.
+ * Runs the rule check, lists its findings and returns them (undefined if a rule failed). If a
+ * rule fails, the panel says so instead of showing a wrong error or nothing at all; the email
+ * itself is still shown.
  */
-export function showRuleCheck(check: () => Finding[], list: HTMLUListElement): void {
+export function showRuleCheck(
+  check: () => Finding[],
+  list: HTMLUListElement,
+): Finding[] | undefined {
   let findings: Finding[];
   try {
     findings = check();
@@ -38,7 +42,8 @@ export function showRuleCheck(check: () => Finding[], list: HTMLUListElement): v
     list.replaceChildren(
       item('warning', `The rule check failed (${message}). Treat this email with care.`),
     );
-    return;
+    return undefined;
   }
   showFindings(findings, list);
+  return findings;
 }

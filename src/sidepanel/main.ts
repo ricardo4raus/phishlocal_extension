@@ -1,8 +1,9 @@
 import { InferenceSource } from 'firebase/ai';
-import { runPrompt, warmUpOnDevice, type WarmUpResult } from '../ai';
+import { runAiCheck, runPrompt, warmUpOnDevice, type WarmUpResult } from '../ai';
 import { appCheckEnabled } from '../firebase';
 import type { Email } from '../email';
 import { checkEmail } from '../rules';
+import { createAiCheck } from './ai-view';
 import { showEmail } from './email-view';
 import { createGmailView } from './gmail-view';
 import { showRuleCheck } from './findings-view';
@@ -114,6 +115,17 @@ const emailElements = {
 };
 const findingsList = byId<HTMLUListElement>('email-findings');
 
+// The AI check of every shown email: on-device only, with the rules as its lower limit.
+const aiCheck = createAiCheck(
+  {
+    overall: byId<HTMLElement>('ai-overall'),
+    status: byId<HTMLElement>('ai-status'),
+    reasons: byId<HTMLUListElement>('ai-reasons'),
+    advice: byId<HTMLElement>('ai-advice'),
+  },
+  { run: runAiCheck, uiLanguage: () => chrome.i18n.getUILanguage() },
+);
+
 function setEmailStatus(text: string, isError = false): void {
   emailStatus.textContent = text;
   emailStatus.classList.toggle('error', isError);
@@ -123,18 +135,22 @@ function setEmailStatus(text: string, isError = false): void {
  * Shows an email from Gmail or the paste area with its rule findings; long texts get a note.
  * `headersNote` stands in for the sender checks while an email has no headers.
  */
-function displayEmail(email: Email, message: string, headersNote?: string): void {
-  showRuleCheck(() => checkEmail(email), findingsList);
+function displayEmail(email: Email, message: string, headersNote?: string, final = true): void {
+  const findings = showRuleCheck(() => checkEmail(email), findingsList);
   showEmail(email, emailElements, headersNote);
   setEmailStatus(email.truncated ? `${message} The text is long and was cut.` : message);
+  aiCheck.shown(email, findings, final);
+}
+
+function hideEmail(): void {
+  emailElements.details.hidden = true;
+  aiCheck.hidden();
 }
 
 // While the panel is open, every email opened in Gmail is checked automatically.
 const gmailView = createGmailView({
   show: displayEmail,
-  hide: () => {
-    emailElements.details.hidden = true;
-  },
+  hide: hideEmail,
   setStatus: setEmailStatus,
 });
 const watch = watchActiveTab({
@@ -161,12 +177,12 @@ setUpPaste(
     },
     onError: (message) => {
       gmailView.pasted();
-      emailElements.details.hidden = true;
+      hideEmail();
       setEmailStatus(message, true);
     },
     onClear: () => {
       gmailView.cleared();
-      emailElements.details.hidden = true;
+      hideEmail();
       setEmailStatus('');
     },
   },

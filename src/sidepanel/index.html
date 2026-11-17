@@ -49,7 +49,14 @@
 
         <p id="email-status" class="email-status" role="status"></p>
         <dl id="email-details" class="email-details" hidden>
-          <dt>Red flags (rule checks, no AI yet)</dt>
+          <dt>Verdict</dt>
+          <dd class="ai-check">
+            <p id="ai-overall" class="ai-overall"></p>
+            <p id="ai-status" class="hint"></p>
+            <ul id="ai-reasons"></ul>
+            <p id="ai-advice" class="ai-advice"></p>
+          </dd>
+          <dt>Red flags (rule checks)</dt>
           <dd><ul id="email-findings" class="findings"></ul></dd>
           <dt>From</dt>
           <dd id="email-sender"></dd>
