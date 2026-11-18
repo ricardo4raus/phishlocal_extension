@@ -68,6 +68,11 @@ explain every red flag, and work offline, with a cloud only as fallback."
   `#verdict`; grey "Checking…" until the AI answers if the rules found nothing). Links show the
   real domain, a shortened URL (`src/sidepanel/link-display.ts`) and a mark when a finding names
   them (`Finding.links`, set by the link and lookalike rules).
+- AI check runs are stoppable: `runAiCheck()` sets an `AbortSignal` on the check model's option
+  objects, which the SDK passes to Chrome by reference (tested through the SDK's browser build in
+  `tests/ai/sdk-on-device.test.ts`). The panel stops a run on timeout and when its email is left.
+  The SDK silently uses the cloud for `ONLY_ON_DEVICE` when `LanguageModel` is missing; keep the
+  guard in `runAiCheck()`. Tests must never reach the network (that test stubs `fetch`).
 - Automatic scan: while the side panel is open, it keeps a port to the active tab
   (`src/sidepanel/watch.ts`, `src/messages.ts`); the content script (`src/content/gmail-watch.ts`)
   reports every opened email and loads its "Show original" page for the headers

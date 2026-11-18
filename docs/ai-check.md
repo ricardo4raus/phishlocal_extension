@@ -24,10 +24,21 @@ are its input and its lower limit.
      - up to 3,000 characters of body text.
 2. **Model** ([`src/ai.ts`](../src/ai.ts), `runAiCheck()`):
    - Firebase AI Logic with `InferenceMode.ONLY_ON_DEVICE`, so no email reaches the cloud.
+   - **Guard against a silent cloud call:** when Chrome's Prompt API (`LanguageModel`) is missing,
+     the SDK builds the model without its on-device path and then sends even `ONLY_ON_DEVICE`
+     requests to the cloud (`callCloudOrDevice` in the SDK). `runAiCheck()` checks for the API
+     right before the call; a test through the SDK's browser build proves it.
    - The SDK does not pass `systemInstruction` to the on-device model, so the system message is
      the session's first prompt (`initialPrompts`).
    - The answer is constrained to [`VERDICT_SCHEMA`](../src/ai/verdict.ts) (`responseConstraint`),
      using only basic JSON Schema keywords, because Chrome supports only part of JSON Schema.
+   - **Stopping a run:** the SDK has no stop signal for on-device prompts, but it hands our option
+     objects to Chrome's `create()` and `prompt()` by reference, so `runAiCheck()` sets a signal on
+     them per run. A run that is given up stops in Chrome too; otherwise Gemini Nano, which works
+     on one prompt at a time, would keep the next check waiting. A test through the SDK's browser
+     build fails if the SDK stops passing the options through.
+   - **Streamed answer:** an answer that grows past 4,000 characters (a real one is far shorter)
+     is cut off at once, and a stopped run reports how many characters the model had written.
 3. **Answer** (`parseVerdict()`):
    - checked field by field: risk, at most 5 reasons, advice, at most 300 characters each;
    - accepted also inside a code fence;
@@ -51,16 +62,21 @@ are its input and its lower limit.
    included. Only the verdict line is a live region for screen readers; the status line with its
    seconds is not.
 6. **When:**
-   - one check at a time; while one runs, only the newest email waits, and results for an email
-     that is no longer shown are dropped;
+   - one check at a time, for the shown email: when another email is queued or the email is
+     hidden, the running check is stopped (in Chrome too); a check that waited for the model to
+     load is skipped if its email was left meanwhile; a late result for an email that is no
+     longer shown is dropped;
    - a check starts once the shown email has not changed for 0.5 s (Gmail shows an email several
      times within a moment); the same email with the same findings uses a running check's answer;
    - the last 20 answers stay in memory while the panel is open: an email shown again gets its
      answer at once; failed runs are not kept, so they are tried again;
    - the panel first waits for the model to load (that can take minutes in a bad Chrome state);
-     the run's 60 s limit starts when it asks the model; the status shows the seconds;
+     the run's 60 s limit starts when it asks the model; the status shows the seconds; after the
+     limit the run is stopped, and the message says how far the model had come ("the model had
+     written N characters"): 0 means it hung, many means it did not stop writing;
    - without the model, the panel offers "Download the on-device model": Chrome starts the
-     download (about 4 GB, once) only after a user action;
+     download (about 4 GB, once) only after a user action; when it is done, the shown email is
+     checked again;
    - a Gmail email waits for its headers, but at most 3 s;
    - without a ready on-device model there is no AI check; the panel says so and the rules stand
      alone.

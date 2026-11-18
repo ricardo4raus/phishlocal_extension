@@ -245,6 +245,11 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   the side panel too, so the panel now shows it as `<U+202E>`.
 - A verdict UI is a security control too: showing "safe" in green before every check has
   answered tells the user to act on half a result. Grey "Checking…" is the honest state.
+- A timeout that only stops waiting is not a timeout: the work goes on in the background and
+  blocks what comes next. Stopping it needs a signal that reaches the model, and the SDK had
+  none for on-device prompts.
+- `InferenceMode.ONLY_ON_DEVICE` is not a guarantee by itself: without Chrome's Prompt API the
+  SDK quietly uses the cloud. "Only on device" has to be checked by our own code too.
 
 ## Accomplishments we're proud of
 
@@ -495,3 +500,23 @@ _To fill in near the submission._
 - Self-review found that an email shown again (Gmail renders it anew, or the user goes back to
   it) started a new AI run and turned the light grey again. The panel now keeps the last 20
   answers in memory; a test fails without the fix.
+- Chrome test: the traffic light and the links worked, but the AI check of the Google notice
+  failed with "no answer within 60 s" although the model was loaded in 4.2 s. Ricardo asked for
+  the logic issues behind the repeated failures. Tracing the path through the SDK found them:
+  - a run the panel gave up on kept running in Chrome, because the SDK passes no stop signal to
+    on-device prompts; Gemini Nano works on one prompt at a time, so the next checks waited
+    behind it;
+  - a check for an email the user had left kept the model busy, and one that waited for the
+    model ran even after its email was gone;
+  - an answer had no length limit, and a timeout did not say whether the model hung or kept
+    writing;
+  - after the model download, the email on screen was not checked again.
+    Fixed: the panel stops a run (in Chrome too) on timeout and when its email is left, the answer
+    is streamed and cut off after 4,000 characters, a timeout says how many characters the model
+    had written, and the download rechecks the shown email. Each fix has a test that fails without
+    it.
+- While testing through the real SDK, the first version of a test made a request to Google's
+  cloud with a made-up key and the word "prompt": the SDK's Node build has no on-device path and
+  sends `ONLY_ON_DEVICE` requests to the cloud. The browser build does the same when Chrome's
+  Prompt API is missing. `runAiCheck()` now checks for the API right before the call, and the
+  test stubs `fetch` so no test can reach the network.
