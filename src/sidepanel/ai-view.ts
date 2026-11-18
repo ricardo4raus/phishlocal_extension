@@ -196,21 +196,31 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
    * The rules' verdict alone. While the AI check is still to come (`pending`), "no red flags" is
    * not shown as green: the AI may still raise it, and the user should not act on it yet.
    */
-  function showRulesOnly(request: Request, note: string, pending = false): void {
+  /**
+   * `aiFailed`: the AI check was meant to run and did not give an answer. The light still shows
+   * the rules' verdict, but the verdict line says that only the rules checked the email.
+   */
+  function showRulesOnly(request: Request, note: string, pending = false, aiFailed = false): void {
     const risk = rulesRisk(request.findings);
     const notYet = pending && risk === 'safe';
     elements.verdict.hidden = false;
     setRisk(notYet ? 'pending' : risk);
     set(
       elements.overall,
-      notYet ? 'Checking… (the rule checks found no red flags)' : `${LABEL[risk]} (rule checks)`,
+      notYet
+        ? 'Checking… (the rule checks found no red flags)'
+        : aiFailed
+          ? `${LABEL[risk]} (rule checks only: the AI check failed)`
+          : `${LABEL[risk]} (rule checks)`,
     );
     set(elements.status, note);
+    elements.status.classList.toggle('ai-failed', aiFailed);
     elements.reasons.replaceChildren();
     set(elements.advice, notYet ? '' : ADVICE[risk]);
   }
 
   function showResult(request: Request, result: AiCheckResult): void {
+    elements.status.classList.remove('ai-failed');
     if (!result.ok) {
       const note =
         result.reason === 'no-model'
@@ -220,7 +230,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
             : result.reason === 'stopped'
               ? 'The AI check was stopped. The rule checks still apply.'
               : 'The AI answer could not be read. The rule checks still apply.';
-      showRulesOnly(request, note);
+      showRulesOnly(request, note, false, result.reason !== 'no-model');
       return;
     }
     const rules = rulesRisk(request.findings);

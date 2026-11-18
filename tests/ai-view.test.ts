@@ -271,6 +271,7 @@ describe('AI check view', () => {
     await show(email, [finding('warning')]);
     expect(text('overall')).toBe('Suspicious (rule checks)');
     expect(text('status')).toMatch(/on-device model is not ready/);
+    expect(get('status').classList.contains('ai-failed')).toBe(false);
     expect(prompts).toHaveLength(0);
 
     modelReady = async () => true;
@@ -278,13 +279,26 @@ describe('AI check view', () => {
     check.shown(email, undefined, true);
     await vi.advanceTimersByTimeAsync(STABLE_MS);
     await answer({ ok: false, reason: 'unreadable-answer' });
-    expect(text('overall')).toBe('Suspicious (rule checks)');
+    expect(text('overall')).toBe('Suspicious (rule checks only: the AI check failed)');
     expect(text('status')).toMatch(/could not be read/);
     await show({ ...email, subject: 'Too long' });
     await answer({ ok: false, reason: 'failed', detail: 'The input is too large.' });
     expect(text('status')).toBe(
       'The AI check failed (The input is too large.). The rule checks still apply.',
     );
+  });
+
+  it('says on the verdict line when the AI check failed, also for a green light', async () => {
+    await show(email);
+    await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS);
+    expect(get('verdict').dataset.risk).toBe('safe');
+    expect(text('overall')).toBe('No signs of phishing (rule checks only: the AI check failed)');
+    expect(get('status').classList.contains('ai-failed')).toBe(true);
+    // The next answer clears the mark.
+    await show({ ...email, subject: 'Next' });
+    expect(get('status').classList.contains('ai-failed')).toBe(false);
+    await answer(verdict('safe'));
+    expect(get('status').classList.contains('ai-failed')).toBe(false);
   });
 
   it('clears the view and drops a late result when the email is hidden', async () => {

@@ -222,6 +222,12 @@ h2 {
   content: var(--risk-symbol, '') / '';
 }
 
+/* "The AI check failed (…)": the user must see that only the rules checked this email. */
+.verdict .ai-failed {
+  font-weight: 600;
+  opacity: 1;
+}
+
 .ai-reasons {
   margin: 4px 0;
   padding-left: 18px;

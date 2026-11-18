@@ -59,7 +59,10 @@ are its input and its lower limit.
    symbol and a word per level (green ✓, yellow !, red ✕). Until the AI has answered, the rules'
    verdict shows, except that "no red flags" stays grey ("Checking…"): the AI may still raise it,
    and nobody should act on an early "safe". Without a model, the rules' verdict stands, green
-   included. Only the verdict line is a live region for screen readers; the status line with its
+   included. If the AI check was meant to run and failed (timeout, error, unreadable answer), the
+   light still shows the rules' verdict, but the verdict line says "rule checks only: the AI check
+   failed" and the reason is shown in bold: the rules alone miss a well-written scam without
+   known tricks. Only the verdict line is a live region for screen readers; the status line with its
    seconds is not.
 6. **When:**
    - one check at a time, for the shown email: when another email is queued or the email is
