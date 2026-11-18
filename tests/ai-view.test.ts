@@ -9,6 +9,7 @@ import {
   type AiCheckDeps,
   createAiCheck,
   HEADERS_WAIT_MS,
+  MAX_REMEMBERED,
   RUN_TIMEOUT_MS,
   STABLE_MS,
 } from '../src/sidepanel/ai-view';
@@ -244,6 +245,35 @@ describe('AI check view', () => {
     await show({ ...email, subject: 'No model' });
     expect(risk()).toBe('safe');
     expect(text('overall')).toBe('No signs of phishing (rule checks)');
+  });
+
+  it('shows a recent answer again at once when the same email comes back', async () => {
+    await show(email);
+    await answer(verdict('dangerous', 'Delete it.'));
+    await show({ ...email, subject: 'Other' });
+    await answer({ ok: false, reason: 'failed', detail: 'boom' });
+
+    check.shown(email, [], false);
+    expect(prompts).toHaveLength(2);
+    expect(get('verdict').dataset.risk).toBe('dangerous');
+    expect(text('advice')).toBe('Delete it.');
+    await vi.advanceTimersByTimeAsync(HEADERS_WAIT_MS);
+    expect(prompts).toHaveLength(2);
+
+    // A failed run is not remembered: it is tried again.
+    await show({ ...email, subject: 'Other' });
+    expect(prompts).toHaveLength(3);
+  });
+
+  it('remembers only the most recent answers', async () => {
+    for (let i = 0; i <= MAX_REMEMBERED; i++) {
+      await show({ ...email, subject: `Email ${i}` });
+      await answer(verdict('safe'));
+    }
+    await show({ ...email, subject: `Email ${MAX_REMEMBERED}` });
+    expect(prompts).toHaveLength(MAX_REMEMBERED + 1);
+    await show({ ...email, subject: 'Email 0' });
+    expect(prompts).toHaveLength(MAX_REMEMBERED + 2);
   });
 
   it('shows green for a confirmed sender whose AI concerns are only notes', async () => {

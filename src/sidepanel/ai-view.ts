@@ -119,6 +119,9 @@ export const STABLE_MS = 500;
 /** A run that has not answered after this long is given up (the queue moves on). */
 export const RUN_TIMEOUT_MS = 60_000;
 
+/** How many recent AI answers are kept for emails shown again. */
+export const MAX_REMEMBERED = 20;
+
 const seconds = (ms: number): string => `${Math.round(ms / 1000)} s`;
 
 export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck {
@@ -130,8 +133,20 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   let current: Request | undefined;
   let waiting: Request | undefined;
   let ticker: ReturnType<typeof setInterval> | undefined;
-  /** Whether the last answer was in a language Gemini Nano marks as experimental. */
-  let experimental = false;
+  /**
+   * Recent AI answers by request key. An email shown again (Gmail renders it anew, or the user
+   * goes back to it) gets its answer at once instead of a new run and a grey light. Only in
+   * memory: closing the panel forgets them.
+   */
+  const answers = new Map<string, AiCheckResult & { ok: true }>();
+
+  const remember = (key: string, result: AiCheckResult): void => {
+    if (!result.ok) return; // A failed run is tried again next time.
+    answers.delete(key);
+    answers.set(key, result);
+    const oldest = answers.keys().next();
+    if (answers.size > MAX_REMEMBERED && !oldest.done) answers.delete(oldest.value);
+  };
 
   /** Shows how long the shown email's check has been running or waiting. */
   const tick = (): void => {
@@ -211,7 +226,9 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
           ? `${LABEL[overall]} (rule checks; the AI said: ${LABEL[verdict.risk].toLowerCase()})`
           : LABEL[overall],
     );
-    const note = experimental ? `${AI_NOTE} Answers in this language are experimental.` : AI_NOTE;
+    const note = EXPERIMENTAL_LANGUAGES.has(request.language)
+      ? `${AI_NOTE} Answers in this language are experimental.`
+      : AI_NOTE;
     set(elements.status, `${note} ${(result.durationMs / 1000).toFixed(1)} s.`);
     elements.reasons.replaceChildren(
       ...verdict.reasons.map((reason) => {
@@ -269,9 +286,9 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       } else {
         result = { ok: false, reason: 'no-model' };
       }
-      experimental = EXPERIMENTAL_LANGUAGES.has(current.language);
       const finished = current;
       current = undefined;
+      remember(finished.key, result);
       if (finished.id === shownId) showResult(finished, result);
     }
     tick();
@@ -301,6 +318,11 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
         key: `${language}|${JSON.stringify(promptData(email, findings ?? []))}`,
         since: performance.now(),
       };
+      const known = answers.get(request.key);
+      if (known) {
+        showResult(request, known);
+        return;
+      }
       showRulesOnly(
         request,
         final ? 'AI check waiting…' : 'AI check waits for the sender checks…',
