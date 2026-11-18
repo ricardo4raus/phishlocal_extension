@@ -13,7 +13,8 @@
     "service_worker": "src/background.ts",
     "type": "module"
   },
-  "permissions": ["sidePanel"],
+  "permissions": ["sidePanel", "scripting"],
+  "host_permissions": ["https://mail.google.com/*"],
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],

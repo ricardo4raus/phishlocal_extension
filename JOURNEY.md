@@ -520,3 +520,9 @@ _To fill in near the submission._
   sends `ONLY_ON_DEVICE` requests to the cloud. The browser build does the same when Chrome's
   Prompt API is missing. `runAiCheck()` now checks for the API right before the call, and the
   test stubs `fetch` so no test can reach the network.
+- Ricardo asked for three things. A failed AI check now says so on the verdict line ("rule checks
+  only: the AI check failed"); the light keeps the rules' colour. Gmail had to be reloaded after
+  every install or update of PhishLocal: Chrome injects manifest content scripts only on new page
+  loads. Ricardo chose automatic injection into open Gmail tabs, which needs the `scripting`
+  permission and host access to Gmail (the same install warning as before). The answer cache
+  stays in the panel's memory only, as Ricardo decided.

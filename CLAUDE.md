@@ -78,7 +78,10 @@ explain every red flag, and work offline, with a cloud only as fallback."
   reports every opened email and loads its "Show original" page for the headers
   (`gmail-original.ts`), which the panel parses (`src/raw/gmail-original-page.ts`, sender checks
   only from `mx.google.com`). Closing the panel stops all reading. "Check the open email again"
-  uses the same port. Gmail's selectors live in `SELECTORS` in
+  uses the same port. After an install or update, `src/inject.ts` injects the manifest's content
+  script into open Gmail tabs (`scripting` + Gmail host permission, added 18 Nov 2026), because
+  Chrome injects manifest content scripts only on new page loads. Gmail's selectors live in
+  `SELECTORS` in
   `src/content/gmail-extract.ts` (measured 15 Nov 2026). If Gmail changes its page, measure
   again with a DevTools snippet that prints only counts and class names, never email content.
 - "Or paste an email" in the side panel is the fallback when Gmail can't be read (and for the

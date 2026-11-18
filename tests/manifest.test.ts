@@ -16,13 +16,18 @@ import {
  * Every addition widens what PhishLocal can access, so it needs a reason (privacy is the core
  * selling point) and should be mentioned in the PR description.
  */
-const ALLOWED_PERMISSIONS: readonly string[] = ['sidePanel'];
-const ALLOWED_HOST_PERMISSIONS: readonly string[] = [];
+/**
+ * `scripting` and Gmail host access: after an install or update, the content script is injected
+ * into Gmail tabs that were already open (src/inject.ts); Chrome does not do that on its own.
+ * Same pages as the content script, so the same install warning.
+ */
+const ALLOWED_PERMISSIONS: readonly string[] = ['sidePanel', 'scripting'];
+const ALLOWED_HOST_PERMISSIONS: readonly string[] = ['https://mail.google.com/*'];
 const ALLOWED_OPTIONAL_PERMISSIONS: readonly string[] = [];
 const ALLOWED_OPTIONAL_HOST_PERMISSIONS: readonly string[] = [];
 /**
- * Pages content scripts may run on. Gmail only: the content script reads the open email when the
- * user clicks "Read open email" in the side panel.
+ * Pages content scripts may run on. Gmail only: the content script reads the open email while
+ * the side panel is open and connected.
  */
 const ALLOWED_CONTENT_SCRIPT_MATCHES: readonly string[] = ['https://mail.google.com/*'];
 

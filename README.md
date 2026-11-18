@@ -54,6 +54,9 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   tracking pixels or run scripts.
 - A cloud check will only happen with explicit consent, after personal data has been removed on
   the device (planned).
+- Permissions: the side panel, and Gmail only (`https://mail.google.com/*`). The `scripting`
+  permission is used once after an install or update, to start PhishLocal's Gmail script in
+  Gmail tabs that were already open, so you don't have to reload Gmail.
 
 ## Setup
 
