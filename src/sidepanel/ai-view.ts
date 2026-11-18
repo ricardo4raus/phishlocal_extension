@@ -143,9 +143,17 @@ export const MAX_REMEMBERED = 20;
  */
 export const LOADING_HINT_MS = 1_000;
 
-/** Results worth one more try: the model may have crashed or answered badly once. */
+/** Errors that come back the same on a second try (Chrome: the input is too large). */
+const LASTING_ERROR = /too large|quota/i;
+
+/**
+ * Results worth one more try: the model may have crashed or answered badly once. Not an error
+ * that would come back the same: a second try would only double the wait.
+ */
 const retryable = (result: AiCheckResult): boolean =>
-  !result.ok && (result.reason === 'failed' || result.reason === 'unreadable-answer');
+  !result.ok &&
+  (result.reason === 'unreadable-answer' ||
+    (result.reason === 'failed' && !LASTING_ERROR.test(result.detail ?? '')));
 
 const seconds = (ms: number): string => `${Math.round(ms / 1000)} s`;
 
@@ -179,11 +187,13 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     if (current?.id === shownId) {
       const elapsed = now - current.since;
       const second = current.attempt === 2 ? ' (second try)' : '';
+      // The rules failed (no findings): their result above says so; do not call them done.
+      const rulesDone = current.findings ? 'Rule checks done. ' : '';
       set(
         elements.status,
         current.phase === 'model' && elapsed >= LOADING_HINT_MS
-          ? 'Rule checks done. The on-device AI is still loading (the first time after Chrome ' +
-              `starts, this can take a few minutes); the result appears here by itself. ${seconds(elapsed)}`
+          ? `On-device model still loading${second}… ${seconds(elapsed)}. ${rulesDone}The AI ` +
+              'result appears here by itself; the first load after Chrome starts can take several minutes.'
           : `AI check running on this device${second}… ${seconds(elapsed)}`,
       );
     } else if (waiting?.id === shownId && current) {
@@ -238,15 +248,16 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   function showResult(request: Request, result: AiCheckResult): void {
     elements.status.classList.remove('ai-failed');
     if (!result.ok) {
-      const twice = request.attempt === 2;
+      // The two tries may have failed differently: name only the last reason.
+      const again = request.attempt === 2 ? ' after a second try' : '';
       const note =
         result.reason === 'no-model'
           ? 'AI check not available: the on-device model is not ready. Rule checks only.'
           : result.reason === 'failed'
-            ? `The AI check failed${twice ? ' twice' : ''} (${result.detail ?? 'unknown error'}). The rule checks still apply.`
+            ? `The AI check failed${again} (${result.detail ?? 'unknown error'}). The rule checks still apply.`
             : result.reason === 'stopped'
               ? 'The AI check was stopped. The rule checks still apply.'
-              : `The AI answer could not be read${twice ? ', also on a second try' : ''}. The rule checks still apply.`;
+              : `The AI answer could not be read${again}. The rule checks still apply.`;
       showRulesOnly(request, note, false, result.reason !== 'no-model');
       return;
     }
@@ -335,6 +346,8 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
    * crash, Chrome loads it again here), then runs the check.
    */
   async function tryOnce(request: Request): Promise<AiCheckResult> {
+    // A second try starts without the first try's (possibly stopped) controller.
+    request.stop = undefined;
     request.phase = 'model';
     request.since = performance.now();
     startTicker();
@@ -374,9 +387,17 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     tick();
   }
 
+  /**
+   * The running check is for the same email, findings and language, and not stopped: its answer
+   * serves `request` too. A stopped run (its email was left, then shown again before the run
+   * ended) only says "stopped", so the email needs a fresh run.
+   */
+  const adoptable = (request: Request): boolean =>
+    current?.key === request.key && !current.stop?.signal.aborted;
+
   const enqueue = (request: Request): void => {
     // The same check is already running (e.g. Gmail showed the email again): use its answer.
-    if (current?.key === request.key) {
+    if (current && adoptable(request)) {
       current.id = request.id;
       startTicker();
       return;
@@ -415,7 +436,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       true,
     );
     // The same email is already being checked: use that run's answer.
-    if (current?.key === request.key) {
+    if (current && adoptable(request)) {
       current.id = request.id;
       startTicker();
       return;
