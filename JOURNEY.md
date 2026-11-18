@@ -256,6 +256,10 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   measurement, and a second measurement after a Chrome restart disproved it. A warm-up at panel
   start is not enough either, because Chrome can unload the model later; checking right before
   each use is what holds.
+- A retry needs to know the platform's limits: Chrome counts model crashes and blocks the model
+  after three, so "try again" must first ask whether the model is available at all.
+- A live region with a ticking counter is a screen reader announcing every second. Keep live
+  regions for state changes and put counters next to them.
 
 ## Accomplishments we're proud of
 
@@ -553,3 +557,22 @@ _To fill in near the submission._
   check's time limit. It takes 0.0 s while the model is loaded and reloads it otherwise, so a
   reload shows as "waits for the on-device model to load" instead of a timeout. How long Chrome
   takes to load the model is Chrome's; the extension cannot guarantee it.
+- Diagnosis in Chrome: `chrome://on-device-internals` logged "Terminated on-device session for
+  LanguageModel. Reason: Session crashed", so the model process had crashed, and the next session
+  needed a full reload. Setting Chrome to the NVIDIA GPU in Windows did not make the load faster.
+  The load time stays Chrome's.
+- For a polished experience anyway (Ricardo's request): a failed run is tried once more after
+  checking the model again, and a long load says what is happening ("Rule checks done. The
+  on-device AI is still loading…; the result appears here by itself") instead of a bare counter.
+  Planned and reviewed before coding; a research agent and two review agents (logic; security,
+  accessibility and wording) checked the change.
+- The research found a risk in Chromium's source: after 3 model crashes Chrome refuses new
+  sessions for a while (1 min, growing to 1 h). A retry must not hammer a blocked model, so the
+  panel now asks `availability()` before opening a session. The logic review found four small
+  bugs (a misleading "failed twice" when the two tries failed differently, retrying an input
+  that is too large, "Rule checks done" when the rules had failed, and a stopped run adopted for
+  an email shown again). The accessibility review found that two status lines with a seconds
+  counter were live regions (a screen reader could announce them every second), two text
+  colours below 4.5:1, and that the new Gmail permission deserves a guard: structure tests now
+  allow network requests only in the Gmail content script and `chrome.scripting` only in
+  `src/inject.ts`. All fixed, each with a test that fails without it where testable.

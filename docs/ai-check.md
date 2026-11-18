@@ -80,7 +80,21 @@ are its input and its lower limit.
      a full load when Chrome had unloaded it (once measured: 249 s minutes after a 3.6 s load).
      So a load never runs inside the check's time limit, and the status says the check waits for
      the model;
-   - the panel first waits for the model to load (that can take minutes);
+   - the panel first waits for the model to load (that can take minutes); after 1 s of waiting
+     the status says "On-device model still loading… X s", that the rule checks are done (only if
+     they ran) and that the AI result appears by itself (shorter waits show "running", so the
+     text does not flash on every check);
+   - a run that fails (error, crash, timeout, unreadable answer) is tried once more while its
+     email is shown, after checking the model again, so a crashed model is reloaded outside the
+     time limit. Not retried: a stopped run, a missing model, a left email, and errors that would
+     come back the same (input too large, quota). A second failure is shown as "failed after a
+     second try", with the last reason;
+   - after repeated crashes Chrome refuses new sessions for a while (from Chromium's source, not
+     Chrome's docs: 3 crashes, then a pause of 1 min growing to 1 h). The panel asks
+     `availability()` before each session, so it neither waits for nor retries against a blocked
+     model; the rules stand alone then;
+   - only the verdict line is a live region for screen readers; counters (seconds, download
+     percentage) sit next to live regions, never in them, so they are not announced every second;
      the run's 60 s limit starts when it asks the model; the status shows the seconds; after the
      limit the run is stopped, and the message says how far the model had come ("the model had
      written N characters"): 0 means it hung, many means it did not stop writing;
