@@ -126,7 +126,7 @@ checks count only if the topmost result comes from Gmail's own server, `mx.googl
 
 ### Pressure phrases ([`phrases.ts`](../src/rules/phrases.ts))
 
-Phrases in English, German, French and Spanish, matched as whole words with any whitespace in
+Phrases in English, German, French, Spanish, Italian and Portuguese, matched as whole words with any whitespace in
 between, in the subject and the body. One finding per category, with up to five phrases.
 
 | Rule          | Severity | Flags                                         | Examples                                                                                  |

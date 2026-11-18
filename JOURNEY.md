@@ -41,7 +41,7 @@ _Current state, updated as features land._
 - While the side panel is open, every email opened in Gmail is read (sender, subject, visible
   text, links with their text and real target) and checked automatically, and its headers are
   loaded from Gmail's own "Show original" page in the background. Closing the panel stops all
-  reading. Nothing leaves the browser. No AI check of the email yet.
+  reading. Nothing leaves the browser.
 - "Or paste an email" is the fallback for other mail apps and for the demo: paste an email
   (optionally with sender and subject) and the panel shows its text and links, including the
   real target behind each link text. Three made-up sample emails (two phishing, one harmless)
@@ -56,6 +56,10 @@ _Current state, updated as features land._
 - Raw source pasted from any mail app ("Show original", "View source") is read with its headers:
   the side panel shows whether SPF, DKIM and DMARC passed and where replies go, and the rules
   flag a forged sender (DMARC failed) as danger and replies to another company as a warning.
+- Every shown email gets an AI verdict from Gemini Nano, on-device only: safe, suspicious or
+  dangerous, with up to five reasons and one piece of advice in the user's language. The rule
+  checks are its lower limit: the AI can raise the verdict, never lower it.
+- The rule checks cover English, German, French, Spanish, Italian and Portuguese.
 
 ## How we built it
 
@@ -225,6 +229,12 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   grows with the square of the nesting depth. Measure with hostile input, not only real emails.
 - A multipart email has two bodies; the mail app shows the HTML one. Checking the other one is a
   gap an attacker can use.
+- Firebase AI Logic's on-device path ignores `systemInstruction`; the system message has to go
+  into the session's `initialPrompts`. The cloud path uses `systemInstruction` as usual.
+- Escaping is not a defense against prompt injection: JSON keeps the email from breaking the
+  prompt's structure, but the model still reads the text. What protects the user is outside the
+  model: the rules as a lower limit, a strict check of the answer, no tools, and our own advice
+  whenever the rules are stricter than the AI.
 - A side panel can watch a tab without the `tabs` permission: `chrome.tabs.connect` reaches only
   our own content script, a closed panel closes the port, and the content script stops with it.
   That makes "read only while the panel is open" a property of the code, not a promise.
@@ -434,3 +444,33 @@ _To fill in near the submission._
   old port (and its watcher) running in the background; content Gmail rendered after the first
   check was never checked; a stopped request still sent a failure; an unexpected error left the
   status at "Loading…".
+- AI check (`feat/ai-check`, planned for Thu 19 Nov), planned and then reviewed again before
+  coding (Ricardo asked for that). The second look changed the plan: links, addresses and phone
+  numbers are removed from AI text, our own advice replaces the AI's when the rules are stricter,
+  the AI waits at most 3 s for Gmail's headers, and only basic JSON Schema keywords are used.
+  Built in small commits: verdict schema and strict reader, prompt builder with random markers,
+  on-device model (`ONLY_ON_DEVICE`, system message as `initialPrompts`), the "Verdict" block
+  with a newest-only queue, Italian and Portuguese pressure phrases, and a sample that tries to
+  talk the AI into "safe". Ricardo asked for Italian and Portuguese; whether Gemini Nano can
+  answer in them is measured in Chrome.
+- Chrome test of the AI check: Ricardo measured the languages (Italian and Portuguese work but
+  are "experimental" in Gemini Nano) and found a false alarm: a real Google security notice with
+  SPF, DKIM and DMARC pass was "suspicious" for the AI. Causes: the AI never saw the sender
+  checks, the cleanup hid the sender's own address ("'[removed]' is unusual"), and Gemini Nano is
+  cautious with account notices. Fixed: the AI now gets the sender checks and a rule about
+  confirmed senders, the email's own addresses stay readable, each reason is one sentence, and
+  the AI answers in Italian and Portuguese with an "experimental" note.
+- Second Chrome test: the Google notice was still "suspicious", although the AI itself noted
+  "DMARC pass". As proposed for this case, the AI alone can no longer raise the verdict for a
+  confirmed sender (DMARC pass) without rule warnings; its points appear as notes. Learning: a
+  small on-device model needs guard rails in both directions, against being talked into "safe"
+  and against false alarms on real notices.
+- Third Chrome test: the panel stayed at "AI check waiting…" for long. Reading the queue showed
+  that Gmail's repeated display of one email ran the same check twice, and that a hanging or
+  failing run could block the queue for good. Now one run serves the same email, runs stop after
+  60 s, and the status shows the seconds while a check runs or waits.
+- Review of the model and answer path (Ricardo asked for it): in a fresh Chrome profile the model
+  could never be downloaded (Chrome needs a click, and there was no button), loading the model
+  counted against the 60 s limit, and Gmail's repeated display of an email still wasted runs.
+  Fixed: a download button with progress, a separate wait for the model, and a check that starts
+  only once the email has not changed for half a second.

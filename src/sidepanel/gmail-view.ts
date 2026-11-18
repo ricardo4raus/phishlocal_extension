@@ -8,8 +8,11 @@ import { headersFromOriginalPage } from '../raw/gmail-original-page';
 import { HEADERS_HINT } from './email-view';
 
 export interface GmailViewUi {
-  /** Shows an email with its rule findings. `headersNote` stands in for missing headers. */
-  show(email: Email, status: string, headersNote?: string): void;
+  /**
+   * Shows an email with its rule findings. `headersNote` stands in for missing headers; `final`
+   * is false while the headers are still loading.
+   */
+  show(email: Email, status: string, headersNote?: string, final?: boolean): void;
   /** Hides the email view. */
   hide(): void;
   setStatus(text: string, isError?: boolean): void;
@@ -80,7 +83,12 @@ export function createGmailView(ui: GmailViewUi): GmailView {
         case 'email':
           current = { key: message.key, email: message.email };
           source = 'gmail';
-          ui.show(message.email, `${CHECKED} Loading the sender checks…`, 'Loading from Gmail…');
+          ui.show(
+            message.email,
+            `${CHECKED} Loading the sender checks…`,
+            'Loading from Gmail…',
+            false,
+          );
           break;
         case 'original':
           if (current?.key === message.key) void addHeaders(current, message.html);

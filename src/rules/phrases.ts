@@ -1,5 +1,5 @@
 /*
- * Pressure phrases in English, German, French and Spanish: time pressure, threats, requests for
+ * Pressure phrases in English, German, French, Spanish, Italian and Portuguese: time pressure, threats, requests for
  * log-in or card details, and payment requests.
  *
  * Phrases, not single words: "password" alone would also flag a harmless "we will never ask for
@@ -14,7 +14,7 @@ interface Category {
   severity: Severity;
   message: string;
   /** Lowercase phrases; whitespace matches any whitespace. */
-  phrases: { en: string[]; de: string[]; fr: string[]; es: string[] };
+  phrases: { en: string[]; de: string[]; fr: string[]; es: string[]; it: string[]; pt: string[] };
 }
 
 const CATEGORIES: readonly Category[] = [
@@ -85,6 +85,33 @@ const CATEGORIES: readonly Category[] = [
         'última advertencia',
         'última oportunidad',
       ],
+      it: [
+        'urgente',
+        'immediatamente',
+        'subito',
+        'entro 12 ore',
+        'entro 24 ore',
+        'entro 48 ore',
+        'il prima possibile',
+        'solo oggi',
+        'ultimo avviso',
+        'ultimo promemoria',
+        'ultima possibilità',
+      ],
+      pt: [
+        'urgente',
+        'imediatamente',
+        'de imediato',
+        'o mais rápido possível',
+        'dentro de 24 horas',
+        'dentro de 48 horas',
+        'em 24 horas',
+        'em 48 horas',
+        'só hoje',
+        'apenas hoje',
+        'último aviso',
+        'última oportunidade',
+      ],
     },
   },
   {
@@ -151,6 +178,33 @@ const CATEGORIES: readonly Category[] = [
         'acciones legales',
         'será eliminada',
         'devuelto al remitente',
+      ],
+      it: [
+        'account è stato bloccato',
+        'account bloccato',
+        'account verrà bloccato',
+        'account verrà chiuso',
+        'account sospeso',
+        'attività insolita',
+        'attività sospetta',
+        'accesso non autorizzato',
+        'azioni legali',
+        'verrà eliminato',
+        'restituito al mittente',
+      ],
+      pt: [
+        'conta foi bloqueada',
+        'conta bloqueada',
+        'conta será bloqueada',
+        'conta será encerrada',
+        'conta suspensa',
+        'atividade incomum',
+        'atividade suspeita',
+        'acesso não autorizado',
+        'medidas legais',
+        'ações legais',
+        'será excluída',
+        'devolvido ao remetente',
       ],
     },
   },
@@ -221,6 +275,31 @@ const CATEGORIES: readonly Category[] = [
         'introduzca su número de tarjeta',
         'introduzca el código de seguridad',
       ],
+      it: [
+        'conferma la tua identità',
+        'confermare la tua identità',
+        'verifica la tua identità',
+        'verificare la tua identità',
+        'conferma il tuo account',
+        'verifica il tuo account',
+        'conferma la tua password',
+        'inserisci la tua password',
+        'inserisci i tuoi dati di accesso',
+        'inserisci il numero della carta',
+      ],
+      pt: [
+        'confirme sua identidade',
+        'confirme a sua identidade',
+        'verifique sua identidade',
+        'verifique a sua identidade',
+        'confirme sua conta',
+        'verifique sua conta',
+        'verifique a sua conta',
+        'confirme sua senha',
+        'digite sua senha',
+        'insira os seus dados de acesso',
+        'insira o número do cartão',
+      ],
     },
   },
   {
@@ -277,6 +356,30 @@ const CATEGORIES: readonly Category[] = [
         'pagar con una tarjeta regalo',
         'realice una transferencia',
         'pagar en bitcoin',
+      ],
+      it: [
+        'tassa doganale',
+        'spese doganali',
+        'spese di spedizione',
+        'paga ora',
+        'pagare ora',
+        'fattura non pagata',
+        'pagamento in sospeso',
+        'paga con una carta regalo',
+        'pagare in bitcoin',
+        'effettua un bonifico',
+      ],
+      pt: [
+        'taxa alfandegária',
+        'taxa de importação',
+        'custos de envio',
+        'pague agora',
+        'pagar agora',
+        'fatura em atraso',
+        'pagamento pendente',
+        'pagar com um cartão-presente',
+        'pagar em bitcoin',
+        'faça uma transferência',
       ],
     },
   },

@@ -24,7 +24,9 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Firebase config comes from `.env.local` (`VITE_FIREBASE_*` variables). `.env.local` is
   git-ignored; `.env.example` with empty values is committed.
 - License: **Apache-2.0** (hackathon requirement: public repo with visible open-source license).
-- Supported email languages on-device: en, de, fr, es.
+- Supported email languages: the rule checks cover en, de, fr, es, it, pt; the on-device AI
+  answers in all six, with it and pt marked experimental (Chrome: "output quality cannot be
+  guaranteed"; supported are de, en, es, fr, ja; measured 17 Nov 2026).
 - Privacy is the core selling point: never send email content anywhere without explicit user
   consent.
 - Keep it simple. No frameworks (React etc.) unless I ask. Plain TypeScript + HTML + CSS.
@@ -54,8 +56,14 @@ explain every red flag, and work offline, with a cloud only as fallback."
   loaded model takes about 1 s for short answers; one run took 39 s, cause unknown. On-device
   needs `expectedInputs` / `expectedOutputs` with languages, otherwise Chrome warns.
 - `PREFER_ON_DEVICE` falls back to the cloud silently; consent before cloud is the 21 Nov task.
-  Until the consent step exists, never run a prompt on a real email (only test text). Reading
-  and showing an email in the side panel is fine: it stays local.
+  Real emails go only to the on-device model (`InferenceMode.ONLY_ON_DEVICE`, decided 17 Nov
+  2026); never to the cloud until the consent step exists. The hybrid test prompt is for test
+  text only.
+- AI check (`src/ai/`, `runAiCheck()` in `src/ai.ts`, `src/sidepanel/ai-view.ts`): every shown
+  email goes on-device to Gemini Nano with a fixed system message (as `initialPrompts`, because
+  the SDK does not pass `systemInstruction` on-device) and a JSON data block between random
+  markers; the answer is constrained to `VERDICT_SCHEMA`, read strictly by `parseVerdict()`, and
+  the rules are its lower limit. Details and limits: `docs/ai-check.md`.
 - Automatic scan: while the side panel is open, it keeps a port to the active tab
   (`src/sidepanel/watch.ts`, `src/messages.ts`); the content script (`src/content/gmail-watch.ts`)
   reports every opened email and loads its "Show original" page for the headers
@@ -73,7 +81,7 @@ explain every red flag, and work offline, with a cloud only as fallback."
   domains, sender name vs address, pressure phrases (en/de/fr/es), invisible characters and
   mixed alphabets, and the side panel lists the findings. Registrable domains
   come from tldts (Public Suffix List, runtime dependency since 16 Nov 2026). `brands.ts` lists
-  real brands as reference data only. No AI check of the email yet. Every rule is documented in
+  real brands as reference data only. Every rule is documented in
   `docs/rules.md`; keep it in sync when a rule changes.
 - Raw emails (`src/raw/`): pasted raw source ("Show original", "View source") is recognized and
   parsed with postal-mime (runtime dependency since 16 Nov 2026, tight limits) into the email

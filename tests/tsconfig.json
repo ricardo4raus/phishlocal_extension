@@ -3,5 +3,11 @@
   "compilerOptions": {
     "types": ["node", "chrome", "vite/client"]
   },
-  "include": [".", "../src/vite-env.d.ts", "../vite.config.ts", "../vitest.config.ts"]
+  "include": [
+    ".",
+    "../src/vite-env.d.ts",
+    "../src/language-model.d.ts",
+    "../vite.config.ts",
+    "../vitest.config.ts"
+  ]
 }

@@ -5,6 +5,8 @@ import {
   type LanguageModelCreateOptions,
   type LanguageModelExpected,
 } from 'firebase/ai';
+import { SYSTEM_PROMPT } from './ai/prompt';
+import { type AiVerdict, parseVerdict, VERDICT_SCHEMA } from './ai/verdict';
 import { ai } from './firebase';
 
 /** Languages Gemini Nano handles on-device. Chrome warns if a session is created without them. */
@@ -28,6 +30,42 @@ const hybridModel = getGenerativeModel(ai, {
   mode: InferenceMode.PREFER_ON_DEVICE,
   onDeviceParams: { createOptions: createOptions() },
 });
+
+/**
+ * The AI check of real emails: on-device only, so no email ever reaches the cloud without the
+ * user's consent (the consent step is planned for 21 Nov). The system message goes in as the
+ * session's first prompt, because the SDK does not pass `systemInstruction` to the on-device
+ * model; the answer is constrained to the verdict JSON schema.
+ */
+function createCheckModel(language: string) {
+  // Chrome needs the exact output language; inputs may be in any supported language.
+  const inputs = ON_DEVICE_LANGUAGES.includes(language)
+    ? ON_DEVICE_LANGUAGES
+    : [...ON_DEVICE_LANGUAGES, language];
+  return getGenerativeModel(ai, {
+    mode: InferenceMode.ONLY_ON_DEVICE,
+    onDeviceParams: {
+      createOptions: {
+        expectedInputs: [{ type: 'text', languages: inputs }],
+        expectedOutputs: [{ type: 'text', languages: [language] }],
+        initialPrompts: [{ role: 'system', content: [{ type: 'text', value: SYSTEM_PROMPT }] }],
+      },
+      promptOptions: { responseConstraint: VERDICT_SCHEMA },
+    },
+  });
+}
+
+/** One check model per answer language, created on first use. */
+const checkModels = new Map<string, ReturnType<typeof createCheckModel>>();
+
+function checkModel(language: string): ReturnType<typeof createCheckModel> {
+  let model = checkModels.get(language);
+  if (!model) {
+    model = createCheckModel(language);
+    checkModels.set(language, model);
+  }
+  return model;
+}
 
 /** Cloud only. Used to test the cloud path on a machine where Gemini Nano is available. */
 const cloudModel = getGenerativeModel(ai, { mode: InferenceMode.ONLY_IN_CLOUD });
@@ -53,6 +91,36 @@ export async function runPrompt(prompt: string, forceCloud = false): Promise<Pro
     source: response.inferenceSource,
     durationMs: performance.now() - start,
   };
+}
+
+export type AiCheckResult =
+  | { ok: true; verdict: AiVerdict; durationMs: number }
+  /** `no-model`: Gemini Nano is not ready on this device, so there is no AI check (rules only). */
+  | { ok: false; reason: 'no-model' | 'unreadable-answer' | 'failed'; detail?: string };
+
+/**
+ * Runs the AI check of one email on-device, answering in `language`, and reads its answer
+ * strictly. `knownAddresses`: the email's own addresses, which may stay in the reasons.
+ */
+export async function runAiCheck(
+  userPrompt: string,
+  language: string,
+  knownAddresses: ReadonlySet<string> = new Set(),
+): Promise<AiCheckResult> {
+  const model = await warmUpOnDevice().catch(() => undefined);
+  if (model?.state !== 'ready') return { ok: false, reason: 'no-model' };
+  const start = performance.now();
+  let text: string;
+  try {
+    const { response } = await checkModel(language).generateContent(userPrompt);
+    text = response.text();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { ok: false, reason: 'failed', detail };
+  }
+  const verdict = parseVerdict(text, knownAddresses);
+  if (!verdict) return { ok: false, reason: 'unreadable-answer' };
+  return { ok: true, verdict, durationMs: performance.now() - start };
 }
 
 export type WarmUpResult =
@@ -95,4 +163,25 @@ export function warmUpOnDevice(): Promise<WarmUpResult> {
     throw error;
   });
   return warmUp;
+}
+
+/**
+ * Downloads Gemini Nano (about 4 GB, once) and loads it. Chrome starts the download only after a
+ * user action, so this must run from a click. `onProgress` gets the share downloaded (0 to 1).
+ * Without it, a fresh Chrome profile never gets the model and the AI check never runs.
+ */
+export async function downloadOnDeviceModel(
+  onProgress: (loaded: number) => void,
+): Promise<WarmUpResult> {
+  if (typeof LanguageModel === 'undefined') return { state: 'unavailable' };
+  const start = performance.now();
+  warmSession = await LanguageModel.create({
+    ...createOptions(),
+    monitor: (monitor) => {
+      monitor.addEventListener('downloadprogress', (event) => onProgress(event.loaded));
+    },
+  });
+  const result: WarmUpResult = { state: 'ready', durationMs: performance.now() - start };
+  warmUp = Promise.resolve(result);
+  return result;
 }

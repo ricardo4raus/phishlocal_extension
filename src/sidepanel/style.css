@@ -117,6 +117,19 @@ h2 {
   }
 }
 
+.ai-check p {
+  margin: 2px 0;
+}
+
+.ai-overall {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.ai-advice {
+  font-style: italic;
+}
+
 .email-body {
   white-space: pre-wrap;
   max-height: 200px;
