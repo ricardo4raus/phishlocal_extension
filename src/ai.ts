@@ -4,6 +4,7 @@ import {
   type InferenceSource,
   type LanguageModelCreateOptions,
   type LanguageModelExpected,
+  type LanguageModelPromptOptions,
 } from 'firebase/ai';
 import { SYSTEM_PROMPT } from './ai/prompt';
 import { type AiVerdict, parseVerdict, VERDICT_SCHEMA } from './ai/verdict';
@@ -42,29 +43,32 @@ function createCheckModel(language: string) {
   const inputs = ON_DEVICE_LANGUAGES.includes(language)
     ? ON_DEVICE_LANGUAGES
     : [...ON_DEVICE_LANGUAGES, language];
-  return getGenerativeModel(ai, {
+  const sessionOptions: LanguageModelCreateOptions = {
+    expectedInputs: [{ type: 'text', languages: inputs }],
+    expectedOutputs: [{ type: 'text', languages: [language] }],
+    initialPrompts: [{ role: 'system', content: [{ type: 'text', value: SYSTEM_PROMPT }] }],
+  };
+  // Chrome's prompt() takes a `signal`; the SDK's type does not list it.
+  const promptOptions: LanguageModelPromptOptions & { signal?: AbortSignal } = {
+    responseConstraint: VERDICT_SCHEMA,
+  };
+  const model = getGenerativeModel(ai, {
     mode: InferenceMode.ONLY_ON_DEVICE,
-    onDeviceParams: {
-      createOptions: {
-        expectedInputs: [{ type: 'text', languages: inputs }],
-        expectedOutputs: [{ type: 'text', languages: [language] }],
-        initialPrompts: [{ role: 'system', content: [{ type: 'text', value: SYSTEM_PROMPT }] }],
-      },
-      promptOptions: { responseConstraint: VERDICT_SCHEMA },
-    },
+    onDeviceParams: { createOptions: sessionOptions, promptOptions },
   });
+  return { model, sessionOptions, promptOptions };
 }
 
 /** One check model per answer language, created on first use. */
 const checkModels = new Map<string, ReturnType<typeof createCheckModel>>();
 
 function checkModel(language: string): ReturnType<typeof createCheckModel> {
-  let model = checkModels.get(language);
-  if (!model) {
-    model = createCheckModel(language);
-    checkModels.set(language, model);
+  let check = checkModels.get(language);
+  if (!check) {
+    check = createCheckModel(language);
+    checkModels.set(language, check);
   }
-  return model;
+  return check;
 }
 
 /** Cloud only. Used to test the cloud path on a machine where Gemini Nano is available. */
@@ -95,29 +99,73 @@ export async function runPrompt(prompt: string, forceCloud = false): Promise<Pro
 
 export type AiCheckResult =
   | { ok: true; verdict: AiVerdict; durationMs: number }
-  /** `no-model`: Gemini Nano is not ready on this device, so there is no AI check (rules only). */
-  | { ok: false; reason: 'no-model' | 'unreadable-answer' | 'failed'; detail?: string };
+  /**
+   * `no-model`: Gemini Nano is not ready on this device, so there is no AI check (rules only).
+   * `stopped`: the caller's signal stopped the run; `detail` says how far the model had come.
+   */
+  | { ok: false; reason: 'no-model' | 'unreadable-answer' | 'failed' | 'stopped'; detail?: string };
+
+/**
+ * Longest answer read. A real verdict is far shorter (five reasons and the advice, 300 characters
+ * each, plus the JSON around them); a longer one is a model that does not stop.
+ */
+export const MAX_ANSWER_CHARS = 4_000;
+
+const written = (text: string): string => `the model had written ${text.length} characters`;
 
 /**
  * Runs the AI check of one email on-device, answering in `language`, and reads its answer
  * strictly. `knownAddresses`: the email's own addresses, which may stay in the reasons.
+ *
+ * `signal` stops the run in Chrome too, so a stopped run does not keep Gemini Nano busy: it works
+ * on one prompt at a time, and the next check would wait behind it. The SDK has no signal for
+ * on-device prompts, but it passes our option objects to Chrome by reference on every call
+ * (`ChromeAdapterImpl` keeps `onDeviceParams` as given), so a signal set on them reaches this
+ * run's session and prompt. Only one check runs at a time (the side panel's queue), so the
+ * signal cannot reach another run. A test fails if the SDK stops passing them through.
+ *
+ * The answer is streamed, so a model that does not stop is cut off early and a stopped run says
+ * how far it had come.
  */
 export async function runAiCheck(
   userPrompt: string,
   language: string,
   knownAddresses: ReadonlySet<string> = new Set(),
+  signal?: AbortSignal,
 ): Promise<AiCheckResult> {
   const model = await warmUpOnDevice().catch(() => undefined);
   if (model?.state !== 'ready') return { ok: false, reason: 'no-model' };
+  // Without Chrome's Prompt API the SDK creates no on-device adapter and then sends even
+  // ONLY_ON_DEVICE requests to the cloud (`callCloudOrDevice`). An email must never get there.
+  if (typeof LanguageModel === 'undefined') return { ok: false, reason: 'no-model' };
+  const check = checkModel(language);
+  const tooLong = new AbortController();
+  const stop = signal ? AbortSignal.any([signal, tooLong.signal]) : tooLong.signal;
+  check.sessionOptions.signal = stop;
+  check.promptOptions.signal = stop;
   const start = performance.now();
-  let text: string;
+  let text = '';
   try {
-    const { response } = await checkModel(language).generateContent(userPrompt);
-    text = response.text();
+    const result = await check.model.generateContentStream(userPrompt);
+    // The same answer, aggregated; its errors also reach the stream read below.
+    result.response.catch(() => undefined);
+    for await (const chunk of result.stream) {
+      text += chunk.text();
+      if (text.length > MAX_ANSWER_CHARS) {
+        tooLong.abort();
+        return {
+          ok: false,
+          reason: 'failed',
+          detail: `the answer did not end (over ${MAX_ANSWER_CHARS} characters)`,
+        };
+      }
+    }
   } catch (error) {
+    if (signal?.aborted) return { ok: false, reason: 'stopped', detail: written(text) };
     const detail = error instanceof Error ? error.message : String(error);
     return { ok: false, reason: 'failed', detail };
   }
+  if (signal?.aborted) return { ok: false, reason: 'stopped', detail: written(text) };
   const verdict = parseVerdict(text, knownAddresses);
   if (!verdict) return { ok: false, reason: 'unreadable-answer' };
   return { ok: true, verdict, durationMs: performance.now() - start };
