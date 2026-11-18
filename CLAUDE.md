@@ -55,9 +55,11 @@ explain every red flag, and work offline, with a cloud only as fallback."
   in a long-running Chrome session, many minutes; a full Chrome exit fixed it. Inference on a
   loaded model takes about 1 s for short answers; one run took 39 s, cause unknown. On-device
   needs `expectedInputs` / `expectedOutputs` with languages, otherwise Chrome warns.
-- Chrome loads the model once per session settings (measured 19 Nov 2026: the first session with
-  new settings took 249 s, later ones 0.0 s). The warm-up therefore uses exactly the check's
-  settings (`checkSessionOptions()` in `src/ai.ts`); keep them identical when changing either.
+- Measured 19 Nov 2026: the first model load after a full Chrome exit took 304.8 s on the dev
+  machine (3.8 s on 15 Nov); afterwards sessions with any settings start in 0.0–0.1 s. Chrome can
+  unload the model while the panel is open (a later session once took 249 s). So the panel opens
+  a session right before each check (`ensureModelLoaded()` in `src/ai.ts`), outside the check's
+  time limit. The load time itself is Chrome's and cannot be guaranteed by the extension.
 - `PREFER_ON_DEVICE` falls back to the cloud silently; consent before cloud is the 21 Nov task.
   Real emails go only to the on-device model (`InferenceMode.ONLY_ON_DEVICE`, decided 17 Nov
   2026); never to the cloud until the consent step exists. The hybrid test prompt is for test

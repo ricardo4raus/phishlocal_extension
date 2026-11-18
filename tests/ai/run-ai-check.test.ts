@@ -154,6 +154,33 @@ describe('runAiCheck', () => {
     });
   });
 
+  it('opens a session before each check, so an unloaded model is loaded outside the check', async () => {
+    const sessions: { destroyed: boolean }[] = [];
+    let fail = false;
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => 'available',
+      create: async () => {
+        if (fail) throw new Error('The model could not be loaded.');
+        const session = { destroyed: false, destroy: () => (session.destroyed = true) };
+        sessions.push(session);
+        return session;
+      },
+    });
+    const { ensureModelLoaded } = await import('../../src/ai');
+    expect(await ensureModelLoaded('de')).toBe(true);
+    expect(await ensureModelLoaded('de')).toBe(true);
+    // The warm-up's session and one per call; only the newest is kept open.
+    expect(sessions.map((session) => session.destroyed)).toEqual([true, true, false]);
+    fail = true;
+    expect(await ensureModelLoaded('de')).toBe(false);
+  });
+
+  it('says the model is not ready when it is not downloaded', async () => {
+    availability = 'downloadable';
+    const { ensureModelLoaded } = await import('../../src/ai');
+    expect(await ensureModelLoaded('en')).toBe(false);
+  });
+
   it('downloads the model on request, reports progress, and then counts it as ready', async () => {
     availability = 'downloadable';
     const created: { monitor?: (monitor: { addEventListener: unknown }) => void }[] = [];

@@ -250,10 +250,12 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   none for on-device prompts.
 - `InferenceMode.ONLY_ON_DEVICE` is not a guarantee by itself: without Chrome's Prompt API the
   SDK quietly uses the cloud. "Only on device" has to be checked by our own code too.
-- A warm-up only helps if it warms the right thing: Chrome loads Gemini Nano once per session
-  settings, so a warm-up with other settings than the real call leaves the slow load in the
-  real call. Count what the model wrote before a timeout: "0 characters" pointed straight at
-  session creation.
+- Count what the model wrote before a timeout: "0 characters" pointed straight at session
+  creation, not at a model that did not stop.
+- Test a theory before building on it: "Chrome loads the model once per settings" fitted one
+  measurement, and a second measurement after a Chrome restart disproved it. A warm-up at panel
+  start is not enough either, because Chrome can unload the model later; checking right before
+  each use is what holds.
 
 ## Accomplishments we're proud of
 
@@ -538,8 +540,16 @@ _To fill in near the submission._
 - Chrome test: the AI check worked once, then failed again with "no answer within 60 s; the
   model had written 0 characters", so the model hung before its first word. Ricardo ran a
   timing snippet in the side panel's console: the first session with the check's settings took
-  249 s to create, the next four 0.0 s, and each answer came in about 2 s. The warm-up had loaded
-  the model with other settings (all four output languages, no system message), and Chrome loads
-  the model once per settings, so the first check did the slow load inside its 60 s limit.
-  Fixed: the warm-up uses exactly the check's settings; a test fails if they differ. The snippet
-  also confirmed that Chrome streams the answer in pieces.
+  249 s to create, the next four 0.0 s, and each answer came in about 2 s. The snippet also
+  confirmed that Chrome streams the answer in pieces.
+- First theory: Chrome loads the model once per session settings, and the warm-up used other
+  settings than the check. The warm-up was changed to the check's settings. Ricardo wanted the
+  load to be fast for sure, not hopefully, so we tested the theory: after a full Chrome exit, the
+  panel's warm-up took 304.8 s, and then sessions with three different settings took 0.0–0.1 s.
+  The theory was wrong; the settings do not matter. Two facts remained: the first load after a
+  Chrome start takes about five minutes on this machine (3.8 s on 15 Nov), and Chrome can unload
+  the model while the panel is open, so a later session needs the full load again (the 249 s).
+- Fix in our control: right before each check, the panel opens a session itself, outside the
+  check's time limit. It takes 0.0 s while the model is loaded and reloads it otherwise, so a
+  reload shows as "waits for the on-device model to load" instead of a timeout. How long Chrome
+  takes to load the model is Chrome's; the extension cannot guarantee it.

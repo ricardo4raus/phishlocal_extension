@@ -73,7 +73,7 @@ describe('runAiCheck through the Firebase SDK', () => {
     const { runAiCheck, warmUpOnDevice } = await import('../../src/ai');
     await warmUpOnDevice('de');
     await runAiCheck('prompt', 'de');
-    // Chrome loads the model once per settings; a first load with other settings took 249 s.
+    // The sessions we open ourselves (warm-up, ensureModelLoaded) match the check's.
     const [warmUp, check] = creates.map(({ signal: _signal, ...settings }) => settings);
     expect(creates).toHaveLength(2);
     expect(check).toEqual(warmUp);

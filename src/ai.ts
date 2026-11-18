@@ -17,7 +17,7 @@ const expectedText = (): LanguageModelExpected[] => [
   { type: 'text', languages: ON_DEVICE_LANGUAGES },
 ];
 
-/** Shared by the SDK and the warm-up, so both ask Chrome for the same model configuration. */
+/** Settings of the test prompt's on-device sessions. */
 const createOptions = (): LanguageModelCreateOptions => ({
   expectedInputs: expectedText(),
   expectedOutputs: expectedText(),
@@ -33,11 +33,8 @@ const hybridModel = getGenerativeModel(ai, {
 });
 
 /**
- * The session settings of the AI check in one answer language. The warm-up loads exactly these:
- * Chrome loads the model once per settings, and that first load can take minutes. Measured
- * 19 Nov 2026: a session with the warm-up's former settings (all four output languages, no
- * system message) was ready in 3.6 s, yet the first check session (one output language, the
- * system message) then took 249 s to create; every later one took 0.0 s.
+ * The session settings of the AI check in one answer language, shared by the check, the warm-up
+ * and ensureModelLoaded(), so the sessions we open ourselves are the same as the check's.
  *
  * The system message goes in as the session's first prompt, because the SDK does not pass
  * `systemInstruction` to the on-device model.
@@ -214,11 +211,10 @@ async function loadOnDeviceModel(language: string): Promise<WarmUpResult> {
 }
 
 /**
- * Loads Gemini Nano for the AI check in `language` before the first check, with exactly the
- * check's session settings (see checkSessionOptions). Loading can take minutes; afterwards every
- * new check session (the SDK creates one per prompt) starts at once. Sends no data and starts no
- * download. Every call for a language returns the same run; after a failure the next call
- * retries.
+ * Loads Gemini Nano for the AI check in `language` before the first check. Loading can take
+ * minutes (measured 19 Nov 2026: 304.8 s right after a full Chrome exit); afterwards every new
+ * session starts at once, whatever its settings. Sends no data and starts no download. Every call
+ * for a language returns the same run; after a failure the next call retries.
  */
 export function warmUpOnDevice(language: string): Promise<WarmUpResult> {
   let warmUp = warmUps.get(language);
@@ -230,6 +226,29 @@ export function warmUpOnDevice(language: string): Promise<WarmUpResult> {
     warmUps.set(language, warmUp);
   }
   return warmUp;
+}
+
+/**
+ * Makes sure the model is loaded right before a check, so a load never runs inside the check's
+ * time limit. Chrome can unload the model although the panel keeps a session open: on 19 Nov the
+ * panel had loaded it in 3.6 s, and a new session minutes later took 249 s, the time of a full
+ * load. Inside a check, that ended as a timeout with 0 characters written.
+ *
+ * Opening a session with the check's settings takes 0.0 s while the model is loaded and loads
+ * it again when it is not; the new session then replaces the kept one. Says whether the model is
+ * ready.
+ */
+export async function ensureModelLoaded(language: string): Promise<boolean> {
+  const warmUp = await warmUpOnDevice(language).catch(() => undefined);
+  if (warmUp?.state !== 'ready' || typeof LanguageModel === 'undefined') return false;
+  try {
+    const session = await LanguageModel.create(checkSessionOptions(language));
+    warmSessions.get(language)?.destroy();
+    warmSessions.set(language, session);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -1,6 +1,7 @@
 import { InferenceSource } from 'firebase/ai';
 import {
   downloadOnDeviceModel,
+  ensureModelLoaded,
   runAiCheck,
   runPrompt,
   warmUpOnDevice,
@@ -138,8 +139,7 @@ const aiCheck = createAiCheck(
   {
     run: runAiCheck,
     uiLanguage: () => chrome.i18n.getUILanguage(),
-    modelReady: async (language) =>
-      (await warmUpOnDevice(language).catch(() => undefined))?.state === 'ready',
+    modelReady: ensureModelLoaded,
   },
 );
 
