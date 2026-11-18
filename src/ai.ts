@@ -242,6 +242,12 @@ export async function ensureModelLoaded(language: string): Promise<boolean> {
   const warmUp = await warmUpOnDevice(language).catch(() => undefined);
   if (warmUp?.state !== 'ready' || typeof LanguageModel === 'undefined') return false;
   try {
+    // After repeated crashes Chrome refuses new sessions for a while (from Chromium's source:
+    // 3 crashes, then a growing pause of 1 min to 1 h; not in Chrome's docs). Then this says
+    // "not ready", so the panel neither waits for a session nor tries a failed check again.
+    if ((await LanguageModel.availability(checkSessionOptions(language))) !== 'available') {
+      return false;
+    }
     const session = await LanguageModel.create(checkSessionOptions(language));
     warmSessions.get(language)?.destroy();
     warmSessions.set(language, session);

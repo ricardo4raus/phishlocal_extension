@@ -175,6 +175,23 @@ describe('runAiCheck', () => {
     expect(await ensureModelLoaded('de')).toBe(false);
   });
 
+  it('opens no session while Chrome refuses the model (e.g. after repeated crashes)', async () => {
+    let creates = 0;
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => availability,
+      create: async () => {
+        creates++;
+        return { destroy: () => {} };
+      },
+    });
+    const { ensureModelLoaded } = await import('../../src/ai');
+    expect(await ensureModelLoaded('de')).toBe(true);
+    availability = 'unavailable';
+    expect(await ensureModelLoaded('de')).toBe(false);
+    // The warm-up's session and one for the first call; none while Chrome refuses.
+    expect(creates).toBe(2);
+  });
+
   it('says the model is not ready when it is not downloaded', async () => {
     availability = 'downloadable';
     const { ensureModelLoaded } = await import('../../src/ai');
