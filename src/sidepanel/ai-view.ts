@@ -71,10 +71,12 @@ const rulesRisk = (findings: Finding[] | undefined): Risk =>
   findings ? ruleRisk(findings) : 'suspicious';
 
 export interface AiCheckDeps {
+  /** Runs one check; `signal` stops it (in Chrome too), e.g. when its email is no longer shown. */
   run: (
     prompt: string,
     language: string,
     knownAddresses: ReadonlySet<string>,
+    signal: AbortSignal,
   ) => Promise<AiCheckResult>;
   /** Chrome's UI language, e.g. "de-CH". */
   uiLanguage: () => string;
@@ -94,6 +96,8 @@ export interface AiCheck {
   shown(email: Email, findings: Finding[] | undefined, final: boolean): void;
   /** No email is shown any more. */
   hidden(): void;
+  /** Checks the shown email again, e.g. once the model is downloaded. A known answer is reused. */
+  recheck(): void;
 }
 
 interface Request {
@@ -107,6 +111,8 @@ interface Request {
   since: number;
   /** While running: still waiting for the model to load, or already asking it. */
   phase?: 'model' | 'run';
+  /** Stops the run while it asks the model. */
+  stop?: AbortController;
 }
 
 /**
@@ -116,8 +122,14 @@ interface Request {
  */
 export const STABLE_MS = 500;
 
-/** A run that has not answered after this long is given up (the queue moves on). */
+/** A run that has not answered after this long is stopped (the queue moves on). */
 export const RUN_TIMEOUT_MS = 60_000;
+
+/**
+ * After a stop, how long a run gets to end before the queue moves on without it. A run that
+ * follows its signal ends at once; this only bounds one that does not.
+ */
+export const STOP_GRACE_MS = 2_000;
 
 /** How many recent AI answers are kept for emails shown again. */
 export const MAX_REMEMBERED = 20;
@@ -205,7 +217,9 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
           ? 'AI check not available: the on-device model is not ready. Rule checks only.'
           : result.reason === 'failed'
             ? `The AI check failed (${result.detail ?? 'unknown error'}). The rule checks still apply.`
-            : 'The AI answer could not be read. The rule checks still apply.';
+            : result.reason === 'stopped'
+              ? 'The AI check was stopped. The rule checks still apply.'
+              : 'The AI answer could not be read. The rule checks still apply.';
       showRulesOnly(request, note);
       return;
     }
@@ -240,26 +254,42 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     set(elements.advice, stricter || !verdict.advice ? ADVICE[overall] : verdict.advice);
   }
 
-  /** Runs one request, never longer than RUN_TIMEOUT_MS, and never throws. */
+  /**
+   * Runs one request and never throws. After RUN_TIMEOUT_MS, or when its email is no longer
+   * shown, it is stopped (in Chrome too, so Gemini Nano is free for the next one).
+   */
   async function runOnce(request: Request): Promise<AiCheckResult> {
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    const tooLong = new Promise<AiCheckResult>((resolve) => {
-      timeout = setTimeout(
-        () =>
-          resolve({
-            ok: false,
-            reason: 'failed',
-            detail: `no answer within ${seconds(RUN_TIMEOUT_MS)}`,
-          }),
-        RUN_TIMEOUT_MS,
+    const stop = new AbortController();
+    request.stop = stop;
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      stop.abort();
+    }, RUN_TIMEOUT_MS);
+    // A run that ignores its signal still lets the queue move on.
+    const abandoned = new Promise<AiCheckResult>((resolve) => {
+      stop.signal.addEventListener(
+        'abort',
+        () => setTimeout(() => resolve({ ok: false, reason: 'stopped' }), STOP_GRACE_MS),
+        { once: true },
       );
     });
     try {
       const prompt = buildUserPrompt(request.email, request.findings ?? [], request.language);
-      return await Promise.race([
-        deps.run(prompt, request.language, ownAddresses(request.email)),
-        tooLong,
+      const result = await Promise.race([
+        deps.run(prompt, request.language, ownAddresses(request.email), stop.signal),
+        abandoned,
       ]);
+      if (timedOut && !result.ok) {
+        // How far the model had come tells a hung model from one that does not stop writing.
+        const progress = result.reason === 'stopped' && result.detail ? `; ${result.detail}` : '';
+        return {
+          ok: false,
+          reason: 'failed',
+          detail: `no answer within ${seconds(RUN_TIMEOUT_MS)}${progress}`,
+        };
+      }
+      return result;
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       return { ok: false, reason: 'failed', detail };
@@ -267,6 +297,11 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       clearTimeout(timeout);
     }
   }
+
+  /** Stops the running check unless it is the one for `key` (its email is still wanted). */
+  const stopRunning = (key?: string): void => {
+    if (current && current.key !== key) current.stop?.abort();
+  };
 
   async function drain(): Promise<void> {
     if (current) return;
@@ -278,7 +313,10 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       // Loading the model does not count against the run's time limit.
       const ready = await deps.modelReady().catch(() => false);
       let result: AiCheckResult;
-      if (ready) {
+      if (current.id !== shownId) {
+        // Another email was opened while the model loaded: do not spend the model on this one.
+        result = { ok: false, reason: 'stopped' };
+      } else if (ready) {
         current.phase = 'run';
         current.since = performance.now();
         tick();
@@ -301,45 +339,59 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       startTicker();
       return;
     }
+    // The running check is for an email that is no longer shown: free the model.
+    stopRunning(request.key);
     waiting = request;
     startTicker();
     void drain();
   };
 
+  /** The email shown now, for `recheck()`. */
+  let last: { email: Email; findings: Finding[] | undefined; final: boolean } | undefined;
+
+  function shown(email: Email, findings: Finding[] | undefined, final: boolean): void {
+    clearTimeout(timer);
+    last = { email, findings, final };
+    const language = answerLanguage(deps.uiLanguage());
+    const request: Request = {
+      id: ++shownId,
+      email,
+      findings,
+      language,
+      key: `${language}|${JSON.stringify(promptData(email, findings ?? []))}`,
+      since: performance.now(),
+    };
+    const known = answers.get(request.key);
+    if (known) {
+      stopRunning(request.key);
+      showResult(request, known);
+      return;
+    }
+    showRulesOnly(
+      request,
+      final ? 'AI check waiting…' : 'AI check waits for the sender checks…',
+      true,
+    );
+    // The same email is already being checked: use that run's answer.
+    if (current?.key === request.key) {
+      current.id = request.id;
+      startTicker();
+      return;
+    }
+    timer = setTimeout(() => enqueue(request), final ? STABLE_MS : waitMs);
+  }
+
   return {
-    shown(email, findings, final) {
-      clearTimeout(timer);
-      const language = answerLanguage(deps.uiLanguage());
-      const request: Request = {
-        id: ++shownId,
-        email,
-        findings,
-        language,
-        key: `${language}|${JSON.stringify(promptData(email, findings ?? []))}`,
-        since: performance.now(),
-      };
-      const known = answers.get(request.key);
-      if (known) {
-        showResult(request, known);
-        return;
-      }
-      showRulesOnly(
-        request,
-        final ? 'AI check waiting…' : 'AI check waits for the sender checks…',
-        true,
-      );
-      // The same email is already being checked: use that run's answer.
-      if (current?.key === request.key) {
-        current.id = request.id;
-        startTicker();
-        return;
-      }
-      timer = setTimeout(() => enqueue(request), final ? STABLE_MS : waitMs);
+    shown,
+    recheck() {
+      if (last) shown(last.email, last.findings, last.final);
     },
     hidden() {
       clearTimeout(timer);
+      last = undefined;
       shownId++;
       waiting = undefined;
+      stopRunning();
       elements.verdict.hidden = true;
       delete elements.verdict.dataset.risk;
       set(elements.overall, '');

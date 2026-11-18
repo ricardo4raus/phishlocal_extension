@@ -243,6 +243,8 @@ async function downloadModel(): Promise<void> {
     if (result.state === 'ready') {
       modelStatus.textContent = 'On-device model ready.';
       modelDownload.hidden = true;
+      // The email on screen was checked by the rules only: give it the AI check now.
+      aiCheck.recheck();
     } else {
       modelStatus.textContent = 'On-device model not available on this device.';
     }
