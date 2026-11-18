@@ -125,6 +125,7 @@ const findingsList = byId<HTMLUListElement>('email-findings');
 // The AI check of every shown email: on-device only, with the rules as its lower limit.
 const aiCheck = createAiCheck(
   {
+    verdict: byId<HTMLElement>('verdict'),
     overall: byId<HTMLElement>('ai-overall'),
     status: byId<HTMLElement>('ai-status'),
     reasons: byId<HTMLUListElement>('ai-reasons'),

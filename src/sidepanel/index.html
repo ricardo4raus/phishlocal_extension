@@ -51,16 +51,18 @@
         </details>
 
         <p id="email-status" class="email-status" role="status"></p>
+        <div id="verdict" class="verdict" hidden>
+          <!-- Only the verdict line is announced; the status below counts seconds. -->
+          <p id="ai-overall" class="ai-overall" role="status"></p>
+          <p id="ai-status" class="hint"></p>
+          <ul id="ai-reasons" class="ai-reasons"></ul>
+          <p id="ai-advice" class="ai-advice"></p>
+        </div>
         <dl id="email-details" class="email-details" hidden>
-          <dt>Verdict</dt>
-          <dd class="ai-check">
-            <p id="ai-overall" class="ai-overall"></p>
-            <p id="ai-status" class="hint"></p>
-            <ul id="ai-reasons"></ul>
-            <p id="ai-advice" class="ai-advice"></p>
-          </dd>
           <dt>Red flags (rule checks)</dt>
           <dd><ul id="email-findings" class="findings"></ul></dd>
+          <dt>Links</dt>
+          <dd><ol id="email-links" class="links"></ol></dd>
           <dt>From</dt>
           <dd id="email-sender"></dd>
           <dt>Subject</dt>
@@ -73,8 +75,6 @@
             <dt>Return-Path</dt>
             <dd id="email-return-path"></dd>
           </div>
-          <dt>Links</dt>
-          <dd><ol id="email-links" class="links"></ol></dd>
           <dt>Text</dt>
           <dd id="email-body" class="email-body"></dd>
         </dl>

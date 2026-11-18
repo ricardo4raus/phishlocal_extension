@@ -158,13 +158,73 @@ h2 {
   list-style: none;
 }
 
-.ai-check p {
+/*
+ * The traffic light. Each level has its own colour, symbol and word, so it reads without colour
+ * too. The symbols have a contrast of about 4.5:1 or more on their circles, and the circles at
+ * least 3:1 on white and on a dark background.
+ */
+.verdict {
+  --risk: #757575;
+  --risk-symbol-color: #fff;
+  padding: 8px 10px;
+  border: 1px solid var(--risk);
+  border-left-width: 6px;
+  border-radius: 6px;
+}
+
+.verdict[hidden] {
+  display: none;
+}
+
+.verdict[data-risk='safe'] {
+  --risk: #2e7d32;
+  --risk-symbol: '✓';
+}
+
+.verdict[data-risk='suspicious'] {
+  --risk: #b26a00;
+  --risk-symbol: '!';
+  --risk-symbol-color: #000;
+}
+
+.verdict[data-risk='dangerous'] {
+  --risk: #c62828;
+  --risk-symbol: '✕';
+}
+
+.verdict[data-risk='pending'] {
+  --risk-symbol: '…';
+}
+
+.verdict p {
   margin: 2px 0;
 }
 
 .ai-overall {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   font-weight: 600;
   font-size: 15px;
+}
+
+/* The symbol is decoration (empty alternative text): the word says the same. */
+.ai-overall::before {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--risk);
+  color: var(--risk-symbol-color);
+  font-size: 14px;
+  line-height: 22px;
+  text-align: center;
+  content: var(--risk-symbol, '') / '';
+}
+
+.ai-reasons {
+  margin: 4px 0;
+  padding-left: 18px;
 }
 
 .ai-advice {

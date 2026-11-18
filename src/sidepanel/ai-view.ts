@@ -17,6 +17,8 @@ import type { Finding } from '../rules';
 export const HEADERS_WAIT_MS = 3_000;
 
 export interface AiElements {
+  /** The verdict block; its `data-risk` sets the traffic light's colour and symbol. */
+  verdict: HTMLElement;
   overall: HTMLElement;
   status: HTMLElement;
   reasons: HTMLUListElement;
@@ -158,12 +160,27 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     ticker ??= setInterval(tick, 1_000);
   };
 
-  function showRulesOnly(request: Request, note: string): void {
+  /** `pending`: grey, while the AI answer is still to come. */
+  const setRisk = (risk: Risk | 'pending'): void => {
+    elements.verdict.dataset.risk = risk;
+  };
+
+  /**
+   * The rules' verdict alone. While the AI check is still to come (`pending`), "no red flags" is
+   * not shown as green: the AI may still raise it, and the user should not act on it yet.
+   */
+  function showRulesOnly(request: Request, note: string, pending = false): void {
     const risk = rulesRisk(request.findings);
-    set(elements.overall, `${LABEL[risk]} (rule checks)`);
+    const notYet = pending && risk === 'safe';
+    elements.verdict.hidden = false;
+    setRisk(notYet ? 'pending' : risk);
+    set(
+      elements.overall,
+      notYet ? 'Checking… (the rule checks found no red flags)' : `${LABEL[risk]} (rule checks)`,
+    );
     set(elements.status, note);
     elements.reasons.replaceChildren();
-    set(elements.advice, ADVICE[risk]);
+    set(elements.advice, notYet ? '' : ADVICE[risk]);
   }
 
   function showResult(request: Request, result: AiCheckResult): void {
@@ -184,6 +201,8 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     const stricter = overall !== verdict.risk;
     // The AI was more worried, but the sender is confirmed and the rules found nothing.
     const onlyNotes = confirmed && RISKS.indexOf(verdict.risk) > RISKS.indexOf(overall);
+    elements.verdict.hidden = false;
+    setRisk(overall);
     set(
       elements.overall,
       onlyNotes
@@ -282,7 +301,11 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
         key: `${language}|${JSON.stringify(promptData(email, findings ?? []))}`,
         since: performance.now(),
       };
-      showRulesOnly(request, final ? 'AI check waiting…' : 'AI check waits for the sender checks…');
+      showRulesOnly(
+        request,
+        final ? 'AI check waiting…' : 'AI check waits for the sender checks…',
+        true,
+      );
       // The same email is already being checked: use that run's answer.
       if (current?.key === request.key) {
         current.id = request.id;
@@ -295,6 +318,8 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       clearTimeout(timer);
       shownId++;
       waiting = undefined;
+      elements.verdict.hidden = true;
+      delete elements.verdict.dataset.risk;
       set(elements.overall, '');
       set(elements.status, '');
       elements.reasons.replaceChildren();

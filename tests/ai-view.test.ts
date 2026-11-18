@@ -50,6 +50,7 @@ const reasons = (): string[] =>
 function create(deps: Partial<AiCheckDeps> = {}): AiCheck {
   return createAiCheck(
     {
+      verdict: get('verdict'),
       overall: get('overall'),
       status: get('status'),
       reasons: get('reasons') as HTMLUListElement,
@@ -85,7 +86,8 @@ beforeEach(() => {
   pending = [];
   modelReady = async () => true;
   document.body.innerHTML =
-    '<p id="overall"></p><p id="status"></p><ul id="reasons"></ul><p id="advice"></p>';
+    '<div id="verdict" hidden><p id="overall"></p><p id="status"></p><ul id="reasons"></ul>' +
+    '<p id="advice"></p></div>';
   check = create();
 });
 
@@ -152,7 +154,7 @@ describe('AI check view', () => {
     expect(prompts).toHaveLength(1);
     await answer(verdict('dangerous'));
     // The first result belongs to an email that is no longer shown.
-    expect(text('overall')).toBe('No signs of phishing (rule checks)');
+    expect(text('overall')).toBe('Checking… (the rule checks found no red flags)');
     expect(prompts).toHaveLength(2);
     expect(prompts[1]).toMatch(/Third/);
     await answer(verdict('suspicious'));
@@ -214,6 +216,46 @@ describe('AI check view', () => {
     await answer(verdict('dangerous'));
     expect(text('overall')).toBe('');
     expect(reasons()).toEqual([]);
+    expect(get('verdict').hidden).toBe(true);
+    expect(get('verdict').dataset.risk).toBeUndefined();
+  });
+
+  it('shows no green light before the AI has answered', async () => {
+    const risk = () => get('verdict').dataset.risk;
+    check.shown(email, [], true);
+    expect(get('verdict').hidden).toBe(false);
+    expect(risk()).toBe('pending');
+    expect(text('overall')).toBe('Checking… (the rule checks found no red flags)');
+    expect(text('advice')).toBe('');
+    await vi.advanceTimersByTimeAsync(STABLE_MS);
+    await answer(verdict('safe'));
+    expect(risk()).toBe('safe');
+
+    // Rule warnings show their colour at once: the AI can only raise them.
+    check.shown({ ...email, subject: 'Warned' }, [finding('warning')], true);
+    expect(risk()).toBe('suspicious');
+    expect(text('advice')).toMatch(/^Be careful/);
+    await vi.advanceTimersByTimeAsync(STABLE_MS);
+    await answer(verdict('dangerous', 'Delete it.'));
+    expect(risk()).toBe('dangerous');
+
+    // Without a model, the rules' verdict stands, green included.
+    modelReady = async () => false;
+    await show({ ...email, subject: 'No model' });
+    expect(risk()).toBe('safe');
+    expect(text('overall')).toBe('No signs of phishing (rule checks)');
+  });
+
+  it('shows green for a confirmed sender whose AI concerns are only notes', async () => {
+    await show({
+      ...email,
+      headers: {
+        replyTo: [],
+        auth: { server: 'mx.google.com', spf: 'pass', dkim: [{ result: 'pass' }], dmarc: 'pass' },
+      },
+    });
+    await answer(verdict('dangerous'));
+    expect(get('verdict').dataset.risk).toBe('safe');
   });
 
   it("passes the language and the email's own addresses, and marks experimental languages", async () => {
