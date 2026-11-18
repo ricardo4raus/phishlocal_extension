@@ -104,9 +104,10 @@ h2 {
   color: #c62828;
 }
 
+/* #8a5300: 4.5:1 or more on white; #b26a00 (the light's amber) was 4.24:1 for this text. */
 .findings .warning strong,
 .links .warning .mark {
-  color: #b26a00;
+  color: #8a5300;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -277,13 +278,24 @@ button:disabled {
   cursor: progress;
 }
 
-#status {
+.prompt-status {
   margin: 4px 0 0;
+}
+
+#status {
   font-weight: 600;
 }
 
 #status.error {
   color: #c62828;
+}
+
+/* The dark background needs a lighter red: #c62828 is only 3.3:1 there. */
+@media (prefers-color-scheme: dark) {
+  .email-status.error,
+  #status.error {
+    color: #ef9a9a;
+  }
 }
 
 #output {

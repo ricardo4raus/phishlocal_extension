@@ -9,7 +9,10 @@
   <body>
     <main id="app">
       <h1>PhishLocal</h1>
-      <p id="model-status" class="model-status" role="status"></p>
+      <!-- Only state changes are announced; the counters next to them are not live regions. -->
+      <p class="model-status">
+        <span id="model-status" role="status"></span> <span id="model-progress"></span>
+      </p>
       <button id="model-download" type="button" hidden>
         Download the on-device model (about 4 GB, once)
       </button>
@@ -94,7 +97,9 @@ Is this email suspicious? Answer in two sentences.
 
       <button id="run" type="button">Run prompt</button>
 
-      <p id="status" role="status"></p>
+      <p class="prompt-status">
+        <span id="status" role="status"></span> <span id="progress"></span>
+      </p>
       <pre id="output"></pre>
     </main>
     <script type="module" src="./main.ts"></script>

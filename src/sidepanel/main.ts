@@ -24,13 +24,15 @@ function byId<T extends HTMLElement>(id: string): T {
   return element;
 }
 
-const modelStatus = byId<HTMLParagraphElement>('model-status');
+const modelStatus = byId<HTMLElement>('model-status');
+const modelProgress = byId<HTMLElement>('model-progress');
 const modelDownload = byId<HTMLButtonElement>('model-download');
 const promptInput = byId<HTMLTextAreaElement>('prompt');
 const forceCloudRow = byId<HTMLLabelElement>('force-cloud-row');
 const forceCloudInput = byId<HTMLInputElement>('force-cloud');
 const runButton = byId<HTMLButtonElement>('run');
-const status = byId<HTMLParagraphElement>('status');
+const status = byId<HTMLElement>('status');
+const progress = byId<HTMLElement>('progress');
 const output = byId<HTMLPreElement>('output');
 
 // The cloud switch exists only to test the cloud path during development.
@@ -49,6 +51,23 @@ function sourceLabel(source: InferenceSource | undefined): string {
 
 const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)} s`;
 
+/**
+ * Counts seconds in `element` until the returned function is called, which clears it. The counter
+ * sits next to a live region, not in it, so a screen reader does not announce every second.
+ */
+function countSeconds(element: HTMLElement): () => void {
+  const start = performance.now();
+  const show = (): void => {
+    element.textContent = `${Math.round((performance.now() - start) / 1000)} s`;
+  };
+  show();
+  const timer = setInterval(show, 1000);
+  return () => {
+    clearInterval(timer);
+    element.textContent = '';
+  };
+}
+
 /** On-device model state, set by the warm-up. `failed`: the warm-up threw; a prompt retries it. */
 type ModelState = WarmUpResult['state'] | 'loading' | 'failed';
 let modelState: ModelState = 'loading';
@@ -60,15 +79,13 @@ function expectedRoute(forceCloud: boolean): 'cloud' | 'on-device' | 'unknown' {
   return 'unknown';
 }
 
-function progressText(forceCloud: boolean, elapsedMs: number): string {
-  const elapsed = seconds(elapsedMs);
+function progressText(forceCloud: boolean): string {
   const route = expectedRoute(forceCloud);
-  if (route === 'cloud') return `Running in the cloud… ${elapsed}`;
-  if (route === 'on-device') return `Running on-device… ${elapsed}`;
-  if (modelState === 'loading') {
-    return `Waiting for the on-device model… ${elapsed} (loading can take minutes)`;
-  }
-  return `Running… ${elapsed}`;
+  if (route === 'cloud') return 'Running in the cloud…';
+  if (route === 'on-device') return 'Running on-device…';
+  if (modelState === 'loading')
+    return 'Waiting for the on-device model (loading can take minutes)…';
+  return 'Running…';
 }
 
 async function run(): Promise<void> {
@@ -83,10 +100,8 @@ async function run(): Promise<void> {
   output.textContent = '';
 
   // Waiting for the model can take minutes, so show that the panel is alive and where it runs.
-  const start = performance.now();
-  const showProgress = (): void => setStatus(progressText(forceCloud, performance.now() - start));
-  showProgress();
-  const timer = setInterval(showProgress, 1000);
+  setStatus(progressText(forceCloud));
+  const stopCounting = countSeconds(progress);
 
   try {
     const result = await runPrompt(prompt, forceCloud);
@@ -102,7 +117,7 @@ async function run(): Promise<void> {
         : '';
     setStatus(`Error: ${message}${hint}`, true);
   } finally {
-    clearInterval(timer);
+    stopCounting();
     runButton.disabled = false;
   }
 }
@@ -207,12 +222,9 @@ setUpPaste(
 
 /** Loads the on-device model as soon as the panel opens, so the first check does not wait. */
 async function warmUp(): Promise<void> {
-  const start = performance.now();
-  const showLoading = (): void => {
-    modelStatus.textContent = `Loading on-device model… ${seconds(performance.now() - start)} (the first time after Chrome starts, this can take a few minutes)`;
-  };
-  showLoading();
-  const timer = setInterval(showLoading, 1000);
+  modelStatus.textContent =
+    'Loading the on-device model (the first load after Chrome starts can take several minutes)…';
+  const stopCounting = countSeconds(modelProgress);
 
   try {
     const result = await warmUpOnDevice(checkLanguage);
@@ -225,25 +237,27 @@ async function warmUp(): Promise<void> {
       modelDownload.hidden = false;
     } else {
       modelStatus.textContent =
-        'On-device model not available on this device. Prompts use the cloud.';
+        'On-device model not available on this device. Emails get the rule checks only; test prompts use the cloud.';
     }
   } catch (error) {
     modelState = 'failed';
     const message = error instanceof Error ? error.message : String(error);
     modelStatus.textContent = `On-device model could not load: ${message}`;
   } finally {
-    clearInterval(timer);
+    stopCounting();
   }
 }
 
 /** Downloads the model on click: Chrome allows the download only after a user action. */
 async function downloadModel(): Promise<void> {
   modelDownload.disabled = true;
-  modelStatus.textContent = 'Downloading the on-device model… 0 %';
+  modelStatus.textContent = 'Downloading the on-device model…';
+  modelProgress.textContent = '0 %';
   try {
     const result = await downloadOnDeviceModel(checkLanguage, (loaded) => {
-      modelStatus.textContent = `Downloading the on-device model… ${Math.round(loaded * 100)} %`;
+      modelProgress.textContent = `${Math.round(loaded * 100)} %`;
     });
+    modelProgress.textContent = '';
     modelState = result.state;
     if (result.state === 'ready') {
       modelStatus.textContent = 'On-device model ready.';
@@ -255,6 +269,7 @@ async function downloadModel(): Promise<void> {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    modelProgress.textContent = '';
     modelStatus.textContent = `The download failed: ${message}`;
   } finally {
     modelDownload.disabled = false;
