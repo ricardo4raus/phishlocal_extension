@@ -300,8 +300,7 @@ describe('AI check view', () => {
 
   it('says on the verdict line when the AI check failed, also for a green light', async () => {
     await show(email);
-    // Both tries reach the time limit.
-    await vi.advanceTimersByTimeAsync(2 * RUN_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS);
     expect(get('verdict').dataset.risk).toBe('safe');
     expect(text('overall')).toBe('No signs of phishing (rule checks only: the AI check failed)');
     expect(get('status').classList.contains('ai-failed')).toBe(true);
@@ -438,15 +437,13 @@ describe('AI check view', () => {
     await show(email);
     await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS);
     expect(signals[0]?.aborted).toBe(true);
-    // The second try starts at once and reaches the limit too.
-    expect(text('status')).toBe('AI check running on this device (second try)… 0 s');
-    await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS);
-    expect(signals[1]?.aborted).toBe(true);
+    // A hung model would most likely hang again: no second try after the time limit.
+    expect(prompts).toHaveLength(1);
     expect(text('status')).toBe(
-      'The AI check failed after a second try (no answer within 60 s; the model had written 0 characters). The rule checks still apply.',
+      'The AI check failed (no answer within 60 s; the model had written 0 characters). The rule checks still apply.',
     );
     await show({ ...email, subject: 'Next' });
-    expect(prompts).toHaveLength(3);
+    expect(prompts).toHaveLength(2);
     await answer(verdict('dangerous'));
     expect(text('overall')).toBe('Dangerous');
   });
@@ -522,6 +519,38 @@ describe('AI check view', () => {
     loaded?.(true);
     await vi.advanceTimersByTimeAsync(0);
     expect(text('status')).toBe('AI check running on this device… 0 s');
+  });
+
+  it('uses the check that waits for the model for an email shown again', async () => {
+    let loaded: ((ready: boolean) => void) | undefined;
+    let loads = 0;
+    const ready = new Promise<boolean>((resolve) => {
+      loaded = resolve;
+    });
+    modelReady = () => {
+      loads++;
+      return ready;
+    };
+    await show({ ...email, subject: 'A' });
+    // B is shown and A again, while A's check still waits for the model.
+    check.shown({ ...email, subject: 'B' }, [], true);
+    await show({ ...email, subject: 'A' });
+    loaded?.(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(loads).toBe(1);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toMatch(/"subject":"A"/);
+  });
+
+  it('does not try again when there is no model', async () => {
+    let loads = 0;
+    modelReady = async () => {
+      loads++;
+      return false;
+    };
+    await show(email);
+    expect(loads).toBe(1);
+    expect(text('status')).toMatch(/on-device model is not ready/);
   });
 
   it('names only the last reason when the two tries fail differently', async () => {

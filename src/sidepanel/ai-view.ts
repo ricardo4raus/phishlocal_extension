@@ -143,8 +143,12 @@ export const MAX_REMEMBERED = 20;
  */
 export const LOADING_HINT_MS = 1_000;
 
-/** Errors that come back the same on a second try (Chrome: the input is too large). */
-const LASTING_ERROR = /too large|quota/i;
+/**
+ * Errors not worth a second try: the input is too large for Chrome (comes back the same), or the
+ * run reached the time limit (a hung model would most likely hang again, and the second try's
+ * wait for the model has no limit). A crash ends with an error of its own and is retried.
+ */
+const LASTING_ERROR = /too large|quota|^no answer within/i;
 
 /**
  * Results worth one more try: the model may have crashed or answered badly once. Not an error

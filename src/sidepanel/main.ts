@@ -253,10 +253,13 @@ async function downloadModel(): Promise<void> {
   modelDownload.disabled = true;
   modelStatus.textContent = 'Downloading the on-device model…';
   modelProgress.textContent = '0 %';
+  // A progress event can arrive after the download ended; it must not show a stale percentage.
+  let done = false;
   try {
     const result = await downloadOnDeviceModel(checkLanguage, (loaded) => {
-      modelProgress.textContent = `${Math.round(loaded * 100)} %`;
+      if (!done) modelProgress.textContent = `${Math.round(loaded * 100)} %`;
     });
+    done = true;
     modelProgress.textContent = '';
     modelState = result.state;
     if (result.state === 'ready') {
@@ -269,6 +272,7 @@ async function downloadModel(): Promise<void> {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    done = true;
     modelProgress.textContent = '';
     modelStatus.textContent = `The download failed: ${message}`;
   } finally {

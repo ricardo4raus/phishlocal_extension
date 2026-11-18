@@ -86,9 +86,10 @@ are its input and its lower limit.
      text does not flash on every check);
    - a run that fails (error, crash, timeout, unreadable answer) is tried once more while its
      email is shown, after checking the model again, so a crashed model is reloaded outside the
-     time limit. Not retried: a stopped run, a missing model, a left email, and errors that would
-     come back the same (input too large, quota). A second failure is shown as "failed after a
-     second try", with the last reason;
+     time limit. Not retried: a stopped run, a missing model, a left email, errors that would come
+     back the same (input too large, quota) and a run that reached the time limit (a hung model
+     would most likely hang again). A second failure is shown as "failed after a second try",
+     with the last reason;
    - after repeated crashes Chrome refuses new sessions for a while (from Chromium's source, not
      Chrome's docs: 3 crashes, then a pause of 1 min growing to 1 h). The panel asks
      `availability()` before each session, so it neither waits for nor retries against a blocked
