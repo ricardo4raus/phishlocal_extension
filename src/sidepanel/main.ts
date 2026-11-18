@@ -117,7 +117,7 @@ const emailElements = {
   headerRows: byId<HTMLElement>('email-header-rows'),
   replyTo: byId<HTMLElement>('email-reply-to'),
   returnPath: byId<HTMLElement>('email-return-path'),
-  links: byId<HTMLUListElement>('email-links'),
+  links: byId<HTMLOListElement>('email-links'),
   body: byId<HTMLElement>('email-body'),
 };
 const findingsList = byId<HTMLUListElement>('email-findings');
@@ -148,7 +148,7 @@ function setEmailStatus(text: string, isError = false): void {
  */
 function displayEmail(email: Email, message: string, headersNote?: string, final = true): void {
   const findings = showRuleCheck(() => checkEmail(email), findingsList);
-  showEmail(email, emailElements, headersNote);
+  showEmail(email, emailElements, headersNote, findings);
   setEmailStatus(email.truncated ? `${message} The text is long and was cut.` : message);
   aiCheck.shown(email, findings, final);
 }

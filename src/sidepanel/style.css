@@ -99,22 +99,63 @@ h2 {
   padding-left: 18px;
 }
 
-.findings .danger strong {
+.findings .danger strong,
+.links .danger .mark {
   color: #c62828;
 }
 
-.findings .warning strong {
+.findings .warning strong,
+.links .warning .mark {
   color: #b26a00;
 }
 
 @media (prefers-color-scheme: dark) {
-  .findings .danger strong {
+  .findings .danger strong,
+  .links .danger .mark {
     color: #ef9a9a;
   }
 
-  .findings .warning strong {
+  .findings .warning strong,
+  .links .warning .mark {
     color: #ffcc80;
   }
+}
+
+.links .link {
+  margin-bottom: 4px;
+}
+
+.links .mark {
+  font-weight: 600;
+}
+
+/* A marked link stands out with a bar in its severity's colour. */
+.links .danger,
+.links .warning {
+  padding-left: 6px;
+  border-left: 3px solid;
+}
+
+.links .danger {
+  border-color: #c62828;
+}
+
+.links .warning {
+  border-color: #b26a00;
+}
+
+.links .url {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.links .link-text {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.links .empty {
+  list-style: none;
 }
 
 .ai-check p {

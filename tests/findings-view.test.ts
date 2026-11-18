@@ -11,6 +11,14 @@ function list(): HTMLUListElement {
 const texts = (element: HTMLUListElement): (string | null)[] =>
   [...element.children].map((child) => child.textContent);
 
+const finding = (links: number[]): Finding => ({
+  rule: 'dangerous-link',
+  severity: 'danger',
+  message: 'Bad link.',
+  evidence: [],
+  links,
+});
+
 const failingCheck = (): Finding[] => {
   throw new Error('boom');
 };
@@ -36,6 +44,20 @@ describe('showFindings', () => {
     ]);
     expect(element.children[0]?.className).toBe('finding danger');
     expect(document.querySelector('img')).toBeNull();
+  });
+
+  it('names the links behind a finding, at most five', () => {
+    const element = list();
+    showFindings(
+      [finding([1]), finding([0, 2]), finding([0, 1, 2, 3, 4, 5]), finding([])],
+      element,
+    );
+    expect(texts(element)).toEqual([
+      'Danger: Bad link. (link 2)',
+      'Danger: Bad link. (links 1, 3)',
+      'Danger: Bad link. (links 1, 2, 3, 4, 5, …)',
+      'Danger: Bad link.',
+    ]);
   });
 
   it('says that no red flags does not mean safe', () => {

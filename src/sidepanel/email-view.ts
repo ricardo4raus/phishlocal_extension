@@ -1,5 +1,7 @@
-import type { AuthResults, Email, Mailbox } from '../email';
+import type { AuthResults, Email, EmailLink, Mailbox } from '../email';
+import type { Finding, Severity } from '../rules';
 import { revealOverrides } from '../rules/unicode';
+import { linkDisplay } from './link-display';
 
 /** Number of body characters shown in the panel (the full text is kept for the check). */
 const BODY_PREVIEW_CHARS = 1_000;
@@ -12,7 +14,7 @@ export interface EmailElements {
   headerRows: HTMLElement;
   replyTo: HTMLElement;
   returnPath: HTMLElement;
-  links: HTMLUListElement;
+  links: HTMLOListElement;
   body: HTMLElement;
 }
 
@@ -45,14 +47,57 @@ const setText = (element: HTMLElement, text: string): void => {
   element.textContent = revealOverrides(text);
 };
 
+const MARK: Record<Severity, string> = { danger: 'Danger', warning: 'Warning', info: 'Note' };
+const STRENGTH: Record<Severity, number> = { danger: 2, warning: 1, info: 0 };
+
+/** Per link position: the most severe finding that names it. */
+function linkSeverities(findings: readonly Finding[]): Map<number, Severity> {
+  const severities = new Map<number, Severity>();
+  for (const { severity, links = [] } of findings) {
+    for (const index of links) {
+      const known = severities.get(index);
+      if (!known || STRENGTH[severity] > STRENGTH[known]) severities.set(index, severity);
+    }
+  }
+  return severities;
+}
+
+function part(tag: 'div' | 'span' | 'strong', className: string, text: string): HTMLElement {
+  const element = document.createElement(tag);
+  element.className = className;
+  setText(element, text);
+  return element;
+}
+
+/**
+ * One link: its mark, where it really goes (bold), the shortened URL (the full one as tooltip)
+ * and its text.
+ */
+function linkItem(link: EmailLink, severity: Severity | undefined): HTMLLIElement {
+  const display = linkDisplay(link.href);
+  const item = document.createElement('li');
+  item.className = severity ? `link ${severity}` : 'link';
+  const head = document.createElement('div');
+  if (severity) head.append(part('span', 'mark', `${MARK[severity]}: `));
+  head.append(part('strong', 'domain', display.domain || 'Not a valid web address'));
+  if (display.forwardsTo) {
+    head.append(' forwards to ', part('strong', 'domain', display.forwardsTo));
+  }
+  const url = part('div', 'url', display.short);
+  url.title = revealOverrides(link.href);
+  item.append(head, url, part('div', 'link-text', `Text: ${link.text || '(none)'}`));
+  return item;
+}
+
 /**
  * Shows the email. `headersNote` replaces the hint in "Sender checks" while an email has no
- * headers (e.g. "Loading from Gmail…").
+ * headers (e.g. "Loading from Gmail…"). Links named by `findings` are marked.
  */
 export function showEmail(
   email: Email,
   elements: EmailElements,
   headersNote: string = HEADERS_HINT,
+  findings: readonly Finding[] = [],
 ): void {
   setText(elements.sender, mailbox(email.sender));
   setText(elements.subject, email.subject || '–');
@@ -63,15 +108,13 @@ export function showEmail(
   setText(elements.replyTo, headers?.replyTo.map(mailbox).join(', ') || '–');
   setText(elements.returnPath, headers?.returnPath || '–');
 
+  const severities = linkSeverities(findings);
   elements.links.replaceChildren(
-    ...email.links.map((link) => {
-      const item = document.createElement('li');
-      setText(item, `${link.text || '(no text)'} → ${link.href}`);
-      return item;
-    }),
+    ...email.links.map((link, index) => linkItem(link, severities.get(index))),
   );
   if (email.links.length === 0) {
     const item = document.createElement('li');
+    item.className = 'empty';
     item.textContent = 'No links';
     elements.links.append(item);
   }
