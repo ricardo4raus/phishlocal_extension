@@ -104,6 +104,32 @@ describe('checkEmail', () => {
     expect(checkEmail({ ...base, links: many })).toHaveLength(MAX_FINDINGS);
   });
 
+  it('names the links behind each red flag, also when the same flag repeats', () => {
+    const email: Email = {
+      ...base,
+      sender: { name: '', address: 'service@paypal.com' },
+      links: [
+        { text: 'Open', href: 'javascript:x' },
+        { text: 'Home', href: 'https://news.example/' },
+        { text: 'Open', href: 'javascript:x' },
+        { text: 'Log in', href: 'https://paypa1.com/login' },
+        { text: 'Help', href: 'https://www.google.com/url?q=https://help.paypa1.com/' },
+      ],
+    };
+    const links = Object.fromEntries(
+      checkEmail(email).map((finding) => [finding.rule, finding.links]),
+    );
+    expect(links).toEqual({ 'dangerous-link': [0, 2], 'lookalike-domain': [3, 4] });
+  });
+
+  it('marks no link for a lookalike sender domain', () => {
+    const findings = checkEmail({
+      ...base,
+      sender: { name: 'PayPal', address: 'service@paypa1.com' },
+    });
+    expect(findings.find((finding) => finding.rule === 'lookalike-domain')?.links).toBeUndefined();
+  });
+
   it('warns when part of the email could not be read', () => {
     expect(rules({ ...base, incomplete: true })).toEqual(['incomplete-check:warning']);
   });

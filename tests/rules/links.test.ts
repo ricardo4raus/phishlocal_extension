@@ -24,6 +24,7 @@ describe('checkLinks', () => {
       severity: 'danger',
       message: 'A link hides its real target behind an "@": it goes to evil.example.',
       evidence: ['https://bank.example@evil.example/login'],
+      links: [0],
     });
     // Only a password before the "@": the message still reads well.
     expect(checkLinks([{ text: 'x', href: 'https://:pw@evil.example/' }])[0]?.message).toBe(
@@ -46,7 +47,16 @@ describe('checkLinks', () => {
       message:
         'The link text says lumorabank.example, but the link goes to lumora-bank-verify.example.',
       evidence: ['lumorabank.example/secure', 'https://lumora-bank-verify.example/login'],
+      links: [0],
     });
+  });
+
+  it('names the position of the link behind each finding', () => {
+    const findings = checkLinks([
+      { text: 'Home', href: 'https://news.example/' },
+      { text: 'Open', href: 'javascript:x' },
+    ]);
+    expect(findings.map((finding) => finding.links)).toEqual([[1]]);
   });
 
   it('reads full-width and ideographic link texts', () => {

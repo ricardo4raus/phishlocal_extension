@@ -41,7 +41,14 @@ export function checkEmail(email: Email): Finding[] {
   const unique = new Map<string, Finding>();
   for (const finding of findings) {
     const key = `${finding.rule}\n${finding.message}`;
-    if (!unique.has(key)) unique.set(key, finding);
+    const known = unique.get(key);
+    if (!known) {
+      unique.set(key, finding);
+    } else if (finding.links) {
+      // The same red flag in several links: mark all of them.
+      const links = new Set([...(known.links ?? []), ...finding.links]);
+      unique.set(key, { ...known, links: [...links].toSorted((a, b) => a - b) });
+    }
   }
   return [...unique.values()]
     .sort((a, b) => ORDER[a.severity] - ORDER[b.severity])

@@ -18,10 +18,14 @@ The code is in [`src/rules/`](../src/rules/); the entry point is `checkEmail(ema
    full stop read as a dot, lowercase, typographic apostrophes as `'`.
 3. **Rules:** completeness, headers, sender, lookalike domains, links, pressure phrases and
    Unicode tricks.
-4. **Result:** each finding once, the most severe first, at most 30 per email.
+4. **Result:** each finding once, the most severe first, at most 30 per email. When the same red
+   flag comes from several links, the one finding names all of them.
 
 A finding has a rule id, a severity, one English sentence and the evidence (the link, domain or
-phrases that triggered it, each cut to 200 characters).
+phrases that triggered it, each cut to 200 characters). Findings of the link and lookalike rules
+also name the positions of their links (`links`), so the side panel can mark those links. A
+lookalike finding marks every link that goes to the lookalike domain, directly or by forwarding;
+a lookalike sender domain marks no link.
 
 | Severity                 | Meaning                                                |
 | ------------------------ | ------------------------------------------------------ |
