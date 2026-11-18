@@ -44,11 +44,19 @@ are its input and its lower limit.
      notes, with our own advice. Gemini Nano rated a real Google security notice as suspicious
      even with the sender checks in its data. Phishing from a confirmed but hijacked sender
      almost always trips the rules too (requests for identity, log-in or card details, payments).
-5. **When:**
+5. **Traffic light:** the verdict is shown as a block above the email details, with a colour, a
+   symbol and a word per level (green ✓, yellow !, red ✕). Until the AI has answered, the rules'
+   verdict shows, except that "no red flags" stays grey ("Checking…"): the AI may still raise it,
+   and nobody should act on an early "safe". Without a model, the rules' verdict stands, green
+   included. Only the verdict line is a live region for screen readers; the status line with its
+   seconds is not.
+6. **When:**
    - one check at a time; while one runs, only the newest email waits, and results for an email
      that is no longer shown are dropped;
    - a check starts once the shown email has not changed for 0.5 s (Gmail shows an email several
      times within a moment); the same email with the same findings uses a running check's answer;
+   - the last 20 answers stay in memory while the panel is open: an email shown again gets its
+     answer at once; failed runs are not kept, so they are tried again;
    - the panel first waits for the model to load (that can take minutes in a bad Chrome state);
      the run's 60 s limit starts when it asks the model; the status shows the seconds;
    - without the model, the panel offers "Download the on-device model": Chrome starts the
@@ -56,7 +64,7 @@ are its input and its lower limit.
    - a Gmail email waits for its headers, but at most 3 s;
    - without a ready on-device model there is no AI check; the panel says so and the rules stand
      alone.
-6. **Language:** Chrome's UI language if the AI supports it (`AI_LANGUAGES`: en, de, fr, es, it,
+7. **Language:** Chrome's UI language if the AI supports it (`AI_LANGUAGES`: en, de, fr, es, it,
    pt), otherwise English. Each answer language gets its own on-device model with exactly that
    output language. Gemini Nano accepts Italian and Portuguese but marks them experimental
    (measured 17 Nov 2026; supported are de, en, es, fr, ja), so the panel says so.

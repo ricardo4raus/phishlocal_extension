@@ -64,6 +64,10 @@ explain every red flag, and work offline, with a cloud only as fallback."
   the SDK does not pass `systemInstruction` on-device) and a JSON data block between random
   markers; the answer is constrained to `VERDICT_SCHEMA`, read strictly by `parseVerdict()`, and
   the rules are its lower limit. Details and limits: `docs/ai-check.md`.
+- Result UI (`feat/result-ui`): the verdict is a traffic light above the details (`data-risk` on
+  `#verdict`; grey "Checking…" until the AI answers if the rules found nothing). Links show the
+  real domain, a shortened URL (`src/sidepanel/link-display.ts`) and a mark when a finding names
+  them (`Finding.links`, set by the link and lookalike rules).
 - Automatic scan: while the side panel is open, it keeps a port to the active tab
   (`src/sidepanel/watch.ts`, `src/messages.ts`); the content script (`src/content/gmail-watch.ts`)
   reports every opened email and loads its "Show original" page for the headers

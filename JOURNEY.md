@@ -60,6 +60,9 @@ _Current state, updated as features land._
   dangerous, with up to five reasons and one piece of advice in the user's language. The rule
   checks are its lower limit: the AI can raise the verdict, never lower it.
 - The rule checks cover English, German, French, Spanish, Italian and Portuguese.
+- The verdict is a traffic light at the top (green, yellow, red, each with a symbol and a word);
+  it stays grey until the AI has answered, unless the rules already found a warning. Each link
+  shows its real domain in bold and a shortened URL, and links behind a red flag are marked.
 
 ## How we built it
 
@@ -240,6 +243,8 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   That makes "read only while the panel is open" a property of the code, not a promise.
 - The tricks we flag in emails can fool our own UI: a right-to-left override reversed text in
   the side panel too, so the panel now shows it as `<U+202E>`.
+- A verdict UI is a security control too: showing "safe" in green before every check has
+  answered tells the user to act on half a result. Grey "Checking…" is the honest state.
 
 ## Accomplishments we're proud of
 
@@ -474,3 +479,19 @@ _To fill in near the submission._
   counted against the 60 s limit, and Gmail's repeated display of an email still wasted runs.
   Fixed: a download button with progress, a separate wait for the model, and a check that starts
   only once the email has not changed for half a second.
+
+### Wed 18 Nov 2026
+
+**Session with Claude Code (continued):**
+
+- Ricardo tested the fixes in Chrome ("works now"); PR #13 (AI check) merged.
+- Result UI (`feat/result-ui`, planned for Fri 20 Nov). Reviewing the plan before coding changed
+  it in eight places. The biggest: lookalike findings cover a domain, not one link, so a finding
+  now names all its links; and a green light before the AI has answered would invite a click, so
+  the light stays grey until then.
+- Built in small commits: a helper that shows a link's real domain and a shortened URL (the host
+  is never cut, the decoy before an "@" is left out), link positions in the findings, a numbered
+  link list with marks, and the traffic light with a symbol and a word for each level.
+- Self-review found that an email shown again (Gmail renders it anew, or the user goes back to
+  it) started a new AI run and turned the light grey again. The panel now keeps the last 20
+  answers in memory; a test fails without the fix.

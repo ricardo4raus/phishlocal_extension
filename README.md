@@ -32,6 +32,11 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   dangerous) with up to five reasons and one piece of advice, in your language. The rule checks
   are its lower limit, so an email that talks the AI into "safe" still shows as dangerous. How it
   works and how it resists prompt injection: [`docs/ai-check.md`](docs/ai-check.md).
+- **Traffic light at the top:** green, yellow or red, each with its own symbol and word. It stays
+  grey ("Checking…") until the AI has answered, unless the rules already found a warning.
+- **Links at a glance:** every link shows where it really goes (the domain in bold, also the final
+  target of a forwarding link), a shortened URL (the full one as tooltip) and its text. Links
+  behind a red flag are marked, and each red flag names its links ("link 2").
 - **Hybrid AI:** a test prompt runs through Firebase AI Logic with
   `InferenceMode.PREFER_ON_DEVICE`. Gemini Nano answers on the device; the cloud (Gemini
   Developer API) is the fallback. The panel loads the on-device model when it opens and shows
