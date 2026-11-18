@@ -209,7 +209,7 @@ setUpPaste(
 async function warmUp(): Promise<void> {
   const start = performance.now();
   const showLoading = (): void => {
-    modelStatus.textContent = `Loading on-device model… ${seconds(performance.now() - start)}`;
+    modelStatus.textContent = `Loading on-device model… ${seconds(performance.now() - start)} (the first time after Chrome starts, this can take a few minutes)`;
   };
   showLoading();
   const timer = setInterval(showLoading, 1000);

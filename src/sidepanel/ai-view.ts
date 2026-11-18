@@ -113,6 +113,8 @@ interface Request {
   phase?: 'model' | 'run';
   /** Stops the run while it asks the model. */
   stop?: AbortController;
+  /** 2 while the check runs a second time after a failure. */
+  attempt?: number;
 }
 
 /**
@@ -133,6 +135,17 @@ export const STOP_GRACE_MS = 2_000;
 
 /** How many recent AI answers are kept for emails shown again. */
 export const MAX_REMEMBERED = 20;
+
+/**
+ * Waiting for the model longer than this means Chrome is really loading it; a loaded model is
+ * ready in about 0 s. Shorter waits show "running", so the loading text does not flash on every
+ * check.
+ */
+export const LOADING_HINT_MS = 1_000;
+
+/** Results worth one more try: the model may have crashed or answered badly once. */
+const retryable = (result: AiCheckResult): boolean =>
+  !result.ok && (result.reason === 'failed' || result.reason === 'unreadable-answer');
 
 const seconds = (ms: number): string => `${Math.round(ms / 1000)} s`;
 
@@ -164,11 +177,14 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   const tick = (): void => {
     const now = performance.now();
     if (current?.id === shownId) {
+      const elapsed = now - current.since;
+      const second = current.attempt === 2 ? ' (second try)' : '';
       set(
         elements.status,
-        current.phase === 'model'
-          ? `AI check waits for the on-device model to load… ${seconds(now - current.since)}`
-          : `AI check running on this device… ${seconds(now - current.since)}`,
+        current.phase === 'model' && elapsed >= LOADING_HINT_MS
+          ? 'Rule checks done. The on-device AI is still loading (the first time after Chrome ' +
+              `starts, this can take a few minutes); the result appears here by itself. ${seconds(elapsed)}`
+          : `AI check running on this device${second}… ${seconds(elapsed)}`,
       );
     } else if (waiting?.id === shownId && current) {
       set(
@@ -222,14 +238,15 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   function showResult(request: Request, result: AiCheckResult): void {
     elements.status.classList.remove('ai-failed');
     if (!result.ok) {
+      const twice = request.attempt === 2;
       const note =
         result.reason === 'no-model'
           ? 'AI check not available: the on-device model is not ready. Rule checks only.'
           : result.reason === 'failed'
-            ? `The AI check failed (${result.detail ?? 'unknown error'}). The rule checks still apply.`
+            ? `The AI check failed${twice ? ' twice' : ''} (${result.detail ?? 'unknown error'}). The rule checks still apply.`
             : result.reason === 'stopped'
               ? 'The AI check was stopped. The rule checks still apply.'
-              : 'The AI answer could not be read. The rule checks still apply.';
+              : `The AI answer could not be read${twice ? ', also on a second try' : ''}. The rule checks still apply.`;
       showRulesOnly(request, note, false, result.reason !== 'no-model');
       return;
     }
@@ -313,26 +330,41 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     if (current && current.key !== key) current.stop?.abort();
   };
 
+  /**
+   * One try: waits for the model (a load does not count against the run's time limit; after a
+   * crash, Chrome loads it again here), then runs the check.
+   */
+  async function tryOnce(request: Request): Promise<AiCheckResult> {
+    request.phase = 'model';
+    request.since = performance.now();
+    startTicker();
+    const ready = await deps.modelReady(request.language).catch(() => false);
+    // Another email was opened while the model loaded: do not spend the model on this one.
+    if (request.id !== shownId) return { ok: false, reason: 'stopped' };
+    if (!ready) return { ok: false, reason: 'no-model' };
+    request.phase = 'run';
+    request.since = performance.now();
+    tick();
+    return runOnce(request);
+  }
+
   async function drain(): Promise<void> {
     if (current) return;
     for (let request = waiting; request; request = waiting) {
       waiting = undefined;
       if (request.id !== shownId) continue;
-      current = { ...request, since: performance.now(), phase: 'model' };
-      startTicker();
-      // Loading the model does not count against the run's time limit.
-      const ready = await deps.modelReady(current.language).catch(() => false);
-      let result: AiCheckResult;
-      if (current.id !== shownId) {
-        // Another email was opened while the model loaded: do not spend the model on this one.
-        result = { ok: false, reason: 'stopped' };
-      } else if (ready) {
-        current.phase = 'run';
-        current.since = performance.now();
-        tick();
-        result = await runOnce(current);
-      } else {
-        result = { ok: false, reason: 'no-model' };
+      current = { ...request, attempt: 1 };
+      let result = await tryOnce(current);
+      // One more try for a run that failed (e.g. Chrome's model crashed) while its email is shown.
+      if (retryable(result) && current.id === shownId) {
+        current.attempt = 2;
+        const second = await tryOnce(current);
+        if (!second.ok && second.reason === 'no-model') {
+          // The model could not be loaded for the second try: the first failure says more.
+          current.attempt = 1;
+        } else {
+          result = second;
+        }
       }
       const finished = current;
       current = undefined;

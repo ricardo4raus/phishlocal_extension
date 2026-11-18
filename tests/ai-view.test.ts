@@ -9,6 +9,7 @@ import {
   type AiCheckDeps,
   createAiCheck,
   HEADERS_WAIT_MS,
+  LOADING_HINT_MS,
   MAX_REMEMBERED,
   RUN_TIMEOUT_MS,
   STABLE_MS,
@@ -257,7 +258,9 @@ describe('AI check view', () => {
       });
     await show(email);
     await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS + 5_000);
-    expect(text('status')).toBe('AI check waits for the on-device model to load… 65 s');
+    expect(text('status')).toMatch(
+      /^Rule checks done\. The on-device AI is still loading \(.*\); the result appears here by itself\. 65 s$/,
+    );
     expect(prompts).toHaveLength(0);
     loaded?.(true);
     await vi.advanceTimersByTimeAsync(2_000);
@@ -278,19 +281,25 @@ describe('AI check view', () => {
     // The rules failed (no findings): at least "suspicious".
     check.shown(email, undefined, true);
     await vi.advanceTimersByTimeAsync(STABLE_MS);
+    // Each failure is tried once more.
+    await answer({ ok: false, reason: 'unreadable-answer' });
     await answer({ ok: false, reason: 'unreadable-answer' });
     expect(text('overall')).toBe('Suspicious (rule checks only: the AI check failed)');
-    expect(text('status')).toMatch(/could not be read/);
+    expect(text('status')).toBe(
+      'The AI answer could not be read, also on a second try. The rule checks still apply.',
+    );
     await show({ ...email, subject: 'Too long' });
     await answer({ ok: false, reason: 'failed', detail: 'The input is too large.' });
+    await answer({ ok: false, reason: 'failed', detail: 'The input is too large.' });
     expect(text('status')).toBe(
-      'The AI check failed (The input is too large.). The rule checks still apply.',
+      'The AI check failed twice (The input is too large.). The rule checks still apply.',
     );
   });
 
   it('says on the verdict line when the AI check failed, also for a green light', async () => {
     await show(email);
-    await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS);
+    // Both tries reach the time limit.
+    await vi.advanceTimersByTimeAsync(2 * RUN_TIMEOUT_MS);
     expect(get('verdict').dataset.risk).toBe('safe');
     expect(text('overall')).toBe('No signs of phishing (rule checks only: the AI check failed)');
     expect(get('status').classList.contains('ai-failed')).toBe(true);
@@ -342,17 +351,18 @@ describe('AI check view', () => {
     await answer(verdict('dangerous', 'Delete it.'));
     await show({ ...email, subject: 'Other' });
     await answer({ ok: false, reason: 'failed', detail: 'boom' });
+    await answer({ ok: false, reason: 'failed', detail: 'boom' });
+    expect(prompts).toHaveLength(3);
 
     check.shown(email, [], false);
-    expect(prompts).toHaveLength(2);
     expect(get('verdict').dataset.risk).toBe('dangerous');
     expect(text('advice')).toBe('Delete it.');
     await vi.advanceTimersByTimeAsync(HEADERS_WAIT_MS);
-    expect(prompts).toHaveLength(2);
+    expect(prompts).toHaveLength(3);
 
     // A failed run is not remembered: it is tried again.
     await show({ ...email, subject: 'Other' });
-    expect(prompts).toHaveLength(3);
+    expect(prompts).toHaveLength(4);
   });
 
   it('remembers only the most recent answers', async () => {
@@ -426,11 +436,15 @@ describe('AI check view', () => {
     await show(email);
     await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS);
     expect(signals[0]?.aborted).toBe(true);
+    // The second try starts at once and reaches the limit too.
+    expect(text('status')).toBe('AI check running on this device (second try)… 0 s');
+    await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS);
+    expect(signals[1]?.aborted).toBe(true);
     expect(text('status')).toBe(
-      'The AI check failed (no answer within 60 s; the model had written 0 characters). The rule checks still apply.',
+      'The AI check failed twice (no answer within 60 s; the model had written 0 characters). The rule checks still apply.',
     );
     await show({ ...email, subject: 'Next' });
-    expect(prompts).toHaveLength(2);
+    expect(prompts).toHaveLength(3);
     await answer(verdict('dangerous'));
     expect(text('overall')).toBe('Dangerous');
   });
@@ -444,8 +458,65 @@ describe('AI check view', () => {
       uiLanguage: () => 'en',
     });
     await show({ ...email, subject: 'Broken' });
-    expect(text('status')).toBe('The AI check failed (boom). The rule checks still apply.');
+    expect(text('status')).toBe('The AI check failed twice (boom). The rule checks still apply.');
     await show(email);
     expect(text('overall')).toBe('Suspicious');
+  });
+
+  it('tries a failed check once more, reloading the model first, and shows the answer', async () => {
+    let loads = 0;
+    modelReady = async () => {
+      loads++;
+      return true;
+    };
+    await show(email);
+    await answer({ ok: false, reason: 'failed', detail: 'Session crashed' });
+    expect(loads).toBe(2);
+    expect(prompts).toHaveLength(2);
+    expect(text('status')).toBe('AI check running on this device (second try)… 0 s');
+    expect(text('overall')).toBe('Checking… (the rule checks found no red flags)');
+    await answer(verdict('suspicious'));
+    expect(text('overall')).toBe('Suspicious');
+    expect(get('status').classList.contains('ai-failed')).toBe(false);
+  });
+
+  it('does not try again without a model, after a stop, or for an email that is gone', async () => {
+    // No model for the second try: the first failure is shown, as a single failure.
+    let tries = 0;
+    modelReady = async () => ++tries === 1;
+    await show(email);
+    await answer({ ok: false, reason: 'failed', detail: 'Session crashed' });
+    expect(prompts).toHaveLength(1);
+    expect(text('status')).toBe(
+      'The AI check failed (Session crashed). The rule checks still apply.',
+    );
+
+    // A stopped run (its email was left) is not tried again.
+    modelReady = async () => true;
+    await show({ ...email, subject: 'First' });
+    await show({ ...email, subject: 'Second' });
+    expect(prompts).toHaveLength(3);
+    expect(prompts[2]).toMatch(/Second/);
+
+    // The email is gone when the first try fails: no second try.
+    pending.shift()?.({ ok: false, reason: 'failed', detail: 'boom' });
+    check.hidden();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(prompts).toHaveLength(3);
+  });
+
+  it('shows the loading text only when the model really takes time to load', async () => {
+    let loaded: ((ready: boolean) => void) | undefined;
+    const ready = new Promise<boolean>((resolve) => {
+      loaded = resolve;
+    });
+    modelReady = () => ready;
+    await show(email);
+    expect(text('status')).toBe('AI check running on this device… 0 s');
+    await vi.advanceTimersByTimeAsync(LOADING_HINT_MS);
+    expect(text('status')).toMatch(/^Rule checks done\. The on-device AI is still loading/);
+    loaded?.(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(text('status')).toBe('AI check running on this device… 0 s');
   });
 });
