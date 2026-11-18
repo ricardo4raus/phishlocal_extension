@@ -33,21 +33,34 @@ const hybridModel = getGenerativeModel(ai, {
 });
 
 /**
- * The AI check of real emails: on-device only, so no email ever reaches the cloud without the
- * user's consent (the consent step is planned for 21 Nov). The system message goes in as the
- * session's first prompt, because the SDK does not pass `systemInstruction` to the on-device
- * model; the answer is constrained to the verdict JSON schema.
+ * The session settings of the AI check in one answer language. The warm-up loads exactly these:
+ * Chrome loads the model once per settings, and that first load can take minutes. Measured
+ * 19 Nov 2026: a session with the warm-up's former settings (all four output languages, no
+ * system message) was ready in 3.6 s, yet the first check session (one output language, the
+ * system message) then took 249 s to create; every later one took 0.0 s.
+ *
+ * The system message goes in as the session's first prompt, because the SDK does not pass
+ * `systemInstruction` to the on-device model.
  */
-function createCheckModel(language: string) {
+function checkSessionOptions(language: string): LanguageModelCreateOptions {
   // Chrome needs the exact output language; inputs may be in any supported language.
   const inputs = ON_DEVICE_LANGUAGES.includes(language)
     ? ON_DEVICE_LANGUAGES
     : [...ON_DEVICE_LANGUAGES, language];
-  const sessionOptions: LanguageModelCreateOptions = {
+  return {
     expectedInputs: [{ type: 'text', languages: inputs }],
     expectedOutputs: [{ type: 'text', languages: [language] }],
     initialPrompts: [{ role: 'system', content: [{ type: 'text', value: SYSTEM_PROMPT }] }],
   };
+}
+
+/**
+ * The AI check of real emails: on-device only, so no email ever reaches the cloud without the
+ * user's consent (the consent step is planned for 21 Nov). The answer is constrained to the
+ * verdict JSON schema.
+ */
+function createCheckModel(language: string) {
+  const sessionOptions = checkSessionOptions(language);
   // Chrome's prompt() takes a `signal`; the SDK's type does not list it.
   const promptOptions: LanguageModelPromptOptions & { signal?: AbortSignal } = {
     responseConstraint: VERDICT_SCHEMA,
@@ -85,9 +98,9 @@ export async function runPrompt(prompt: string, forceCloud = false): Promise<Pro
   const model = forceCloud ? cloudModel : hybridModel;
   const start = performance.now();
   if (!forceCloud) {
-    // If the warm-up is still loading the model, wait for it instead of letting the SDK start a
-    // second load. A failed warm-up is not fatal here: the SDK decides on its own.
-    await warmUpOnDevice().catch(() => undefined);
+    // If a warm-up is still loading the model, wait for it instead of letting the SDK start a
+    // second load at the same time. A failed warm-up is not fatal here: the SDK decides.
+    await Promise.allSettled(warmUps.values());
   }
   const { response } = await model.generateContent(prompt);
   return {
@@ -133,7 +146,7 @@ export async function runAiCheck(
   knownAddresses: ReadonlySet<string> = new Set(),
   signal?: AbortSignal,
 ): Promise<AiCheckResult> {
-  const model = await warmUpOnDevice().catch(() => undefined);
+  const model = await warmUpOnDevice(language).catch(() => undefined);
   if (model?.state !== 'ready') return { ok: false, reason: 'no-model' };
   // Without Chrome's Prompt API the SDK creates no on-device adapter and then sends even
   // ONLY_ON_DEVICE requests to the cloud (`callCloudOrDevice`). An email must never get there.
@@ -179,37 +192,43 @@ export type WarmUpResult =
   | { state: 'unavailable' };
 
 /**
- * Kept open so Chrome keeps the model in memory while the side panel is open. Never read: holding
- * the reference is the whole point (it stops the session from being garbage-collected).
+ * Kept open so Chrome keeps the model in memory while the side panel is open, one per answer
+ * language. Never read: holding the reference is the whole point (it stops the session from
+ * being garbage-collected).
  */
-// oxlint-disable-next-line no-unused-vars
-let warmSession: LanguageModelSession | undefined;
+const warmSessions = new Map<string, LanguageModelSession>();
 
-/** The one warm-up run, shared by every caller so the model is never loaded twice in parallel. */
-let warmUp: Promise<WarmUpResult> | undefined;
+/** The warm-up run per answer language, shared by every caller, so nothing loads twice. */
+const warmUps = new Map<string, Promise<WarmUpResult>>();
 
-async function loadOnDeviceModel(): Promise<WarmUpResult> {
+async function loadOnDeviceModel(language: string): Promise<WarmUpResult> {
   if (typeof LanguageModel === 'undefined') return { state: 'unavailable' };
 
-  const availability = await LanguageModel.availability(createOptions());
+  const availability = await LanguageModel.availability(checkSessionOptions(language));
   if (availability === 'unavailable') return { state: 'unavailable' };
   if (availability !== 'available') return { state: 'not-downloaded' };
 
   const start = performance.now();
-  warmSession = await LanguageModel.create(createOptions());
+  warmSessions.set(language, await LanguageModel.create(checkSessionOptions(language)));
   return { state: 'ready', durationMs: performance.now() - start };
 }
 
 /**
- * Loads Gemini Nano into memory before the first prompt. Loading can take minutes; afterwards
- * every new session (the SDK creates one per prompt) starts in about 0.1 s. Sends no data and
- * starts no download. Every call returns the same run; after a failure the next call retries.
+ * Loads Gemini Nano for the AI check in `language` before the first check, with exactly the
+ * check's session settings (see checkSessionOptions). Loading can take minutes; afterwards every
+ * new check session (the SDK creates one per prompt) starts at once. Sends no data and starts no
+ * download. Every call for a language returns the same run; after a failure the next call
+ * retries.
  */
-export function warmUpOnDevice(): Promise<WarmUpResult> {
-  warmUp ??= loadOnDeviceModel().catch((error: unknown) => {
-    warmUp = undefined;
-    throw error;
-  });
+export function warmUpOnDevice(language: string): Promise<WarmUpResult> {
+  let warmUp = warmUps.get(language);
+  if (!warmUp) {
+    warmUp = loadOnDeviceModel(language).catch((error: unknown) => {
+      warmUps.delete(language);
+      throw error;
+    });
+    warmUps.set(language, warmUp);
+  }
   return warmUp;
 }
 
@@ -219,17 +238,19 @@ export function warmUpOnDevice(): Promise<WarmUpResult> {
  * Without it, a fresh Chrome profile never gets the model and the AI check never runs.
  */
 export async function downloadOnDeviceModel(
+  language: string,
   onProgress: (loaded: number) => void,
 ): Promise<WarmUpResult> {
   if (typeof LanguageModel === 'undefined') return { state: 'unavailable' };
   const start = performance.now();
-  warmSession = await LanguageModel.create({
-    ...createOptions(),
+  const session = await LanguageModel.create({
+    ...checkSessionOptions(language),
     monitor: (monitor) => {
       monitor.addEventListener('downloadprogress', (event) => onProgress(event.loaded));
     },
   });
+  warmSessions.set(language, session);
   const result: WarmUpResult = { state: 'ready', durationMs: performance.now() - start };
-  warmUp = Promise.resolve(result);
+  warmUps.set(language, Promise.resolve(result));
   return result;
 }

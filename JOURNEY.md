@@ -250,6 +250,10 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   none for on-device prompts.
 - `InferenceMode.ONLY_ON_DEVICE` is not a guarantee by itself: without Chrome's Prompt API the
   SDK quietly uses the cloud. "Only on device" has to be checked by our own code too.
+- A warm-up only helps if it warms the right thing: Chrome loads Gemini Nano once per session
+  settings, so a warm-up with other settings than the real call leaves the slow load in the
+  real call. Count what the model wrote before a timeout: "0 characters" pointed straight at
+  session creation.
 
 ## Accomplishments we're proud of
 
@@ -526,3 +530,16 @@ _To fill in near the submission._
   loads. Ricardo chose automatic injection into open Gmail tabs, which needs the `scripting`
   permission and host access to Gmail (the same install warning as before). The answer cache
   stays in the panel's memory only, as Ricardo decided.
+
+### Thu 19 Nov 2026
+
+**Session with Claude Code (continued):**
+
+- Chrome test: the AI check worked once, then failed again with "no answer within 60 s; the
+  model had written 0 characters", so the model hung before its first word. Ricardo ran a
+  timing snippet in the side panel's console: the first session with the check's settings took
+  249 s to create, the next four 0.0 s, and each answer came in about 2 s. The warm-up had loaded
+  the model with other settings (all four output languages, no system message), and Chrome loads
+  the model once per settings, so the first check did the slow load inside its 60 s limit.
+  Fixed: the warm-up uses exactly the check's settings; a test fails if they differ. The snippet
+  also confirmed that Chrome streams the answer in pieces.

@@ -59,10 +59,25 @@ afterEach(() => {
 describe('runAiCheck through the Firebase SDK', () => {
   it('never reaches the cloud when the Prompt API is gone', async () => {
     const { runAiCheck, warmUpOnDevice } = await import('../../src/ai');
-    expect((await warmUpOnDevice()).state).toBe('ready');
+    expect((await warmUpOnDevice('en')).state).toBe('ready');
     // The SDK would build the check model without its on-device path and use the cloud.
     vi.stubGlobal('LanguageModel', undefined);
     expect(await runAiCheck('prompt', 'en')).toEqual({ ok: false, reason: 'no-model' });
+  });
+
+  it('warms up with exactly the session settings the check then uses', async () => {
+    write = (controller) => {
+      controller.enqueue('{"risk":"safe","reasons":[],"advice":""}');
+      controller.close();
+    };
+    const { runAiCheck, warmUpOnDevice } = await import('../../src/ai');
+    await warmUpOnDevice('de');
+    await runAiCheck('prompt', 'de');
+    // Chrome loads the model once per settings; a first load with other settings took 249 s.
+    const [warmUp, check] = creates.map(({ signal: _signal, ...settings }) => settings);
+    expect(creates).toHaveLength(2);
+    expect(check).toEqual(warmUp);
+    expect(warmUp).toMatchObject({ expectedOutputs: [{ type: 'text', languages: ['de'] }] });
   });
 
   it('reads a streamed answer and passes the stop signal to Chrome', async () => {

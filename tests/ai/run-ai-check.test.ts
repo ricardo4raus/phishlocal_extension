@@ -172,11 +172,11 @@ describe('runAiCheck', () => {
     });
     const { downloadOnDeviceModel, warmUpOnDevice } = await import('../../src/ai');
     const progress: number[] = [];
-    const result = await downloadOnDeviceModel((loaded) => progress.push(loaded));
+    const result = await downloadOnDeviceModel('de', (loaded) => progress.push(loaded));
     expect(result.state).toBe('ready');
     expect(progress).toEqual([0.5, 1]);
     // The warm-up now reports ready without loading again.
-    expect((await warmUpOnDevice()).state).toBe('ready');
+    expect((await warmUpOnDevice('de')).state).toBe('ready');
     expect(created).toHaveLength(1);
   });
 });

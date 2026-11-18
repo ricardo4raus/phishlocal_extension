@@ -84,7 +84,7 @@ export interface AiCheckDeps {
    * Waits until the on-device model is loaded (that can take minutes in a bad Chrome state) and
    * says whether it is ready. The run's time limit starts only after that.
    */
-  modelReady: () => Promise<boolean>;
+  modelReady: (language: string) => Promise<boolean>;
   headersWaitMs?: number;
 }
 
@@ -321,7 +321,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       current = { ...request, since: performance.now(), phase: 'model' };
       startTicker();
       // Loading the model does not count against the run's time limit.
-      const ready = await deps.modelReady().catch(() => false);
+      const ready = await deps.modelReady(current.language).catch(() => false);
       let result: AiCheckResult;
       if (current.id !== shownId) {
         // Another email was opened while the model loaded: do not spend the model on this one.

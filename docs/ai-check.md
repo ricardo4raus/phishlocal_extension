@@ -73,6 +73,10 @@ are its input and its lower limit.
      times within a moment); the same email with the same findings uses a running check's answer;
    - the last 20 answers stay in memory while the panel is open: an email shown again gets its
      answer at once; failed runs are not kept, so they are tried again;
+   - when the panel opens, it loads the model with exactly the check's session settings (answer
+     language and system message): Chrome loads the model once per settings, and a first session
+     with other settings took 249 s although the warm-up's own session was ready in 3.6 s
+     (measured 19 Nov 2026; every later session took 0.0 s);
    - the panel first waits for the model to load (that can take minutes in a bad Chrome state);
      the run's 60 s limit starts when it asks the model; the status shows the seconds; after the
      limit the run is stopped, and the message says how far the model had come ("the model had

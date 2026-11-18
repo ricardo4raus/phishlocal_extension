@@ -6,6 +6,7 @@ import {
   warmUpOnDevice,
   type WarmUpResult,
 } from '../ai';
+import { answerLanguage } from '../ai/prompt';
 import { appCheckEnabled } from '../firebase';
 import type { Email } from '../email';
 import { checkEmail } from '../rules';
@@ -122,6 +123,9 @@ const emailElements = {
 };
 const findingsList = byId<HTMLUListElement>('email-findings');
 
+/** The AI check's answer language; the warm-up loads the model for exactly this one. */
+const checkLanguage = answerLanguage(chrome.i18n.getUILanguage());
+
 // The AI check of every shown email: on-device only, with the rules as its lower limit.
 const aiCheck = createAiCheck(
   {
@@ -134,7 +138,8 @@ const aiCheck = createAiCheck(
   {
     run: runAiCheck,
     uiLanguage: () => chrome.i18n.getUILanguage(),
-    modelReady: async () => (await warmUpOnDevice().catch(() => undefined))?.state === 'ready',
+    modelReady: async (language) =>
+      (await warmUpOnDevice(language).catch(() => undefined))?.state === 'ready',
   },
 );
 
@@ -210,7 +215,7 @@ async function warmUp(): Promise<void> {
   const timer = setInterval(showLoading, 1000);
 
   try {
-    const result = await warmUpOnDevice();
+    const result = await warmUpOnDevice(checkLanguage);
     modelState = result.state;
     if (result.state === 'ready') {
       modelStatus.textContent = `On-device model ready (loaded in ${seconds(result.durationMs)})`;
@@ -236,7 +241,7 @@ async function downloadModel(): Promise<void> {
   modelDownload.disabled = true;
   modelStatus.textContent = 'Downloading the on-device model… 0 %';
   try {
-    const result = await downloadOnDeviceModel((loaded) => {
+    const result = await downloadOnDeviceModel(checkLanguage, (loaded) => {
       modelStatus.textContent = `Downloading the on-device model… ${Math.round(loaded * 100)} %`;
     });
     modelState = result.state;
