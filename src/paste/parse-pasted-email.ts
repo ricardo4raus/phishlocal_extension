@@ -117,7 +117,11 @@ function parseLimited(html: string): { document: HtmlNode; complete: boolean } {
     },
   };
   try {
-    parse(tooLarge ? html.slice(0, MAX_PASTE_HTML_CHARS) : html, { treeAdapter });
+    // Lone surrogates become U+FFFD first: parse5 8.0.1 throws "Invalid code point" on two low
+    // surrogates in a row ("\udfff\udc00"), so one such pair made the whole email unreadable
+    // (found by the monkey test). A browser never sends them; a pasting page's script can.
+    const input = (tooLarge ? html.slice(0, MAX_PASTE_HTML_CHARS) : html).toWellFormed();
+    parse(input, { treeAdapter });
     return { document, complete: !tooLarge };
   } catch (error) {
     if (error instanceof TooDeep) return { document, complete: false };

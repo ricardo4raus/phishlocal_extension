@@ -15,6 +15,13 @@ describe('parsePastedEmail', () => {
     expect(typeof DOMParser).toBe('undefined');
   });
 
+  it('reads HTML with lone surrogates, which made parse5 throw', () => {
+    // Found by the monkey test: two low surrogates in a row ("Invalid code point").
+    const lowLow = String.fromCharCode(0xdfff, 0xdc00);
+    const content = readHtml(`<a href="https://evil.example/">x${lowLow}</a>`);
+    expect(content.links).toEqual([{ text: 'x��', href: 'https://evil.example/' }]);
+  });
+
   it('takes the text from text/plain and the links from text/html', () => {
     const email = parsePastedEmail({
       text: 'Your account is locked.\nConfirm here: paypal.com',
