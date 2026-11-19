@@ -74,7 +74,14 @@ const arabicIndic = (digits: string): string =>
  * by design: the pattern needs 9 characters, so amounts and short numbers stay readable.
  */
 function plantedPhoneShown(text: string): boolean {
-  const withoutDates = text.replace(/(?<!\d)\d{1,2}\.\d{1,2}\.\d{4}(?!\d)/g, ' ');
+  // Only plausible dates: "48.73.2026" is a planted number, not a date.
+  const withoutDates = text.replace(
+    /(?<!\d)(\d{1,2})\.(\d{1,2})\.\d{4}(?!\d)/g,
+    (date, day: string, month: string) =>
+      Number(day) >= 1 && Number(day) <= 31 && Number(month) >= 1 && Number(month) <= 12
+        ? ' '
+        : date,
+  );
   const runs =
     withoutDates.match(
       /\p{Nd}(?:[\s\p{Pd}()./\u2212\u00b7\u2022\u2027\u2219\u30fb\u2044\u2215]*\p{Nd})*/gu,
@@ -119,7 +126,7 @@ function randomAnswer(rng: Rng, known: string): string {
         `${rng.pick(['ftp', 'hxxp', 'chrome-extension', 'x'])}://evil.example/login`,
         `+49 30/1234${rng.pick(['-', '\u2013', ' ', '/', '\u2212', '\u00b7', '\u2022', '\u301c', '\u30fb', ' -- '])}56789`,
         // Shaped like dates, but not dates: must go too.
-        `call ${rng.pick(['0791-2345', '555-12-3456', '079.12.3456', '48.73.2026'])} now`,
+        `call ${rng.pick(['0791-23456', '555-12-3456', '079.12.3456', '48.73.2026'])} now`,
         `call ${arabicIndic('48')}.${arabicIndic('73')}.${arabicIndic('2026')} now`,
         // A date between the groups of a phone number.
         `call 079 ${rng.pick(['19.11.2026', '1.2.2026'])} ${rng.pick(['123 4567', '1234567'])}`,
@@ -171,6 +178,16 @@ describe('monkey: rule checks', () => {
       // No hidden state (e.g. a global regex's lastIndex): the same email, the same findings.
       expect(checkEmail(email)).toEqual(findings);
     });
+  });
+});
+
+describe('monkey: phone check of the monkey itself', () => {
+  it('sees planted numbers, also behind a date, but not a date alone', () => {
+    expect(plantedPhoneShown('call 48.73.2026 now')).toBe(true);
+    expect(plantedPhoneShown('call 079 19.11.2026 123 4567')).toBe(true);
+    expect(plantedPhoneShown('call +1 555 123 4567')).toBe(true);
+    expect(plantedPhoneShown('pay by 19.11.2026')).toBe(false);
+    expect(plantedPhoneShown('call [removed] now')).toBe(false);
   });
 });
 
