@@ -41,14 +41,19 @@ export interface AiVerdict {
  * keep bare domains ("the link goes to paypa1.com" is the explanation users need); advice drops
  * them too, because advice should never send anyone anywhere.
  */
-// No \b in front: a link glued to a word ("4567https://evil.example") must go too.
-const FULL_URL = /(?:https?:\/\/|www\.)\S+/gi;
+// Any scheme ("ftp://", not only "https://"), and no \b in front: a link glued to a word
+// ("4567https://evil.example") must go too.
+const FULL_URL = /(?:[a-z][a-z\d+.-]*:\/\/|www\.)\S+/gi;
 const EMAIL_ADDRESS = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
-const PHONE_NUMBER = /\+?\d[\d ().-]{7,}\d/g;
+// Digits of any script (Arabic-Indic too), and "/" or dashes between the groups.
+const PHONE_NUMBER = /\+?\p{Nd}[\p{Nd} ()./\u2010-\u2015-]{7,}\p{Nd}/gu;
 const BARE_DOMAIN = /\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,24}\b(?:\/\S*)?/gi;
 
 /** Invisible format characters (zero-width, soft hyphen, direction controls). */
 const INVISIBLE = /\p{Cf}/gu;
+
+/** The ideographic full stop, which NFKC keeps (its halfwidth form becomes it): read as "." */
+const IDEOGRAPHIC_STOP = /\u3002/g;
 
 /** Model output is short; longer text is cut before the patterns run. */
 const MAX_RAW_AI_TEXT = 2_000;
@@ -74,6 +79,7 @@ export function cleanAiText(
     .slice(0, MAX_RAW_AI_TEXT)
     .normalize('NFKC')
     .replace(INVISIBLE, '')
+    .replace(IDEOGRAPHIC_STOP, '.')
     .replace(/\s+/g, ' ')
     .replaceAll(FULL_URL, '[removed]')
     .replaceAll(EMAIL_ADDRESS, (address) =>

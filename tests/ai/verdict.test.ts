@@ -17,6 +17,10 @@ const finding = (severity: Finding['severity']): Finding => ({
   evidence: [],
 });
 
+/** Digits in Arabic-Indic script, e.g. for "49". */
+const arabicIndic = (digits: string): string =>
+  [...digits].map((digit) => String.fromCodePoint(0x0660 + Number(digit))).join('');
+
 describe('parseVerdict', () => {
   it('reads a valid answer, also inside a code fence', () => {
     const answer = { risk: 'suspicious', reasons: ['Time pressure.'], advice: 'Do not reply.' };
@@ -89,6 +93,31 @@ describe('parseVerdict', () => {
       'Call [removed][removed]',
     ]);
     expect(verdict?.advice).toBe('Write to [removed]');
+  });
+
+  it('removes links of any scheme, phone numbers in any digits, and domains with other dots', () => {
+    // Found in review: these shapes passed every pattern.
+    const ideographicStop = String.fromCodePoint(0x3002);
+    const halfwidthStop = String.fromCodePoint(0xff61);
+    const verdict = parseVerdict(
+      JSON.stringify({
+        risk: 'safe',
+        reasons: [
+          'Confirm at ftp://evil.example/login',
+          'Call +49 30/1234 56789',
+          `Call +${arabicIndic('49')} ${arabicIndic('30')} ${arabicIndic('12345678')}`,
+          `Call 0170${String.fromCodePoint(0x2013)}1234567`,
+        ],
+        advice: `Log in at paypa1${halfwidthStop}secure${ideographicStop}example`,
+      }),
+    );
+    expect(verdict?.reasons).toEqual([
+      'Confirm at [removed]',
+      'Call [removed]',
+      'Call [removed]',
+      'Call [removed]',
+    ]);
+    expect(verdict?.advice).toBe('Log in at [removed]');
   });
 });
 
