@@ -640,3 +640,9 @@ _To fill in near the submission._
   ("19.11.2026 12:00") made the whole match look like a phone number, so the deadline was
   removed. Digits of every script are now read as their values, and a match is checked in parts
   split at spaces.
+- Review round 5 found that this part-by-part check opened a leak: a date placed between the
+  groups of a phone number ("079 19.11.2026 123 4567") split it into pieces too short for the
+  filter, so the whole number stayed readable. Now the parts that are not dates are joined and
+  checked as one; a phone number right next to a date takes the date with it. Five review rounds
+  on one filter: each fix for false alarms opened a new way around it, and each was caught by a
+  test written for the earlier round.
