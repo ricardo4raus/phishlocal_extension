@@ -542,6 +542,17 @@ describe('AI check view', () => {
     expect(prompts[0]).toMatch(/"subject":"A"/);
   });
 
+  it('keeps the floor of failed rules when the email joins a running check', async () => {
+    // Found by the monkey test: failed rules (undefined) give the same prompt as no findings, so
+    // the running check was used, with its old "no findings" floor.
+    await show(email, []);
+    check.shown(email, undefined, true);
+    await answer(verdict('safe'));
+    expect(prompts).toHaveLength(1);
+    expect(get('verdict').dataset.risk).toBe('suspicious');
+    expect(text('overall')).toBe('Suspicious (rule checks; the AI said: no signs of phishing)');
+  });
+
   it('does not try again when there is no model', async () => {
     let loads = 0;
     modelReady = async () => {

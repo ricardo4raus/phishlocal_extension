@@ -399,13 +399,23 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   const adoptable = (request: Request): boolean =>
     current?.key === request.key && !current.stop?.signal.aborted;
 
+  /**
+   * The same check is already running (e.g. Gmail showed the email again): its answer serves
+   * `request`. The running check takes over the new email and findings, which the key may not
+   * tell apart: rules that failed this time (`undefined`) give the same prompt as no findings,
+   * but must keep the verdict at "suspicious" at least (found by the monkey test).
+   */
+  const adopt = (request: Request): boolean => {
+    if (!current || !adoptable(request)) return false;
+    current.id = request.id;
+    current.email = request.email;
+    current.findings = request.findings;
+    startTicker();
+    return true;
+  };
+
   const enqueue = (request: Request): void => {
-    // The same check is already running (e.g. Gmail showed the email again): use its answer.
-    if (current && adoptable(request)) {
-      current.id = request.id;
-      startTicker();
-      return;
-    }
+    if (adopt(request)) return;
     // The running check is for an email that is no longer shown: free the model.
     stopRunning(request.key);
     waiting = request;
@@ -440,11 +450,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       true,
     );
     // The same email is already being checked: use that run's answer.
-    if (current && adoptable(request)) {
-      current.id = request.id;
-      startTicker();
-      return;
-    }
+    if (adopt(request)) return;
     timer = setTimeout(() => enqueue(request), final ? STABLE_MS : waitMs);
   }
 
