@@ -63,7 +63,9 @@ are its input and its lower limit.
      - **Known gaps:** a phone number that is a plausible date ("12.11.2026") or a 19xx/20xx
        year range ("2001-2002") stays; other separators ("|", "[") split a number; fragments
        shorter than 9 characters stay, so that amounts like "12,345.67 EUR" stay readable; a
-       date written with spaces ("19. 11. 2026") is removed. A link scheme with a lookalike first
+       date written with spaces ("19. 11. 2026") is removed, and so is a date followed by a
+       space-grouped number of 9 characters or more ("bis 19.11.2026 4 500 000.00 CHF"): the
+       filter cannot tell such an amount or time window from a phone number. A link scheme with a lookalike first
        letter (Cyrillic "һttps://…") loses its link anyway; only that one letter stays.
 4. **Verdict** ([`src/sidepanel/ai-view.ts`](../src/sidepanel/ai-view.ts)):
    - The overall risk is the higher of AI and rules. A rule danger finding means at least

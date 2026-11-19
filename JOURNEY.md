@@ -646,3 +646,7 @@ _To fill in near the submission._
   checked as one; a phone number right next to a date takes the date with it. Five review rounds
   on one filter: each fix for false alarms opened a new way around it, and each was caught by a
   test written for the earlier round.
+- Review round 6 found no leak. It found that the stricter rule now also drops a deadline
+  followed by a space-grouped amount ("bis 19.11.2026 4 500 000.00 CHF"); keeping it would
+  reopen the leak, so it is a documented limit. The monkey's own phone check got a test of its
+  own, after the review showed it also hid one planted number.
