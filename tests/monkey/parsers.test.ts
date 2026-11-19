@@ -67,14 +67,16 @@ const arabicIndic = (digits: string): string =>
 
 /**
  * True if a planted phone number is still readable: 8 digits of it ("55512345", "30123456",
- * "07912345" or "48732026") in one run of digits. The run follows the spec in docs/ai-check.md, not the
- * source's regex: digits joined by whitespace, dash punctuation, the minus sign, dots, bullets,
- * slashes or parentheses, in any number. Shorter fragments may stay by design: the pattern needs
- * 9 characters, so amounts and short numbers stay readable.
+ * "07912345" or "48732026") in one run of digits. The run follows the spec in docs/ai-check.md,
+ * not the source's regex: digits joined by whitespace, dash punctuation, the minus sign, dots,
+ * bullets, slashes or parentheses, in any number. A reader skips a date placed between the
+ * groups ("079 19.11.2026 123 4567"), so dates are taken out first. Shorter fragments may stay
+ * by design: the pattern needs 9 characters, so amounts and short numbers stay readable.
  */
 function plantedPhoneShown(text: string): boolean {
+  const withoutDates = text.replace(/(?<!\d)\d{1,2}\.\d{1,2}\.\d{4}(?!\d)/g, ' ');
   const runs =
-    text.match(
+    withoutDates.match(
       /\p{Nd}(?:[\s\p{Pd}()./\u2212\u00b7\u2022\u2027\u2219\u30fb\u2044\u2215]*\p{Nd})*/gu,
     ) ?? [];
   return runs.some((run) =>
@@ -119,6 +121,8 @@ function randomAnswer(rng: Rng, known: string): string {
         // Shaped like dates, but not dates: must go too.
         `call ${rng.pick(['0791-2345', '555-12-3456', '079.12.3456', '48.73.2026'])} now`,
         `call ${arabicIndic('48')}.${arabicIndic('73')}.${arabicIndic('2026')} now`,
+        // A date between the groups of a phone number.
+        `call 079 ${rng.pick(['19.11.2026', '1.2.2026'])} ${rng.pick(['123 4567', '1234567'])}`,
         `+${arabicIndic('49')} ${arabicIndic('30')} ${arabicIndic('12345678')}`,
         `paypa1${rng.pick(['\uff61', '\u3002', '.', '\uff0e'])}secure.example`,
         known,
