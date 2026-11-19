@@ -16,7 +16,7 @@ vi.setConfig({ testTimeout: MONKEY_TIMEOUT_MS });
  * Six emails; each run's prompt names its email by the token in the subject. The last two come
  * from a confirmed sender (DMARC pass), where the AI alone may not raise the verdict.
  */
-const EMAILS: Email[] = [0, 1, 2, 3, 4, 5].map((number) => ({
+const BASE_EMAILS: Email[] = [0, 1, 2, 3, 4, 5].map((number) => ({
   sender: { name: 'Lumora Bank', address: `news${number}@lumorabank.example` },
   subject: `MAIL${number}`,
   bodyText: 'Hello',
@@ -31,6 +31,25 @@ const EMAILS: Email[] = [0, 1, 2, 3, 4, 5].map((number) => ({
       }
     : {}),
 }));
+
+/**
+ * Plus MAIL1 with a Reply-To: the same prompt, but other own addresses, which the answer may
+ * name. Its answer must never be shown for the plain MAIL1, or the other way round.
+ */
+const EMAILS: Email[] = [
+  ...BASE_EMAILS,
+  {
+    ...(BASE_EMAILS[1] as Email),
+    headers: { replyTo: [{ name: '', address: 'mallory@evil.example' }] },
+  },
+];
+
+/** The own addresses the panel passes to the model, as the fake answer names them. */
+const ownOf = (email: Email): string =>
+  [email.sender.address, ...(email.headers?.replyTo.map((box) => box.address) ?? [])]
+    .map((address) => address.toLowerCase())
+    .toSorted()
+    .join(' ');
 
 const FINDING_SETS: (Finding[] | undefined)[] = [
   [],
@@ -78,7 +97,8 @@ function create(rng: Rng): AiCheck {
       advice: get('advice'),
     },
     {
-      run: (prompt, _language, _known, signal) => {
+      run: (prompt, _language, known, signal) => {
+        const own = [...known].toSorted().join(' ');
         const email = tokenOf(prompt);
         // Recorded, not thrown: the panel catches errors from a run.
         // One prompt at a time: every earlier run has ended or was told to stop. (A run that
@@ -122,7 +142,7 @@ function create(rng: Rng): AiCheck {
                 ok: true,
                 verdict: {
                   risk: rng.pick(RISKS),
-                  reasons: [`About ${email}`],
+                  reasons: [`About ${email} for ${own}`],
                   advice: `Advice for ${email}`,
                 },
                 durationMs: after,
@@ -192,7 +212,8 @@ function checkPanelOnce(): void {
   // Reasons and advice shown belong to the email on screen.
   const token = tokenOf(shown.email.subject);
   for (const item of document.querySelectorAll('#reasons li')) {
-    expect(item.textContent).toBe(`About ${token}`);
+    // Made for this email and its own addresses (an answer may name exactly those).
+    expect(item.textContent).toBe(`About ${token} for ${ownOf(shown.email)}`);
   }
   const advice = get('advice').textContent ?? '';
   if (advice.startsWith('Advice for')) expect(advice).toBe(`Advice for ${token}`);

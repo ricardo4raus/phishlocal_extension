@@ -61,10 +61,30 @@ const CANARY = 'QJXCANARYQJX';
 /** Model output in the AI's answer: link, address and phone shapes it must never show. */
 const FULL_URL = /(?:[a-z][a-z\d+.-]*:\/\/|www\.)\S/i;
 const EMAIL_ADDRESS = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
-const PHONE_NUMBER = /\+?\p{Nd}[\p{Nd} ()./\u2010-\u2015-]{7,}\p{Nd}/u;
 const BARE_DOMAIN = /\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,24}\b/i;
 const arabicIndic = (digits: string): string =>
   [...digits].map((digit) => String.fromCodePoint(0x0660 + Number(digit))).join('');
+
+/**
+ * True if a planted phone number is still readable: 8 digits of it ("55512345" or "30123456")
+ * in one run of digits joined by at most three other non-letters. Independent of the source's
+ * phone pattern, so a separator that pattern does not know (found in review: the minus sign)
+ * fails here. Shorter fragments may stay by design: the pattern needs 9 characters, so amounts
+ * and short numbers stay readable.
+ */
+function plantedPhoneShown(text: string): boolean {
+  const runs = text.match(/\p{Nd}(?:[^\p{L}\p{Nd}]{0,3}\p{Nd})*/gu) ?? [];
+  return runs.some((run) =>
+    [...run]
+      .filter((char) => /\p{Nd}/u.test(char))
+      .map((char) => {
+        const code = char.codePointAt(0) ?? 0;
+        return code >= 0x0660 && code <= 0x0669 ? String(code - 0x0660) : char;
+      })
+      .join('')
+      .match(/55512345|30123456/),
+  );
+}
 
 /** What can split a phone number or link in model output without being visible. */
 const SPLITTERS = ['\n', '\t', '\r\n', ' ', ...NASTY_CHARS.slice(0, 17)];
@@ -92,7 +112,7 @@ function randomAnswer(rng: Rng, known: string): string {
         `help${rng.pick(SPLITTERS)}@evil.example`,
         'write to help@evil.example',
         `${rng.pick(['ftp', 'hxxp', 'chrome-extension', 'x'])}://evil.example/login`,
-        `+49 30/1234${rng.pick(['-', '\u2013', ' ', '/'])}56789`,
+        `+49 30/1234${rng.pick(['-', '\u2013', ' ', '/', '\u2212', '\u00b7', '\u2022'])}56789`,
         `+${arabicIndic('49')} ${arabicIndic('30')} ${arabicIndic('12345678')}`,
         `paypa1${rng.pick(['\uff61', '\u3002', '.', '\uff0e'])}secure.example`,
         known,
@@ -160,7 +180,7 @@ describe('monkey: AI answer reader', () => {
         expect([...text].length).toBeLessThanOrEqual(MAX_AI_TEXT);
         const seen = visible(text);
         expect(seen, where).not.toMatch(FULL_URL);
-        expect(seen, where).not.toMatch(PHONE_NUMBER);
+        expect(plantedPhoneShown(seen), `phone ${where}`).toBe(false);
         // The known address may stay, also cut short at the end of a long text. (Before
         // visible(): NFKC turns the "…" into "...".)
         const cutKnown = /(\S+)…$/.exec(text)?.[1];
