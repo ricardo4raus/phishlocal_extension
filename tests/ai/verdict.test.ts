@@ -63,6 +63,33 @@ describe('parseVerdict', () => {
     ]);
     expect(verdict?.advice).toBe('Verify your account at [removed] or write to [removed].');
   });
+
+  it('also removes them when line breaks, invisible or fullwidth characters split them', () => {
+    // Found by the monkey test: the spaces were joined only after the patterns had run.
+    const zeroWidth = String.fromCodePoint(0x200b);
+    const fullwidthFive = String.fromCodePoint(0xff15);
+    const verdict = parseVerdict(
+      JSON.stringify({
+        risk: 'safe',
+        reasons: [
+          'Call +1\n555\t123\n4567',
+          `Call +1 555${zeroWidth} 123 4567`,
+          `Call +1 ${fullwidthFive.repeat(3)} 123 4567`,
+          `Open https://${zeroWidth}evil.example`,
+          'Call +1 555 123 4567https://evil.example/login',
+        ],
+        advice: `Write to help${zeroWidth}@evil.example`,
+      }),
+    );
+    expect(verdict?.reasons).toEqual([
+      'Call [removed]',
+      'Call [removed]',
+      'Call [removed]',
+      'Open [removed]',
+      'Call [removed][removed]',
+    ]);
+    expect(verdict?.advice).toBe('Write to [removed]');
+  });
 });
 
 describe('cleanAiText', () => {

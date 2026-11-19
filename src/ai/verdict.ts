@@ -41,10 +41,14 @@ export interface AiVerdict {
  * keep bare domains ("the link goes to paypa1.com" is the explanation users need); advice drops
  * them too, because advice should never send anyone anywhere.
  */
-const FULL_URL = /\b(?:https?:\/\/|www\.)\S+/gi;
+// No \b in front: a link glued to a word ("4567https://evil.example") must go too.
+const FULL_URL = /(?:https?:\/\/|www\.)\S+/gi;
 const EMAIL_ADDRESS = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const PHONE_NUMBER = /\+?\d[\d ().-]{7,}\d/g;
 const BARE_DOMAIN = /\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,24}\b(?:\/\S*)?/gi;
+
+/** Invisible format characters (zero-width, soft hyphen, direction controls). */
+const INVISIBLE = /\p{Cf}/gu;
 
 /** Model output is short; longer text is cut before the patterns run. */
 const MAX_RAW_AI_TEXT = 2_000;
@@ -63,15 +67,21 @@ export function cleanAiText(
   text: string,
   { keepDomains = true, knownAddresses = new Set() }: CleanOptions = {},
 ): string {
+  // Normalized first, so the patterns see the text as it is shown: a phone number split by line
+  // breaks, invisible characters or fullwidth digits would otherwise slip past them and appear
+  // whole once the spaces are joined (found by the monkey test).
   let cleaned = text
     .slice(0, MAX_RAW_AI_TEXT)
+    .normalize('NFKC')
+    .replace(INVISIBLE, '')
+    .replace(/\s+/g, ' ')
     .replaceAll(FULL_URL, '[removed]')
     .replaceAll(EMAIL_ADDRESS, (address) =>
       knownAddresses.has(address.toLowerCase()) ? address : '[removed]',
     )
     .replaceAll(PHONE_NUMBER, '[removed]');
   if (!keepDomains) cleaned = cleaned.replaceAll(BARE_DOMAIN, '[removed]');
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  cleaned = cleaned.trim();
   return cleaned.length > MAX_AI_TEXT ? `${cleaned.slice(0, MAX_AI_TEXT - 1)}…` : cleaned;
 }
 
