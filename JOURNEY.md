@@ -595,9 +595,9 @@ _To fill in near the submission._
     model that answers, fails, crashes, hangs or ignores its stop signal;
   - a UI monkey for the whole side panel (real `index.html` and `main.ts`, fake Chrome and
     model): random clicks, typing, pastes, samples, Gmail messages and disconnects.
-    After every step they check the panel's promises: the verdict is never below the rules, no
-    result for another email, one model run at a time, no markup from email content, and at the
-    end nothing still running and no button stuck.
+- After every step the monkeys check the panel's promises: the verdict is never below the
+  rules, no result for another email, one model run at a time, no markup from email content,
+  and at the end nothing still running and no button stuck.
 - The monkeys found four bugs, each now fixed with a regression test that fails without it:
   - the AI answer reader let a phone number through when the model split it with line breaks
     or invisible characters, or wrote it in fullwidth digits; whitespace was joined only after
@@ -609,3 +609,13 @@ _To fill in near the submission._
     rules had failed this time, a "safe" AI answer showed green instead of at least yellow.
 - A 100× run (about 200,000 random cases) found one more failure, but in the test's own check:
   the allowed sender address, cut at 300 characters, no longer looked allowed.
+- Two review agents checked the PR. The first found older gaps in the AI answer reader, all
+  fixed: links with other schemes (`ftp://`), phone numbers in Arabic-Indic digits or with `/`
+  and dashes, domains written with ideographic full stops, and a reused answer that could name
+  the Reply-To address of a different email with the same prompt. The second found weak spots in
+  the monkeys themselves: the UI monkey now also counts live model runs, checks that no counter
+  or download percentage is left when nothing loads, and that no timer runs at the end; the
+  chaos monkey covers confirmed senders; the link check asserts the host is kept.
+- Fixing the reused answer made the UI monkey fail at once with "URI malformed": a `mailto:%E0`
+  link made `decodeURIComponent` throw. Before, that error was caught inside the AI run, so any
+  email with such a link (attacker-written) silently turned its AI check into "failed". Fixed.
