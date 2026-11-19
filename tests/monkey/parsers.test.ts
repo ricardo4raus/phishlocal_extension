@@ -66,14 +66,17 @@ const arabicIndic = (digits: string): string =>
   [...digits].map((digit) => String.fromCodePoint(0x0660 + Number(digit))).join('');
 
 /**
- * True if a planted phone number is still readable: 8 digits of it ("55512345" or "30123456")
- * in one run of digits joined by at most three other non-letters. Independent of the source's
- * phone pattern, so a separator that pattern does not know (found in review: the minus sign)
- * fails here. Shorter fragments may stay by design: the pattern needs 9 characters, so amounts
- * and short numbers stay readable.
+ * True if a planted phone number is still readable: 8 digits of it ("55512345", "30123456" or
+ * "07912345") in one run of digits. The run follows the spec in docs/ai-check.md, not the
+ * source's regex: digits joined by whitespace, dash punctuation, the minus sign, dots, bullets,
+ * slashes or parentheses, in any number. Shorter fragments may stay by design: the pattern needs
+ * 9 characters, so amounts and short numbers stay readable.
  */
 function plantedPhoneShown(text: string): boolean {
-  const runs = text.match(/\p{Nd}(?:[^\p{L}\p{Nd}]{0,3}\p{Nd})*/gu) ?? [];
+  const runs =
+    text.match(
+      /\p{Nd}(?:[\s\p{Pd}()./\u2212\u00b7\u2022\u2027\u2219\u30fb\u2044\u2215]*\p{Nd})*/gu,
+    ) ?? [];
   return runs.some((run) =>
     [...run]
       .filter((char) => /\p{Nd}/u.test(char))
@@ -82,7 +85,7 @@ function plantedPhoneShown(text: string): boolean {
         return code >= 0x0660 && code <= 0x0669 ? String(code - 0x0660) : char;
       })
       .join('')
-      .match(/55512345|30123456/),
+      .match(/55512345|30123456|07912345/),
   );
 }
 
@@ -112,7 +115,9 @@ function randomAnswer(rng: Rng, known: string): string {
         `help${rng.pick(SPLITTERS)}@evil.example`,
         'write to help@evil.example',
         `${rng.pick(['ftp', 'hxxp', 'chrome-extension', 'x'])}://evil.example/login`,
-        `+49 30/1234${rng.pick(['-', '\u2013', ' ', '/', '\u2212', '\u00b7', '\u2022'])}56789`,
+        `+49 30/1234${rng.pick(['-', '\u2013', ' ', '/', '\u2212', '\u00b7', '\u2022', '\u301c', '\u30fb', ' -- '])}56789`,
+        // Shaped like dates, but not dates: must go too.
+        `call ${rng.pick(['0791-2345', '555-12-3456', '079.12.3456'])} now`,
         `+${arabicIndic('49')} ${arabicIndic('30')} ${arabicIndic('12345678')}`,
         `paypa1${rng.pick(['\uff61', '\u3002', '.', '\uff0e'])}secure.example`,
         known,

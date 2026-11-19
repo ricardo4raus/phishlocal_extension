@@ -46,8 +46,13 @@ const EMAILS: Email[] = [
 
 /** The own addresses the panel passes to the model, as the fake answer names them. */
 const ownOf = (email: Email): string =>
-  [email.sender.address, ...(email.headers?.replyTo.map((box) => box.address) ?? [])]
-    .map((address) => address.toLowerCase())
+  [
+    ...new Set(
+      [email.sender.address, ...(email.headers?.replyTo.map((box) => box.address) ?? [])].map(
+        (address) => address.toLowerCase(),
+      ),
+    ),
+  ]
     .toSorted()
     .join(' ');
 
