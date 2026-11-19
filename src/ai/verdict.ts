@@ -45,8 +45,16 @@ export interface AiVerdict {
 // ("4567https://evil.example") must go too.
 const FULL_URL = /(?:[a-z][a-z\d+.-]*:\/\/|www\.)\S+/gi;
 const EMAIL_ADDRESS = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
-// Digits of any script (Arabic-Indic too), and "/" or dashes between the groups.
-const PHONE_NUMBER = /\+?\p{Nd}[\p{Nd} ()./\u2010-\u2015-]{7,}\p{Nd}/gu;
+// Digits of any script (Arabic-Indic too), and "/", dashes, the minus sign, middle dots or
+// bullets between the groups.
+const PHONE_NUMBER =
+  /\+?\p{Nd}[\p{Nd} ()./\u2010-\u2015\u2212\u00b7\u2022\u2044\u2215-]{7,}\p{Nd}/gu;
+/**
+ * A date ("19.11.2026", "19/11/2026", "2026-11-19") or a year range ("2020\u20132025") looks like a
+ * phone number to the pattern above, but deadlines are the evidence a reason needs: kept.
+ */
+const DATE_LIKE =
+  /^(?:\p{Nd}{1,4}([./\u2010-\u2015-])\p{Nd}{1,2}\1\p{Nd}{2,4}|\p{Nd}{4} ?[\u2010-\u2015-] ?\p{Nd}{4})$/u;
 const BARE_DOMAIN = /\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,24}\b(?:\/\S*)?/gi;
 
 /** Invisible format characters (zero-width, soft hyphen, direction controls). */
@@ -85,7 +93,7 @@ export function cleanAiText(
     .replaceAll(EMAIL_ADDRESS, (address) =>
       knownAddresses.has(address.toLowerCase()) ? address : '[removed]',
     )
-    .replaceAll(PHONE_NUMBER, '[removed]');
+    .replaceAll(PHONE_NUMBER, (number) => (DATE_LIKE.test(number) ? number : '[removed]'));
   if (!keepDomains) cleaned = cleaned.replaceAll(BARE_DOMAIN, '[removed]');
   cleaned = cleaned.trim();
   return cleaned.length > MAX_AI_TEXT ? `${cleaned.slice(0, MAX_AI_TEXT - 1)}…` : cleaned;

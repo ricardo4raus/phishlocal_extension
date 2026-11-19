@@ -122,6 +122,23 @@ describe('parseVerdict', () => {
 });
 
 describe('cleanAiText', () => {
+  it('keeps dates and year ranges, which the phone pattern also matches', () => {
+    // Found in review: deadlines are the evidence of a reason ("pay by 19/11/2026").
+    const enDash = String.fromCodePoint(0x2013);
+    for (const date of ['19.11.2026', '19/11/2026', '2026-11-19', `2020${enDash}2025`]) {
+      expect(cleanAiText(`Pay by ${date} or lose access.`)).toBe(`Pay by ${date} or lose access.`);
+    }
+  });
+
+  it('removes phone numbers grouped with the minus sign, middle dots or bullets', () => {
+    for (const code of [0x2212, 0x00b7, 0x2022]) {
+      const separator = String.fromCodePoint(code);
+      expect(cleanAiText(`Call +49 30${separator}1234${separator}5678 now`)).toBe(
+        'Call [removed] now',
+      );
+    }
+  });
+
   it('stays fast on long hostile output', () => {
     const start = performance.now();
     cleanAiText(`${'a.'.repeat(50_000)}x`, { keepDomains: false });
