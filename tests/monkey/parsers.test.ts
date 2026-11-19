@@ -66,8 +66,8 @@ const arabicIndic = (digits: string): string =>
   [...digits].map((digit) => String.fromCodePoint(0x0660 + Number(digit))).join('');
 
 /**
- * True if a planted phone number is still readable: 8 digits of it ("55512345", "30123456" or
- * "07912345") in one run of digits. The run follows the spec in docs/ai-check.md, not the
+ * True if a planted phone number is still readable: 8 digits of it ("55512345", "30123456",
+ * "07912345" or "48732026") in one run of digits. The run follows the spec in docs/ai-check.md, not the
  * source's regex: digits joined by whitespace, dash punctuation, the minus sign, dots, bullets,
  * slashes or parentheses, in any number. Shorter fragments may stay by design: the pattern needs
  * 9 characters, so amounts and short numbers stay readable.
@@ -85,7 +85,7 @@ function plantedPhoneShown(text: string): boolean {
         return code >= 0x0660 && code <= 0x0669 ? String(code - 0x0660) : char;
       })
       .join('')
-      .match(/55512345|30123456|07912345/),
+      .match(/55512345|30123456|07912345|48732026/),
   );
 }
 
@@ -117,7 +117,8 @@ function randomAnswer(rng: Rng, known: string): string {
         `${rng.pick(['ftp', 'hxxp', 'chrome-extension', 'x'])}://evil.example/login`,
         `+49 30/1234${rng.pick(['-', '\u2013', ' ', '/', '\u2212', '\u00b7', '\u2022', '\u301c', '\u30fb', ' -- '])}56789`,
         // Shaped like dates, but not dates: must go too.
-        `call ${rng.pick(['0791-2345', '555-12-3456', '079.12.3456'])} now`,
+        `call ${rng.pick(['0791-2345', '555-12-3456', '079.12.3456', '48.73.2026'])} now`,
+        `call ${arabicIndic('48')}.${arabicIndic('73')}.${arabicIndic('2026')} now`,
         `+${arabicIndic('49')} ${arabicIndic('30')} ${arabicIndic('12345678')}`,
         `paypa1${rng.pick(['\uff61', '\u3002', '.', '\uff0e'])}secure.example`,
         known,
