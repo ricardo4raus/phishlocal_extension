@@ -45,16 +45,46 @@ export interface AiVerdict {
 // ("4567https://evil.example") must go too.
 const FULL_URL = /(?:[a-z][a-z\d+.-]*:\/\/|www\.)\S+/gi;
 const EMAIL_ADDRESS = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
-// Digits of any script (Arabic-Indic too), and "/", dashes, the minus sign, middle dots or
-// bullets between the groups.
-const PHONE_NUMBER =
-  /\+?\p{Nd}[\p{Nd} ()./\u2010-\u2015\u2212\u00b7\u2022\u2044\u2215-]{7,}\p{Nd}/gu;
-/**
- * A date ("19.11.2026", "19/11/2026", "2026-11-19") or a year range ("2020\u20132025") looks like a
- * phone number to the pattern above, but deadlines are the evidence a reason needs: kept.
+/*
+ * A phone number: digits of any script (Arabic-Indic too), grouped by spaces, parentheses, dash
+ * punctuation (\p{Pd}), the minus sign, dots (also middle dots, bullets, hyphenation point,
+ * katakana middle dot) or slashes. Other characters ("|", "[") split a number: no filter can
+ * know every separator, and adding commas would remove amounts like "12,345.67 EUR".
  */
-const DATE_LIKE =
-  /^(?:\p{Nd}{1,4}([./\u2010-\u2015-])\p{Nd}{1,2}\1\p{Nd}{2,4}|\p{Nd}{4} ?[\u2010-\u2015-] ?\p{Nd}{4})$/u;
+const GROUPING = String.raw`\p{Pd} ()./\u2212\u00b7\u2022\u2027\u2219\u30fb\u2044\u2215`;
+const PHONE_NUMBER = new RegExp(String.raw`\+?\p{Nd}[\p{Nd}${GROUPING}]{7,}\p{Nd}`, 'gu');
+
+/**
+ * A date ("19.11.2026", "19/11/26", "2026-11-19") or a year range ("2020-2025") matches the
+ * phone pattern too, but deadlines are the evidence a reason needs: kept. Only real date shapes:
+ * day and month have 1 or 2 digits and plausible values, so "0791-2345", "555-12-3456" or
+ * "079.12.3456" are still removed.
+ */
+const DATE_SEPARATOR = String.raw`[./\p{Pd}\u2044\u2215]`;
+const DAY_MONTH_YEAR = new RegExp(
+  String.raw`^(\p{Nd}{1,2})(${DATE_SEPARATOR})(\p{Nd}{1,2})\2(?:\p{Nd}{4}|\p{Nd}{2})$`,
+  'u',
+);
+const YEAR_MONTH_DAY = new RegExp(
+  String.raw`^\p{Nd}{4}(${DATE_SEPARATOR})(\p{Nd}{1,2})\1(\p{Nd}{1,2})$`,
+  'u',
+);
+const YEAR_RANGE = /^(?:19|20)\d\d ?\p{Pd} ?(?:19|20)\d\d$/u;
+
+/** Day and month (either order) are plausible; digits of other scripts count by shape only. */
+function plausible(first: string, second: string): boolean {
+  const [a, b] = [Number(first), Number(second)];
+  if (Number.isNaN(a) || Number.isNaN(b)) return true;
+  return a >= 1 && b >= 1 && a <= 31 && b <= 31 && (a <= 12 || b <= 12);
+}
+
+function isDate(text: string): boolean {
+  if (YEAR_RANGE.test(text)) return true;
+  const dayFirst = DAY_MONTH_YEAR.exec(text);
+  if (dayFirst) return plausible(dayFirst[1] ?? '', dayFirst[3] ?? '');
+  const yearFirst = YEAR_MONTH_DAY.exec(text);
+  return yearFirst ? plausible(yearFirst[2] ?? '', yearFirst[3] ?? '') : false;
+}
 const BARE_DOMAIN = /\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,24}\b(?:\/\S*)?/gi;
 
 /** Invisible format characters (zero-width, soft hyphen, direction controls). */
@@ -93,7 +123,7 @@ export function cleanAiText(
     .replaceAll(EMAIL_ADDRESS, (address) =>
       knownAddresses.has(address.toLowerCase()) ? address : '[removed]',
     )
-    .replaceAll(PHONE_NUMBER, (number) => (DATE_LIKE.test(number) ? number : '[removed]'));
+    .replaceAll(PHONE_NUMBER, (number) => (isDate(number) ? number : '[removed]'));
   if (!keepDomains) cleaned = cleaned.replaceAll(BARE_DOMAIN, '[removed]');
   cleaned = cleaned.trim();
   return cleaned.length > MAX_AI_TEXT ? `${cleaned.slice(0, MAX_AI_TEXT - 1)}…` : cleaned;

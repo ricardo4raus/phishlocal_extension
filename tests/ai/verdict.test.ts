@@ -125,13 +125,26 @@ describe('cleanAiText', () => {
   it('keeps dates and year ranges, which the phone pattern also matches', () => {
     // Found in review: deadlines are the evidence of a reason ("pay by 19/11/2026").
     const enDash = String.fromCodePoint(0x2013);
-    for (const date of ['19.11.2026', '19/11/2026', '2026-11-19', `2020${enDash}2025`]) {
+    for (const date of [
+      '19.11.2026',
+      '19/11/2026',
+      '19/11/26',
+      '2026-11-19',
+      `2020${enDash}2025`,
+    ]) {
       expect(cleanAiText(`Pay by ${date} or lose access.`)).toBe(`Pay by ${date} or lose access.`);
     }
   });
 
-  it('removes phone numbers grouped with the minus sign, middle dots or bullets', () => {
-    for (const code of [0x2212, 0x00b7, 0x2022]) {
+  it('still removes phone numbers that are shaped like dates', () => {
+    // Found in review round 3: the first date check kept these as "dates".
+    for (const number of ['0791-2345', '555-12-3456', '079.12.3456', '41.79.123', '12.34.5678']) {
+      expect(cleanAiText(`Call ${number} to verify.`)).toBe('Call [removed] to verify.');
+    }
+  });
+
+  it('removes phone numbers grouped with any dash, the minus sign, dots or bullets', () => {
+    for (const code of [0x2212, 0x00b7, 0x2022, 0x301c, 0x2027, 0x30fb]) {
       const separator = String.fromCodePoint(code);
       expect(cleanAiText(`Call +49 30${separator}1234${separator}5678 now`)).toBe(
         'Call [removed] now',
