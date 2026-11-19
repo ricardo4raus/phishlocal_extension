@@ -47,9 +47,12 @@ are its input and its lower limit.
      The text is normalized first (NFKC, invisible characters removed, ideographic full stops
      read as ".", whitespace joined), so a phone number split by line breaks or written in
      fullwidth digits is caught too. Links of any scheme (`ftp://` too) are removed, and phone
-     numbers in any digits (Arabic-Indic too) with spaces, dots, slashes or dashes. Known gap: a
-     scheme written with lookalike letters (Cyrillic "һttps") stays as text; it is not a link the
-     user can click.
+     numbers of at least 9 characters in any digits (Arabic-Indic too), grouped with spaces,
+     dots, slashes, dashes, the minus sign, middle dots or bullets. Dates and year ranges
+     ("19/11/2026", "2020–2025") match that pattern too but stay: deadlines are evidence. Known
+     gaps: a phone number written like a date ("0800-12-3456") stays, and shorter fragments stay
+     by design. A link scheme with a lookalike first letter (Cyrillic "һttps://…") loses its link
+     anyway; only that one letter stays.
      Anything else means "the AI answer could not be read".
 4. **Verdict** ([`src/sidepanel/ai-view.ts`](../src/sidepanel/ai-view.ts)):
    - The overall risk is the higher of AI and rules. A rule danger finding means at least

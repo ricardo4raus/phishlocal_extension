@@ -619,3 +619,13 @@ _To fill in near the submission._
 - Fixing the reused answer made the UI monkey fail at once with "URI malformed": a `mailto:%E0`
   link made `decodeURIComponent` throw. Before, that error was caught inside the AI run, so any
   email with such a link (attacker-written) silently turned its AI check into "failed". Fixed.
+- A second review round found that the phone filter now also removed deadlines from the AI's
+  reasons ("pay by 19/11/2026"; dates with dots were already removed before). Dates and year
+  ranges are now kept, and the minus sign, middle dots and bullets count as phone separators.
+  The review also noted that the monkey's phone check copied the source's own pattern, so a gap
+  in the pattern could never fail it. The new check is independent: the planted phone digits
+  must not stay readable as one run. It immediately flagged a fragment left behind when a link
+  swallowed half of a glued phone number; that fragment is shorter than the 9 characters the
+  filter needs by design, so the check now looks for 8-digit cores. The chaos monkey also got
+  an email variant with a Reply-To, and every shown reason must name exactly the shown email's
+  own addresses.
