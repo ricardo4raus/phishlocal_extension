@@ -44,6 +44,8 @@ are its input and its lower limit.
    - accepted also inside a code fence;
    - full links, planted email addresses and phone numbers are removed from it, and bare domains
      from the advice. The email's own addresses (sender, Reply-To) stay readable in the reasons.
+     The text is normalized first (NFKC, invisible characters removed, whitespace joined), so a
+     phone number split by line breaks or written in fullwidth digits is caught too.
      Anything else means "the AI answer could not be read".
 4. **Verdict** ([`src/sidepanel/ai-view.ts`](../src/sidepanel/ai-view.ts)):
    - The overall risk is the higher of AI and rules. A rule danger finding means at least
@@ -70,7 +72,9 @@ are its input and its lower limit.
      load is skipped if its email was left meanwhile; a late result for an email that is no
      longer shown is dropped;
    - a check starts once the shown email has not changed for 0.5 s (Gmail shows an email several
-     times within a moment); the same email with the same findings uses a running check's answer;
+     times within a moment); the same email with the same findings uses a running check's answer
+     (the check takes over the newer findings, so rules that failed this time still set the
+     floor);
    - the last 20 answers stay in memory while the panel is open: an email shown again gets its
      answer at once; failed runs are not kept, so they are tried again;
    - when the panel opens, it loads the model (measured 19 Nov 2026: 304.8 s right after a full

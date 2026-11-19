@@ -177,6 +177,13 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - `tests/` holds structure tests for the source, the manifest and the `dist` build output
   (e.g. no remote code). When adding a manifest permission, host permission or content-script
   match, update the allow-list in `tests/manifest.test.ts` on purpose.
+- Monkey tests (`tests/monkey/`, added 19 Nov 2026): random hostile input for the parsers, rules
+  and AI answer reader, and random event orders for the AI check and the whole side panel
+  (`main.ts` with fake Chrome and model). CI runs a fixed seed. Before a PR that touches parsing,
+  the AI check or the panel, also run them with a random seed and 100 times the cases
+  (`MONKEY_SEED=random`, `MONKEY_RUNS=100`; command in the README). A failure names
+  `MONKEY_SEED` and `MONKEY_CASE` to replay it. A new panel promise belongs in their checks; a
+  new move (button, message type) in their move lists.
 - `npm run dev` overwrites `dist` with a dev build; run `npm run build` before `npm test`.
 - If a `dist` test fails, find the pattern in the source; the minified names won't help.
 - The remote-code check reads JavaScript with Vite's parser, HTML with parse5 and CSS with
