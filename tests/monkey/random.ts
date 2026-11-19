@@ -23,25 +23,31 @@ import {
 } from '../../src/email';
 import { GMAIL_SERVER } from '../../src/raw/gmail-original-page';
 
-const envSeed = process.env.MONKEY_SEED;
+/** A whole number from the environment; a typo fails loudly instead of running other cases. */
+function envNumber(name: string): number | undefined {
+  const value = process.env[name];
+  if (value === undefined || value === '') return undefined;
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 0) {
+    throw new Error(`${name}=${value} is not a whole number`);
+  }
+  return number;
+}
 
 /** The base seed of this run. */
 export const MONKEY_SEED: number =
-  envSeed === 'random'
+  process.env.MONKEY_SEED === 'random'
     ? Math.floor(Math.random() * 2 ** 32)
-    : envSeed
-      ? Number(envSeed) >>> 0
-      : 20_261_119;
+    : (envNumber('MONKEY_SEED') ?? 20_261_119) >>> 0;
 
 /** Multiplies the number of cases per test (default 1). */
-export const MONKEY_RUNS = Math.max(1, Number(process.env.MONKEY_RUNS) || 1);
+export const MONKEY_RUNS = Math.max(1, envNumber('MONKEY_RUNS') ?? 1);
 
 /** Time limit per monkey test: more cases take longer. */
 export const MONKEY_TIMEOUT_MS = 20_000 * MONKEY_RUNS;
 
 /** Only this case, to replay a failure. */
-const ONLY_CASE =
-  process.env.MONKEY_CASE === undefined ? undefined : Number(process.env.MONKEY_CASE);
+const ONLY_CASE = envNumber('MONKEY_CASE');
 
 /** True while one case is replayed: checks over all cases do not apply. */
 export const REPLAYING_ONE_CASE = ONLY_CASE !== undefined;

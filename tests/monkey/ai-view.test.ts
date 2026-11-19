@@ -12,13 +12,24 @@ import { forEachCase, MONKEY_TIMEOUT_MS, type Rng } from './random';
 
 vi.setConfig({ testTimeout: MONKEY_TIMEOUT_MS });
 
-/** Four emails; each run's prompt names its email by the token in the subject. */
-const EMAILS: Email[] = [0, 1, 2, 3].map((number) => ({
+/**
+ * Six emails; each run's prompt names its email by the token in the subject. The last two come
+ * from a confirmed sender (DMARC pass), where the AI alone may not raise the verdict.
+ */
+const EMAILS: Email[] = [0, 1, 2, 3, 4, 5].map((number) => ({
   sender: { name: 'Lumora Bank', address: `news${number}@lumorabank.example` },
   subject: `MAIL${number}`,
   bodyText: 'Hello',
   links: [],
   truncated: false,
+  ...(number >= 4
+    ? {
+        headers: {
+          replyTo: [],
+          auth: { server: 'mx.google.com', dkim: [{ result: 'pass' }], dmarc: 'pass' },
+        },
+      }
+    : {}),
 }));
 
 const FINDING_SETS: (Finding[] | undefined)[] = [
@@ -70,7 +81,9 @@ function create(rng: Rng): AiCheck {
       run: (prompt, _language, _known, signal) => {
         const email = tokenOf(prompt);
         // Recorded, not thrown: the panel catches errors from a run.
-        // One prompt at a time: every earlier run has ended or was told to stop.
+        // One prompt at a time: every earlier run has ended or was told to stop. (A run that
+        // ignores its stop is let go after STOP_GRACE_MS by design, so the queue cannot hang on
+        // it; Chrome's own runs follow the signal.)
         if (runs.some((run) => !run.settled && !run.signal.aborted)) {
           violations.push(`a run for ${email} started while another one was live`);
         }
@@ -162,6 +175,11 @@ function checkPanelOnce(): void {
   if (!shown) return;
   const risk = verdict.dataset.risk ?? '';
   const rules: Risk = shown.findings ? ruleRisk(shown.findings) : 'suspicious';
+  // A confirmed sender whose rules found nothing: the AI may add notes, never raise the light.
+  const confirmedClean = shown.email.headers?.auth?.dmarc === 'pass' && rules === 'safe';
+  expect(confirmedClean && risk !== 'pending' && risk !== 'safe', 'raised a confirmed sender').toBe(
+    false,
+  );
   if (risk === 'pending') {
     // Grey only while the rules found nothing.
     expect(rules).toBe('safe');

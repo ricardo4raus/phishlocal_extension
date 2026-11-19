@@ -30,6 +30,12 @@ let violations: string[] = [];
 let trace: string[] = [];
 /** What the monkey reached across all cases, so a test that idles cannot pass. */
 const reached = new Set<string>();
+/** AI check runs that have started and not ended: Gemini Nano takes one prompt at a time. */
+let liveRuns = 0;
+/** Warm-ups and downloads in flight: only then may the model line show a counter. */
+let modelWork = 0;
+/** Test prompts in flight: only then may the prompt line show a counter. */
+let promptWork = 0;
 
 const later = <T>(value: () => T, ms: number): Promise<T> =>
   new Promise((resolve, reject) => {
@@ -54,7 +60,9 @@ vi.mock('../../src/ai', () => ({
       ? 'ready'
       : rng.pick(['ready', 'ready', 'not-downloaded', 'unavailable', 'throw'] as const);
     trace.push(`  warm-up: ${state}`);
+    modelWork++;
     return later(() => {
+      modelWork--;
       if (state === 'throw') throw new Error('Chrome refused');
       return state === 'ready' ? { state, durationMs: 1_234 } : { state };
     }, delay());
@@ -75,7 +83,16 @@ vi.mock('../../src/ai', () => ({
       ? 'answer'
       : rng.pick(['answer', 'answer', 'fail', 'unreadable', 'hang']);
     trace.push(`  AI check: ${behaviour}`);
-    return new Promise((resolve) => {
+    if (liveRuns > 0) violations.push('a second AI check started while one ran');
+    liveRuns++;
+    return new Promise<AiCheckResult>((settle) => {
+      let ended = false;
+      const resolve = (result: AiCheckResult): void => {
+        if (ended) return;
+        ended = true;
+        liveRuns--;
+        settle(result);
+      };
       signal.addEventListener('abort', () =>
         resolve({ ok: false, reason: 'stopped', detail: 'the model had written 0 characters' }),
       );
@@ -97,7 +114,9 @@ vi.mock('../../src/ai', () => ({
   },
   runPrompt: (): Promise<PromptResult> => {
     const fails = !calm && rng.chance(0.3);
+    promptWork++;
     return later(() => {
+      promptWork--;
       if (fails) throw new Error('The cloud said no');
       return { text: 'An answer.', source: undefined, durationMs: 800 };
     }, delay());
@@ -112,7 +131,9 @@ vi.mock('../../src/ai', () => ({
     // Chrome may report progress after the download has ended.
     setTimeout(() => onProgress(0.5), 10_000);
     const result = calm ? 'ready' : rng.pick(['ready', 'unavailable', 'throw'] as const);
+    modelWork++;
     return later(() => {
+      modelWork--;
       if (result === 'throw') throw new Error('Download failed');
       return result === 'ready' ? { state: result, durationMs: 1 } : { state: result };
     }, 1_000);
@@ -324,6 +345,9 @@ function checkPanelOnce(): void {
       expect(LEVEL[risk as Risk], 'verdict below the rules').toBeGreaterThanOrEqual(LEVEL[rules]);
     }
   }
+  // Counters run only while something is loading: no stale seconds or download percentage.
+  if (modelWork === 0) expect(get('model-progress').textContent, '#model-progress idle').toBe('');
+  if (promptWork === 0) expect(get('progress').textContent, '#progress idle').toBe('');
   for (const id of STATUS_IDS) {
     expect(get(id).textContent, `#${id}`).not.toMatch(/undefined|NaN|\[object |null/);
   }
@@ -343,11 +367,14 @@ function checkPanel(): void {
   }
 }
 
-/** The panel's body without its script tag (main.ts is imported by the test). */
-const PANEL_HTML = (/<body>([\s\S]*)<\/body>/.exec(body)?.[1] ?? '').replace(
-  /<script[\s\S]*?<\/script>/,
-  '',
-);
+/**
+ * Loads the real panel page. Parsed by jsdom (innerHTML runs no scripts and loads nothing), then
+ * the script tag is removed through the DOM, never with a regex: main.ts is imported by the test.
+ */
+function loadPanel(): void {
+  document.documentElement.innerHTML = body;
+  for (const element of document.querySelectorAll('script, link')) element.remove();
+}
 
 const onError = (event: ErrorEvent): void => {
   violations.push(`uncaught: ${event.message}`);
@@ -371,9 +398,12 @@ describe('monkey: side panel', () => {
       calm = false;
       violations = [];
       trace = [];
+      liveRuns = 0;
+      modelWork = 0;
+      promptWork = 0;
       vi.clearAllTimers();
       vi.resetModules();
-      document.body.innerHTML = PANEL_HTML;
+      loadPanel();
       stubChrome();
       await import('../../src/sidepanel/main');
       await vi.advanceTimersByTimeAsync(0);
@@ -396,6 +426,8 @@ describe('monkey: side panel', () => {
         expect(get<HTMLButtonElement>(id).disabled, `#${id} stuck disabled`).toBe(false);
       }
       expect(get('ai-status').textContent ?? '').not.toMatch(/running|waiting|waits|loading/i);
+      // Nothing keeps running: no ticker, no counter, no forgotten timeout.
+      expect(vi.getTimerCount(), 'timers left running').toBe(0);
     });
     // A monkey that never got anywhere proves nothing: the main states must have been reached.
     // (Not while one case is replayed.)

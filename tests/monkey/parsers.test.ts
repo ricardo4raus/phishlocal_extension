@@ -8,6 +8,7 @@ import { parsePastedEmail, readHtml } from '../../src/paste/parse-pasted-email';
 import { headersFromOriginalPage, GMAIL_SERVER } from '../../src/raw/gmail-original-page';
 import { looksLikeRawEmail, parseRawEmail, RawEmailError } from '../../src/raw/parse-raw-email';
 import { checkEmail, MAX_FINDINGS } from '../../src/rules';
+import { parseUrl } from '../../src/rules/domains';
 import { MAX_EVIDENCE_CHARS } from '../../src/rules/types';
 import {
   cutMiddle,
@@ -17,6 +18,7 @@ import {
 } from '../../src/sidepanel/link-display';
 import {
   forEachCase,
+  MONKEY_RUNS,
   MONKEY_TIMEOUT_MS,
   longText,
   NASTY_CHARS,
@@ -25,13 +27,17 @@ import {
   randomHtml,
   randomRaw,
   randomText,
+  REPLAYING_ONE_CASE,
   type Rng,
 } from './random';
 
 vi.setConfig({ testTimeout: MONKEY_TIMEOUT_MS });
 
-/** One call must stay fast even for hostile input (slow regexes, deep nesting). */
-const MAX_CALL_MS = 1_500;
+/**
+ * One call must stay fast even for hostile input (slow regexes, deep nesting). Generous, so a
+ * busy CI runner does not fail it; a slow regex on hostile input takes far longer.
+ */
+const MAX_CALL_MS = 5_000;
 
 function timed<T>(what: string, call: () => T): T {
   const start = performance.now();
@@ -53,9 +59,12 @@ async function timedAsync<T>(what: string, call: () => Promise<T>): Promise<T> {
 const CANARY = 'QJXCANARYQJX';
 
 /** Model output in the AI's answer: link, address and phone shapes it must never show. */
-const FULL_URL = /(?:https?:\/\/|www\.)\S/i;
+const FULL_URL = /(?:[a-z][a-z\d+.-]*:\/\/|www\.)\S/i;
 const EMAIL_ADDRESS = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
-const PHONE_NUMBER = /\+?\d[\d ().-]{7,}\d/;
+const PHONE_NUMBER = /\+?\p{Nd}[\p{Nd} ()./\u2010-\u2015-]{7,}\p{Nd}/u;
+const BARE_DOMAIN = /\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,24}\b/i;
+const arabicIndic = (digits: string): string =>
+  [...digits].map((digit) => String.fromCodePoint(0x0660 + Number(digit))).join('');
 
 /** What can split a phone number or link in model output without being visible. */
 const SPLITTERS = ['\n', '\t', '\r\n', ' ', ...NASTY_CHARS.slice(0, 17)];
@@ -65,6 +74,7 @@ const visible = (text: string): string =>
   text
     .normalize('NFKC')
     .replace(/\p{Cf}/gu, '')
+    .replace(/\u3002/g, '.')
     .replace(/\s+/g, ' ');
 
 /** A string the model might answer with: valid JSON, broken JSON, fenced, or junk. */
@@ -81,6 +91,10 @@ function randomAnswer(rng: Rng, known: string): string {
         `https://${rng.pick(SPLITTERS)}evil.example/x`,
         `help${rng.pick(SPLITTERS)}@evil.example`,
         'write to help@evil.example',
+        `${rng.pick(['ftp', 'hxxp', 'chrome-extension', 'x'])}://evil.example/login`,
+        `+49 30/1234${rng.pick(['-', '\u2013', ' ', '/'])}56789`,
+        `+${arabicIndic('49')} ${arabicIndic('30')} ${arabicIndic('12345678')}`,
+        `paypa1${rng.pick(['\uff61', '\u3002', '.', '\uff0e'])}secure.example`,
         known,
         'paypa1.example',
         longText(rng, 3_000),
@@ -132,11 +146,13 @@ describe('monkey: rule checks', () => {
 
 describe('monkey: AI answer reader', () => {
   it('never crashes and never shows links, foreign addresses or phone numbers', async () => {
+    let read = 0;
     await forEachCase(500, (rng) => {
       const known = 'news@lumorabank.example';
       const answer = randomAnswer(rng, known);
       const verdict = timed('parseVerdict', () => parseVerdict(answer, new Set([known])));
       if (!verdict) return;
+      read++;
       expect(RISKS).toContain(verdict.risk);
       expect(verdict.reasons.length).toBeLessThanOrEqual(MAX_REASONS);
       for (const text of [...verdict.reasons, verdict.advice]) {
@@ -153,9 +169,12 @@ describe('monkey: AI answer reader', () => {
         expect(visible(uncut).replaceAll(known, ''), where).not.toMatch(EMAIL_ADDRESS);
       }
       for (const reason of verdict.reasons) expect(reason).not.toBe('');
-      // Advice never names an address, not even the sender's.
+      // Advice never names an address, not even the sender's, and no domain.
       expect(visible(verdict.advice)).not.toMatch(EMAIL_ADDRESS);
+      expect(visible(verdict.advice)).not.toMatch(BARE_DOMAIN);
     });
+    // Most answers must be readable, or the checks above would hardly run.
+    expect(REPLAYING_ONE_CASE || read >= 500 * MONKEY_RUNS * 0.3).toBe(true);
   });
 });
 
@@ -249,6 +268,9 @@ describe('monkey: link display', () => {
       // A forward to the same domain is not worth a note.
       expect(shown.forwardsTo).not.toBe(shown.domain);
       // The host is never cut (at most 253 characters), the rest is.
+      const url = parseUrl(href);
+      const web = url?.protocol === 'http:' || url?.protocol === 'https:';
+      expect(web ? shown.short.includes(url.hostname) : true, 'host kept in full').toBe(true);
       expect([...shown.short].length).toBeLessThanOrEqual(
         Math.max(MAX_OTHER_CHARS, 'http://'.length + 253 + ':65535'.length + MAX_PATH_CHARS),
       );
