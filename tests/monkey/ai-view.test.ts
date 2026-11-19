@@ -1,0 +1,255 @@
+// @vitest-environment jsdom
+// Chaos monkey for the AI check in the side panel: random emails shown and hidden, random time
+// jumps, and a model that answers, fails, crashes, hangs or ignores the stop signal at random.
+// After every step the panel must still keep its promises.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AiCheckResult } from '../../src/ai';
+import { RISKS, type Risk, ruleRisk } from '../../src/ai/verdict';
+import type { Email } from '../../src/email';
+import type { Finding } from '../../src/rules';
+import { type AiCheck, createAiCheck } from '../../src/sidepanel/ai-view';
+import { forEachCase, MONKEY_TIMEOUT_MS, type Rng } from './random';
+
+vi.setConfig({ testTimeout: MONKEY_TIMEOUT_MS });
+
+/** Four emails; each run's prompt names its email by the token in the subject. */
+const EMAILS: Email[] = [0, 1, 2, 3].map((number) => ({
+  sender: { name: 'Lumora Bank', address: `news${number}@lumorabank.example` },
+  subject: `MAIL${number}`,
+  bodyText: 'Hello',
+  links: [],
+  truncated: false,
+}));
+
+const FINDING_SETS: (Finding[] | undefined)[] = [
+  [],
+  [{ rule: 'urgency', severity: 'warning', message: 'w', evidence: [] }],
+  [{ rule: 'dangerous-link', severity: 'danger', message: 'd', evidence: [] }],
+  [{ rule: 'urgency', severity: 'info', message: 'i', evidence: [] }],
+  undefined, // The rules failed.
+];
+
+const LEVEL: Record<Risk, number> = { safe: 0, suspicious: 1, dangerous: 2 };
+
+interface Run {
+  email: string;
+  signal: AbortSignal;
+  settled: boolean;
+}
+
+/** The test's own model of what the panel shows. */
+interface Shown {
+  email: Email;
+  findings: Finding[] | undefined;
+}
+
+const tokenOf = (text: string): string => /MAIL\d/.exec(text)?.[0] ?? '?';
+
+let runs: Run[];
+/** Broken promises seen inside the fake model. */
+let violations: string[];
+/** What happened, for the failure message. */
+let trace: string[];
+let shown: Shown | undefined;
+/** In the end phase the model behaves: everything answers, so the panel must come to rest. */
+let calm: boolean;
+let check: AiCheck;
+
+const get = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
+
+function create(rng: Rng): AiCheck {
+  return createAiCheck(
+    {
+      verdict: get('verdict'),
+      overall: get('overall'),
+      status: get('status'),
+      reasons: get('reasons') as HTMLUListElement,
+      advice: get('advice'),
+    },
+    {
+      run: (prompt, _language, _known, signal) => {
+        const email = tokenOf(prompt);
+        // Recorded, not thrown: the panel catches errors from a run.
+        // One prompt at a time: every earlier run has ended or was told to stop.
+        if (runs.some((run) => !run.settled && !run.signal.aborted)) {
+          violations.push(`a run for ${email} started while another one was live`);
+        }
+        // Only the email on screen is checked.
+        const onScreen = shown ? tokenOf(shown.email.subject) : 'nothing';
+        if (email !== onScreen)
+          violations.push(`a run for ${email} started; on screen: ${onScreen}`);
+        const run: Run = { email, signal, settled: false };
+        trace.push(`  run ${runs.length} starts for ${email}`);
+        runs.push(run);
+        const behaviour = calm
+          ? 'answer'
+          : rng.pick(['answer', 'answer', 'fail', 'crash', 'unreadable', 'throw', 'hang', 'deaf']);
+        const after = calm ? 1_000 : rng.pick([0, 10, 900, 5_000, 59_000, 70_000]);
+        trace.push(`  (${behaviour} after ${after} ms)`);
+        return new Promise<AiCheckResult>((resolve, reject) => {
+          const end = (result: AiCheckResult | Error): void => {
+            if (run.settled) return;
+            run.settled = true;
+            trace.push(
+              `  run for ${email} ends: ${result instanceof Error ? 'throws' : JSON.stringify(result)}`,
+            );
+            if (result instanceof Error) reject(result);
+            else resolve(result);
+          };
+          // A deaf run ignores its stop signal (the panel must move on without it).
+          if (behaviour !== 'deaf') {
+            signal.addEventListener('abort', () =>
+              end({ ok: false, reason: 'stopped', detail: 'the model had written 3 characters' }),
+            );
+          }
+          if (behaviour === 'hang' || behaviour === 'deaf') return;
+          setTimeout(() => {
+            if (behaviour === 'answer') {
+              end({
+                ok: true,
+                verdict: {
+                  risk: rng.pick(RISKS),
+                  reasons: [`About ${email}`],
+                  advice: `Advice for ${email}`,
+                },
+                durationMs: after,
+              });
+            } else if (behaviour === 'fail') {
+              end({ ok: false, reason: 'failed', detail: rng.pick(['input too large', 'x']) });
+            } else if (behaviour === 'crash') {
+              end({ ok: false, reason: 'failed', detail: 'Session crashed' });
+            } else if (behaviour === 'unreadable') {
+              end({ ok: false, reason: 'unreadable-answer' });
+            } else {
+              end(new Error('The model threw'));
+            }
+          }, after);
+        });
+      },
+      uiLanguage: () => rng.pick(['de-CH', 'de']),
+      modelReady: () => {
+        const wait = calm ? 0 : rng.pick([0, 0, 500, 3_000, 300_000]);
+        const outcome = calm ? 'ready' : rng.pick(['ready', 'ready', 'ready', 'no', 'throw']);
+        trace.push(`  model: ${outcome} after ${wait} ms`);
+        return new Promise<boolean>((resolve, reject) => {
+          setTimeout(() => {
+            if (outcome === 'throw') reject(new Error('Chrome refused'));
+            else resolve(outcome === 'ready');
+          }, wait);
+        });
+      },
+      headersWaitMs: 3_000,
+    },
+  );
+}
+
+/** What the panel promises after every step. */
+function checkPanel(): void {
+  try {
+    checkPanelOnce();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const panel = `panel: ${get('verdict').dataset.risk} | ${get('overall').textContent} | ${get('status').textContent}`;
+    const steps = trace.slice(-40).join('\n');
+    throw new Error(`${message}\n${panel}\nLast steps:\n${steps}`, { cause: error });
+  }
+}
+
+function checkPanelOnce(): void {
+  expect(violations).toEqual([]);
+  const verdict = get('verdict');
+  expect(verdict.hidden, 'verdict visible exactly while an email is shown').toBe(!shown);
+  if (!shown) return;
+  const risk = verdict.dataset.risk ?? '';
+  const rules: Risk = shown.findings ? ruleRisk(shown.findings) : 'suspicious';
+  if (risk === 'pending') {
+    // Grey only while the rules found nothing.
+    expect(rules).toBe('safe');
+  } else {
+    expect(RISKS).toContain(risk);
+    expect(LEVEL[risk as Risk], 'the verdict is never below the rules').toBeGreaterThanOrEqual(
+      LEVEL[rules],
+    );
+  }
+  // Reasons and advice shown belong to the email on screen.
+  const token = tokenOf(shown.email.subject);
+  for (const item of document.querySelectorAll('#reasons li')) {
+    expect(item.textContent).toBe(`About ${token}`);
+  }
+  const advice = get('advice').textContent ?? '';
+  if (advice.startsWith('Advice for')) expect(advice).toBe(`Advice for ${token}`);
+  expect(document.body.textContent).not.toMatch(/undefined|NaN|\[object /);
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('monkey: AI check view', () => {
+  it('keeps its promises whatever the emails, the timing and the model do', async () => {
+    await forEachCase(120, async (rng) => {
+      vi.clearAllTimers();
+      runs = [];
+      violations = [];
+      trace = [];
+      shown = undefined;
+      calm = false;
+      document.body.innerHTML =
+        '<div id="verdict" hidden><p id="overall"></p><p id="status"></p>' +
+        '<ul id="reasons"></ul><p id="advice"></p></div>';
+      check = create(rng);
+
+      for (let step = 0; step < 40; step++) {
+        const action = rng.pick([
+          'show',
+          'show',
+          'show',
+          'hide',
+          'recheck',
+          'wait',
+          'wait',
+          'wait',
+        ]);
+        if (action === 'show') {
+          shown = { email: rng.pick(EMAILS), findings: rng.pick(FINDING_SETS) };
+          const final = rng.chance(0.7);
+          trace.push(
+            `show ${shown.email.subject} rules ${shown.findings ? ruleRisk(shown.findings) : 'failed'}${final ? '' : ' (headers to come)'}`,
+          );
+          check.shown(shown.email, shown.findings, final);
+        } else if (action === 'hide') {
+          trace.push('hide');
+          shown = undefined;
+          check.hidden();
+        } else if (action === 'recheck') {
+          trace.push('recheck');
+          check.recheck();
+        }
+        const ms =
+          action === 'wait' ? rng.pick([0, 100, 499, 500, 1_000, 3_000, 61_000, 63_000]) : 0;
+        if (ms) trace.push(`wait ${ms} ms`);
+        await vi.advanceTimersByTimeAsync(ms);
+        checkPanel();
+      }
+
+      // The model behaves from now on: the shown email must get a final answer, and nothing may
+      // keep running (no ticker, no timer) once everything has ended.
+      calm = true;
+      if (shown) check.recheck();
+      await vi.advanceTimersByTimeAsync(1_000_000);
+      checkPanel();
+      // The check came to rest (with nothing shown, both are empty).
+      expect(get('status').textContent).not.toMatch(/waiting|waits|running|loading/i);
+      expect(get('overall').textContent).not.toMatch(/^Checking/);
+      check.hidden();
+      shown = undefined;
+      await vi.advanceTimersByTimeAsync(10_000);
+      checkPanel();
+      expect(vi.getTimerCount(), 'timers left running').toBe(0);
+    });
+  });
+});
