@@ -627,5 +627,11 @@ _To fill in near the submission._
   must not stay readable as one run. It immediately flagged a fragment left behind when a link
   swallowed half of a glued phone number; that fragment is shorter than the 9 characters the
   filter needs by design, so the check now looks for 8-digit cores. The chaos monkey also got
-  an email variant with a Reply-To, and every shown reason must name exactly the shown email's
-  own addresses.
+  an email variant with a Reply-To, and the answer shown must come from a run that got exactly
+  the shown email's own addresses (the ones the model may name).
+- Review round 3 found a hole in the date exception: number shapes like "0791-2345" or
+  "555-12-3456" counted as dates and stayed visible. Dates now need real date shapes (day and
+  month with 1 or 2 digits and plausible values). The phone separators are now a written
+  spec (any dash punctuation, dots, bullets, slashes, parentheses), shared by the code, the
+  docs and the monkey's check; other characters such as "[" split a number, which a 100x run
+  showed and which is now a documented gap.

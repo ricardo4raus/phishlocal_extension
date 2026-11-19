@@ -48,11 +48,14 @@ are its input and its lower limit.
      read as ".", whitespace joined), so a phone number split by line breaks or written in
      fullwidth digits is caught too. Links of any scheme (`ftp://` too) are removed, and phone
      numbers of at least 9 characters in any digits (Arabic-Indic too), grouped with spaces,
-     dots, slashes, dashes, the minus sign, middle dots or bullets. Dates and year ranges
-     ("19/11/2026", "2020–2025") match that pattern too but stay: deadlines are evidence. Known
-     gaps: a phone number written like a date ("0800-12-3456") stays, and shorter fragments stay
-     by design. A link scheme with a lookalike first letter (Cyrillic "һttps://…") loses its link
-     anyway; only that one letter stays.
+     parentheses, any dash punctuation, the minus sign, dots (also middle dots and bullets) or
+     slashes. Real dates and year ranges ("19/11/2026", "2026-11-19", "2020–2025") match that
+     pattern too but stay: deadlines are evidence. Only date shapes count (day and month with 1
+     or 2 digits and plausible values), so "0791-2345" or "555-12-3456" are still removed. Known
+     gaps: a phone number that is a plausible date ("12.11.2026") stays; other separators ("|",
+     "[") split a number, and fragments shorter than 9 characters stay, so that amounts like
+     "12,345.67 EUR" stay readable. A link scheme with a lookalike first letter (Cyrillic
+     "һttps://…") loses its link anyway; only that one letter stays.
      Anything else means "the AI answer could not be read".
 4. **Verdict** ([`src/sidepanel/ai-view.ts`](../src/sidepanel/ai-view.ts)):
    - The overall risk is the higher of AI and rules. A rule danger finding means at least
