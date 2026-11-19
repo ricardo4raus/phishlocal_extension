@@ -58,32 +58,73 @@ const PHONE_NUMBER = new RegExp(String.raw`\+?\p{Nd}[\p{Nd}${GROUPING}]{7,}\p{Nd
  * A date ("19.11.2026", "19/11/26", "2026-11-19") or a year range ("2020-2025") matches the
  * phone pattern too, but deadlines are the evidence a reason needs: kept. Only real date shapes:
  * day and month have 1 or 2 digits and plausible values, so "0791-2345", "555-12-3456" or
- * "079.12.3456" are still removed.
+ * "079.12.3456" are still removed. Year ranges count only for 19xx and 20xx.
  */
 const DATE_SEPARATOR = String.raw`[./\p{Pd}\u2044\u2215]`;
 const DAY_MONTH_YEAR = new RegExp(
-  String.raw`^(\p{Nd}{1,2})(${DATE_SEPARATOR})(\p{Nd}{1,2})\2(?:\p{Nd}{4}|\p{Nd}{2})$`,
+  String.raw`^(\d{1,2})(${DATE_SEPARATOR})(\d{1,2})\2(?:\d{4}|\d{2})$`,
   'u',
 );
-const YEAR_MONTH_DAY = new RegExp(
-  String.raw`^\p{Nd}{4}(${DATE_SEPARATOR})(\p{Nd}{1,2})\1(\p{Nd}{1,2})$`,
-  'u',
-);
+const YEAR_MONTH_DAY = new RegExp(String.raw`^\d{4}(${DATE_SEPARATOR})(\d{1,2})\1(\d{1,2})$`, 'u');
 const YEAR_RANGE = /^(?:19|20)\d\d ?\p{Pd} ?(?:19|20)\d\d$/u;
 
-/** Day and month (either order) are plausible; digits of other scripts count by shape only. */
+const isDigit = (char: string): boolean => /^\p{Nd}$/u.test(char);
+
+/**
+ * Digits of any script as ASCII digits (NFKC folds only some, e.g. fullwidth). Unicode keeps
+ * each script's digits 0 to 9 in a row, so a digit's value is its distance from the start of
+ * that row (several rows in a row, as for mathematical digits, repeat every 10).
+ */
+function asciiDigits(text: string): string {
+  return text.replace(/\p{Nd}/gu, (char) => {
+    const code = char.codePointAt(0) ?? 0;
+    let start = code;
+    while (start > 0 && isDigit(String.fromCodePoint(start - 1))) start--;
+    return String((code - start) % 10);
+  });
+}
+
+/** Day and month (either order) are plausible. */
 function plausible(first: string, second: string): boolean {
   const [a, b] = [Number(first), Number(second)];
-  if (Number.isNaN(a) || Number.isNaN(b)) return true;
   return a >= 1 && b >= 1 && a <= 31 && b <= 31 && (a <= 12 || b <= 12);
 }
 
 function isDate(text: string): boolean {
-  if (YEAR_RANGE.test(text)) return true;
-  const dayFirst = DAY_MONTH_YEAR.exec(text);
+  const ascii = asciiDigits(text);
+  if (YEAR_RANGE.test(ascii)) return true;
+  const dayFirst = DAY_MONTH_YEAR.exec(ascii);
   if (dayFirst) return plausible(dayFirst[1] ?? '', dayFirst[3] ?? '');
-  const yearFirst = YEAR_MONTH_DAY.exec(text);
+  const yearFirst = YEAR_MONTH_DAY.exec(ascii);
   return yearFirst ? plausible(yearFirst[2] ?? '', yearFirst[3] ?? '') : false;
+}
+
+/**
+ * A phone-pattern match, with real dates kept. The match can hold more than a date ("19.11.2026
+ * 12" from "19.11.2026 12:00"), so it is read in parts split at spaces: dates stay, and the rest
+ * between them is checked again (a phone number next to a date is still removed).
+ */
+function removePhoneNumbers(match: string): string {
+  const parts = match.split(/( )/);
+  let result = '';
+  let rest = '';
+  const flush = (): void => {
+    // Its own regex object: the outer replaceAll is still using PHONE_NUMBER.
+    result += rest.replaceAll(new RegExp(PHONE_NUMBER.source, 'gu'), (number) =>
+      isDate(number) ? number : '[removed]',
+    );
+    rest = '';
+  };
+  for (const part of parts) {
+    if (isDate(part)) {
+      flush();
+      result += part;
+    } else {
+      rest += part;
+    }
+  }
+  flush();
+  return result;
 }
 const BARE_DOMAIN = /\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,24}\b(?:\/\S*)?/gi;
 
@@ -123,7 +164,7 @@ export function cleanAiText(
     .replaceAll(EMAIL_ADDRESS, (address) =>
       knownAddresses.has(address.toLowerCase()) ? address : '[removed]',
     )
-    .replaceAll(PHONE_NUMBER, (number) => (isDate(number) ? number : '[removed]'));
+    .replaceAll(PHONE_NUMBER, removePhoneNumbers);
   if (!keepDomains) cleaned = cleaned.replaceAll(BARE_DOMAIN, '[removed]');
   cleaned = cleaned.trim();
   return cleaned.length > MAX_AI_TEXT ? `${cleaned.slice(0, MAX_AI_TEXT - 1)}…` : cleaned;

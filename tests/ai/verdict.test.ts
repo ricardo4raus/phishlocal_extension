@@ -136,6 +136,22 @@ describe('cleanAiText', () => {
     }
   });
 
+  it('keeps a date next to a time or another date, but not a phone number next to it', () => {
+    // Found in review round 4: the time was part of the match, so the date went too.
+    expect(cleanAiText('Frist 19.11.2026 12:00 Uhr')).toBe('Frist 19.11.2026 12:00 Uhr');
+    expect(cleanAiText('Bis 19.11.2026 - 20.11.2026')).toBe('Bis 19.11.2026 - 20.11.2026');
+    expect(cleanAiText('Call +41 79 123 45 67 by 19.11.2026')).toBe('Call [removed] by 19.11.2026');
+    expect(cleanAiText('Call 19.11.2026 079 123 45 67')).toBe('Call 19.11.2026 [removed]');
+  });
+
+  it('checks dates in other scripts by value too', () => {
+    // Found in review round 4: Arabic-Indic digits skipped the value check.
+    const implausible = `${arabicIndic('99')}.${arabicIndic('99')}.${arabicIndic('9999')}`;
+    const real = `${arabicIndic('19')}.${arabicIndic('11')}.${arabicIndic('2026')}`;
+    expect(cleanAiText(`Call ${implausible} now`)).toBe('Call [removed] now');
+    expect(cleanAiText(`Pay by ${real} now`)).toBe(`Pay by ${real} now`);
+  });
+
   it('still removes phone numbers that are shaped like dates', () => {
     // Found in review round 3: the first date check kept these as "dates".
     for (const number of ['0791-2345', '555-12-3456', '079.12.3456', '41.79.123', '12.34.5678']) {
@@ -155,6 +171,10 @@ describe('cleanAiText', () => {
   it('stays fast on long hostile output', () => {
     const start = performance.now();
     cleanAiText(`${'a.'.repeat(50_000)}x`, { keepDomains: false });
+    // Long digit runs split by spaces, dates in between, digits of another script.
+    cleanAiText('1 '.repeat(5_000));
+    cleanAiText('19.11.2026 1 '.repeat(500));
+    cleanAiText(`${arabicIndic('1234567890').repeat(200)} `.repeat(2));
     expect(performance.now() - start).toBeLessThan(200);
   });
 });
