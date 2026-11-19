@@ -51,10 +51,13 @@ are its input and its lower limit.
      parentheses, any dash punctuation, the minus sign, dots (also middle dots and bullets) or
      slashes. Real dates and year ranges ("19/11/2026", "2026-11-19", "2020–2025") match that
      pattern too but stay: deadlines are evidence. Only date shapes count (day and month with 1
-     or 2 digits and plausible values), so "0791-2345" or "555-12-3456" are still removed. Known
-     gaps: a phone number that is a plausible date ("12.11.2026") stays; other separators ("|",
-     "[") split a number, and fragments shorter than 9 characters stay, so that amounts like
-     "12,345.67 EUR" stay readable. A link scheme with a lookalike first letter (Cyrillic
+     or 2 digits and plausible values, in any script's digits; year ranges only for 19xx and
+     20xx), so "0791-2345" or "555-12-3456" are still removed. A match is read in parts split at
+     spaces, so a time after a date ("19.11.2026 12:00") keeps the date, and a phone number next
+     to a date is still removed. Known gaps: a phone number that is a plausible date
+     ("12.11.2026") or a 19xx/20xx year range ("2001-2002") stays; other separators ("|", "[")
+     split a number; fragments shorter than 9 characters stay, so that amounts like "12,345.67
+     EUR" stay readable; a date written with spaces ("19. 11. 2026") is removed. A link scheme with a lookalike first letter (Cyrillic
      "һttps://…") loses its link anyway; only that one letter stays.
      Anything else means "the AI answer could not be read".
 4. **Verdict** ([`src/sidepanel/ai-view.ts`](../src/sidepanel/ai-view.ts)):

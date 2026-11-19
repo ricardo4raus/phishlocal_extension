@@ -632,6 +632,11 @@ _To fill in near the submission._
 - Review round 3 found a hole in the date exception: number shapes like "0791-2345" or
   "555-12-3456" counted as dates and stayed visible. Dates now need real date shapes (day and
   month with 1 or 2 digits and plausible values). The phone separators are now a written
-  spec (any dash punctuation, dots, bullets, slashes, parentheses), shared by the code, the
-  docs and the monkey's check; other characters such as "[" split a number, which a 100x run
+  spec (any dash punctuation, dots, bullets, slashes, parentheses), written in the docs and
+  kept in sync by hand in the code and the monkey's check; other characters such as "[" split a number, which a 100x run
   showed and which is now a documented gap.
+- Review round 4 found two smaller gaps in the date exception: dates in Arabic-Indic digits
+  skipped the value check (so an implausible "date" stayed), and a time after a date
+  ("19.11.2026 12:00") made the whole match look like a phone number, so the deadline was
+  removed. Digits of every script are now read as their values, and a match is checked in parts
+  split at spaces.
