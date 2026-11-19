@@ -100,31 +100,22 @@ function isDate(text: string): boolean {
 }
 
 /**
- * A phone-pattern match, with real dates kept. The match can hold more than a date ("19.11.2026
- * 12" from "19.11.2026 12:00"), so it is read in parts split at spaces: dates stay, and the rest
- * between them is checked again (a phone number next to a date is still removed).
+ * A phone-pattern match, kept only if it is a date, or holds dates and nothing else that reads
+ * as a phone number. The match can hold more than a date ("19.11.2026 12" from "19.11.2026
+ * 12:00"), so its space-separated parts are read: the parts that are not dates, joined, must not
+ * be a phone number. Joined, not one by one: a date placed between the groups of a phone number
+ * ("079 19.11.2026 123 4567") must not split it into harmless-looking pieces (found in review).
+ * A phone number right next to a date takes the date with it; that errs on the safe side.
  */
 function removePhoneNumbers(match: string): string {
-  const parts = match.split(/( )/);
-  let result = '';
-  let rest = '';
-  const flush = (): void => {
-    // Its own regex object: the outer replaceAll is still using PHONE_NUMBER.
-    result += rest.replaceAll(new RegExp(PHONE_NUMBER.source, 'gu'), (number) =>
-      isDate(number) ? number : '[removed]',
-    );
-    rest = '';
-  };
-  for (const part of parts) {
-    if (isDate(part)) {
-      flush();
-      result += part;
-    } else {
-      rest += part;
-    }
-  }
-  flush();
-  return result;
+  if (isDate(match)) return match;
+  const parts = match.split(' ');
+  if (!parts.some(isDate)) return '[removed]';
+  const rest = parts.filter((part) => !isDate(part)).join(' ');
+  const phoneInRest = [...rest.matchAll(new RegExp(PHONE_NUMBER.source, 'gu'))].some(
+    ([number]) => !isDate(number),
+  );
+  return phoneInRest ? '[removed]' : match;
 }
 const BARE_DOMAIN = /\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,24}\b(?:\/\S*)?/gi;
 

@@ -141,7 +141,11 @@ describe('cleanAiText', () => {
     expect(cleanAiText('Frist 19.11.2026 12:00 Uhr')).toBe('Frist 19.11.2026 12:00 Uhr');
     expect(cleanAiText('Bis 19.11.2026 - 20.11.2026')).toBe('Bis 19.11.2026 - 20.11.2026');
     expect(cleanAiText('Call +41 79 123 45 67 by 19.11.2026')).toBe('Call [removed] by 19.11.2026');
-    expect(cleanAiText('Call 19.11.2026 079 123 45 67')).toBe('Call 19.11.2026 [removed]');
+    // A phone number right next to a date takes the date with it (the safe side).
+    expect(cleanAiText('Call 19.11.2026 079 123 45 67')).toBe('Call [removed]');
+    // Found in review round 5: a date between the groups split the number into short pieces.
+    expect(cleanAiText('Call 079 19.11.2026 123 4567')).toBe('Call [removed]');
+    expect(cleanAiText('Call 07912 19.11.2026 34567')).toBe('Call [removed]');
   });
 
   it('checks dates in other scripts by value too', () => {
