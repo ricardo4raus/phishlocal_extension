@@ -44,7 +44,29 @@ are its input and its lower limit.
    - accepted also inside a code fence;
    - full links, planted email addresses and phone numbers are removed from it, and bare domains
      from the advice. The email's own addresses (sender, Reply-To) stay readable in the reasons.
-     Anything else means "the AI answer could not be read".
+     Anything else means "the AI answer could not be read". Details of the cleaning:
+     - **Normalized first** (NFKC, invisible characters removed, ideographic full stops read as
+       ".", whitespace joined), so a phone number split by line breaks or written in fullwidth
+       digits is caught too.
+     - **Links** of any scheme (`ftp://` too).
+     - **Phone numbers** of at least 9 characters, in any script's digits (Arabic-Indic too),
+       grouped with spaces, parentheses, any dash punctuation, the minus sign, dots (also middle
+       dots and bullets) or slashes.
+     - **Dates stay:** real dates and year ranges ("19/11/2026", "2026-11-19", "2020–2025") match
+       the phone pattern too, but deadlines are evidence. Only date shapes count: day and month
+       with 1 or 2 digits and plausible values, in any script's digits; year ranges only for
+       19xx and 20xx. So "0791-2345" or "555-12-3456" are still removed. A match that holds a
+       date stays only if the rest, without the dates, reads as no phone number: a time after a
+       date ("19.11.2026 12:00") keeps the date, and a date placed between the groups of a phone
+       number ("079 19.11.2026 123 4567") does not save it. A phone number right next to a date
+       takes the date with it.
+     - **Known gaps:** a phone number that is a plausible date ("12.11.2026") or a 19xx/20xx
+       year range ("2001-2002") stays; other separators ("|", "[") split a number; fragments
+       shorter than 9 characters stay, so that amounts like "12,345.67 EUR" stay readable; a
+       date written with spaces ("19. 11. 2026") is removed, and so is a date followed by a
+       space-grouped number of 9 characters or more ("bis 19.11.2026 4 500 000.00 CHF"): the
+       filter cannot tell such an amount or time window from a phone number. A link scheme with a lookalike first
+       letter (Cyrillic "һttps://…") loses its link anyway; only that one letter stays.
 4. **Verdict** ([`src/sidepanel/ai-view.ts`](../src/sidepanel/ai-view.ts)):
    - The overall risk is the higher of AI and rules. A rule danger finding means at least
      "dangerous", a warning at least "suspicious".
@@ -70,9 +92,13 @@ are its input and its lower limit.
      load is skipped if its email was left meanwhile; a late result for an email that is no
      longer shown is dropped;
    - a check starts once the shown email has not changed for 0.5 s (Gmail shows an email several
-     times within a moment); the same email with the same findings uses a running check's answer;
+     times within a moment); the same email with the same findings uses a running check's answer
+     (the check takes over the newer findings, so rules that failed this time still set the
+     floor);
    - the last 20 answers stay in memory while the panel is open: an email shown again gets its
-     answer at once; failed runs are not kept, so they are tried again;
+     answer at once; failed runs are not kept, so they are tried again. An answer is reused only
+     for the same prompt, language and own addresses (sender, Reply-To, `mailto:` links), because
+     the answer may name exactly those addresses;
    - when the panel opens, it loads the model (measured 19 Nov 2026: 304.8 s right after a full
      Chrome exit, 3.6–3.8 s on other days; afterwards every new session starts in 0.0–0.1 s,
      whatever its settings);

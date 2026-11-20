@@ -139,6 +139,11 @@ _Current state, updated as features land._
   "Copy to clipboard", so pasting raw source came first. For automatic scanning, Ricardo measured
   Gmail's undocumented "Show original" URL with content-free snippets: it needs an account key
   (`ik`) that only Gmail's own scripts contain, and a same-site request returns the raw email.
+- **Bugs no hand-written test found:** the unit tests covered every case we thought of, and
+  the monkey tests still found four bugs within minutes, in code that had already been reviewed
+  several times. All four came from combinations nobody writes by hand: a phone number split by a
+  tab, a link glued to a digit, two low surrogates in a row, rules failing on the second showing
+  of the same email.
 
 ## What we learned
 
@@ -260,6 +265,12 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   after three, so "try again" must first ask whether the model is available at all.
 - A live region with a ticking counter is a screen reader announcing every second. Keep live
   regions for state changes and put counters next to them.
+- Random tests need an oracle and a seed: "it did not crash" finds little; checking the
+  panel's promises after every step (never below the rules, no result for another email) found
+  the logic bug. A fixed seed keeps CI stable; a random seed finds new cases locally, and the
+  seed in the failure message replays them.
+- Run a filter on the text as the user will see it: cleaning that joins whitespace after the
+  filter has run can rebuild what the filter removed.
 
 ## Accomplishments we're proud of
 
@@ -576,3 +587,66 @@ _To fill in near the submission._
   colours below 4.5:1, and that the new Gmail permission deserves a guard: structure tests now
   allow network requests only in the Gmail content script and `chrome.scripting` only in
   `src/inject.ts`. All fixed, each with a test that fails without it where testable.
+- Ricardo asked for a "monkey test". Three monkey tests now run in CI (`tests/monkey/`), from
+  a seeded random generator, so every failure can be replayed:
+  - random hostile input (invisible and direction characters, lone surrogates, deep HTML, broken
+    MIME, injected JSON) for the rules, the parsers, the prompt and the AI answer reader;
+  - a chaos monkey for the AI check: random emails shown and hidden, random time jumps, and a
+    model that answers, fails, crashes, hangs or ignores its stop signal;
+  - a UI monkey for the whole side panel (real `index.html` and `main.ts`, fake Chrome and
+    model): random clicks, typing, pastes, samples, Gmail messages and disconnects.
+- After every step the monkeys check the panel's promises: the verdict is never below the
+  rules, no result for another email, one model run at a time, no markup from email content,
+  and at the end nothing still running and no button stuck.
+- The monkeys found four bugs, each now fixed with a regression test that fails without it:
+  - the AI answer reader let a phone number through when the model split it with line breaks
+    or invisible characters, or wrote it in fullwidth digits; whitespace was joined only after
+    the filter ran;
+  - a link glued to a word ("4567https://evil.example") slipped past the link filter;
+  - parse5 8.0.1 throws on two low surrogates in a row, so one such pair made a pasted email
+    unreadable;
+  - an email shown again while its check ran joined that check with the old findings: if the
+    rules had failed this time, a "safe" AI answer showed green instead of at least yellow.
+- A 100× run (about 200,000 random cases) found one more failure, but in the test's own check:
+  the allowed sender address, cut at 300 characters, no longer looked allowed.
+- Two review agents checked the PR. The first found older gaps in the AI answer reader, all
+  fixed: links with other schemes (`ftp://`), phone numbers in Arabic-Indic digits or with `/`
+  and dashes, domains written with ideographic full stops, and a reused answer that could name
+  the Reply-To address of a different email with the same prompt. The second found weak spots in
+  the monkeys themselves: the UI monkey now also counts live model runs, checks that no counter
+  or download percentage is left when nothing loads, and that no timer runs at the end; the
+  chaos monkey covers confirmed senders; the link check asserts the host is kept.
+- Fixing the reused answer made the UI monkey fail at once with "URI malformed": a `mailto:%E0`
+  link made `decodeURIComponent` throw. Before, that error was caught inside the AI run, so any
+  email with such a link (attacker-written) silently turned its AI check into "failed". Fixed.
+- A second review round found that the phone filter now also removed deadlines from the AI's
+  reasons ("pay by 19/11/2026"; dates with dots were already removed before). Dates and year
+  ranges are now kept, and the minus sign, middle dots and bullets count as phone separators.
+  The review also noted that the monkey's phone check copied the source's own pattern, so a gap
+  in the pattern could never fail it. The new check is independent: the planted phone digits
+  must not stay readable as one run. It immediately flagged a fragment left behind when a link
+  swallowed half of a glued phone number; that fragment is shorter than the 9 characters the
+  filter needs by design, so the check now looks for 8-digit cores. The chaos monkey also got
+  an email variant with a Reply-To, and the answer shown must come from a run that got exactly
+  the shown email's own addresses (the ones the model may name).
+- Review round 3 found a hole in the date exception: number shapes like "0791-2345" or
+  "555-12-3456" counted as dates and stayed visible. Dates now need real date shapes (day and
+  month with 1 or 2 digits and plausible values). The phone separators are now a written
+  spec (any dash punctuation, dots, bullets, slashes, parentheses), written in the docs and
+  kept in sync by hand in the code and the monkey's check; other characters such as "[" split a number, which a 100x run
+  showed and which is now a documented gap.
+- Review round 4 found two smaller gaps in the date exception: dates in Arabic-Indic digits
+  skipped the value check (so an implausible "date" stayed), and a time after a date
+  ("19.11.2026 12:00") made the whole match look like a phone number, so the deadline was
+  removed. Digits of every script are now read as their values, and a match is checked in parts
+  split at spaces.
+- Review round 5 found that this part-by-part check opened a leak: a date placed between the
+  groups of a phone number ("079 19.11.2026 123 4567") split it into pieces too short for the
+  filter, so the whole number stayed readable. Now the parts that are not dates are joined and
+  checked as one; a phone number right next to a date takes the date with it. Five review rounds
+  on one filter: each fix for false alarms opened a new way around it, and each was caught by a
+  test written for the earlier round.
+- Review round 6 found no leak. It found that the stricter rule now also drops a deadline
+  followed by a space-grouped amount ("bis 19.11.2026 4 500 000.00 CHF"); keeping it would
+  reopen the leak, so it is a documented limit. The monkey's own phone check got a test of its
+  own, after the review showed it also hid one planted number.

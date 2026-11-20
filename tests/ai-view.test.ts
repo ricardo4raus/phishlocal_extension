@@ -366,6 +366,29 @@ describe('AI check view', () => {
     expect(prompts).toHaveLength(4);
   });
 
+  it('does not reuse an answer for an email with other own addresses', async () => {
+    // Found in review: the prompt leaves Reply-To out, but the answer may name the email's own
+    // addresses, so an answer for a Reply-To email must not serve the same email without it.
+    const withReplyTo: Email = {
+      ...email,
+      headers: { replyTo: [{ name: '', address: 'mallory@evil.example' }] },
+    };
+    await show(withReplyTo);
+    await answer(verdict('suspicious'));
+    await show({ ...email, headers: { replyTo: [] } });
+    expect(prompts).toHaveLength(2);
+  });
+
+  it('runs the AI check for an email with a broken mailto: link', async () => {
+    // Found by the monkey test: decodeURIComponent threw on "%E0", so such a link (attacker-
+    // written) turned every AI check of the email into "failed".
+    const broken: Email = { ...email, links: [{ text: 'Write us', href: 'mailto:%E0@x.example' }] };
+    await show(broken);
+    await answer(verdict('suspicious'));
+    expect(prompts).toHaveLength(1);
+    expect(text('overall')).toBe('Suspicious');
+  });
+
   it('remembers only the most recent answers', async () => {
     for (let i = 0; i <= MAX_REMEMBERED; i++) {
       await show({ ...email, subject: `Email ${i}` });
@@ -540,6 +563,17 @@ describe('AI check view', () => {
     expect(loads).toBe(1);
     expect(prompts).toHaveLength(1);
     expect(prompts[0]).toMatch(/"subject":"A"/);
+  });
+
+  it('keeps the floor of failed rules when the email joins a running check', async () => {
+    // Found by the monkey test: failed rules (undefined) give the same prompt as no findings, so
+    // the running check was used, with its old "no findings" floor.
+    await show(email, []);
+    check.shown(email, undefined, true);
+    await answer(verdict('safe'));
+    expect(prompts).toHaveLength(1);
+    expect(get('verdict').dataset.risk).toBe('suspicious');
+    expect(text('overall')).toBe('Suspicious (rule checks; the AI said: no signs of phishing)');
   });
 
   it('does not try again when there is no model', async () => {

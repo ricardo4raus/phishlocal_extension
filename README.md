@@ -105,6 +105,25 @@ the extension:
 - contains an API key or the App Check debug token;
 - contains invisible characters.
 
+**Monkey tests** (`tests/monkey/`) throw random, hostile input at the parsers, the rules and the
+AI answer reader. They also play random event orders against the AI check and the whole side
+panel: clicks, typing, pastes, Gmail messages and disconnects, with a model that answers, fails,
+hangs or ignores its stop signal. After every step they check the panel's promises, for example:
+
+- the verdict is never below the rules;
+- a result is never shown for another email;
+- only one model run at a time;
+- email content never becomes markup;
+- nothing keeps running at the end.
+
+CI runs a fixed seed. For more and new cases (PowerShell):
+
+```powershell
+$env:MONKEY_SEED='random'; $env:MONKEY_RUNS='100'; npx vitest run tests/monkey
+```
+
+A failure names its seed and case; set `MONKEY_SEED` and `MONKEY_CASE` to replay it.
+
 | Path                   | Contents                          |
 | ---------------------- | --------------------------------- |
 | `manifest.json`        | Extension manifest                |

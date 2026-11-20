@@ -17,6 +17,10 @@ const finding = (severity: Finding['severity']): Finding => ({
   evidence: [],
 });
 
+/** Digits in Arabic-Indic script, e.g. for "49". */
+const arabicIndic = (digits: string): string =>
+  [...digits].map((digit) => String.fromCodePoint(0x0660 + Number(digit))).join('');
+
 describe('parseVerdict', () => {
   it('reads a valid answer, also inside a code fence', () => {
     const answer = { risk: 'suspicious', reasons: ['Time pressure.'], advice: 'Do not reply.' };
@@ -63,12 +67,118 @@ describe('parseVerdict', () => {
     ]);
     expect(verdict?.advice).toBe('Verify your account at [removed] or write to [removed].');
   });
+
+  it('also removes them when line breaks, invisible or fullwidth characters split them', () => {
+    // Found by the monkey test: the spaces were joined only after the patterns had run.
+    const zeroWidth = String.fromCodePoint(0x200b);
+    const fullwidthFive = String.fromCodePoint(0xff15);
+    const verdict = parseVerdict(
+      JSON.stringify({
+        risk: 'safe',
+        reasons: [
+          'Call +1\n555\t123\n4567',
+          `Call +1 555${zeroWidth} 123 4567`,
+          `Call +1 ${fullwidthFive.repeat(3)} 123 4567`,
+          `Open https://${zeroWidth}evil.example`,
+          'Call +1 555 123 4567https://evil.example/login',
+        ],
+        advice: `Write to help${zeroWidth}@evil.example`,
+      }),
+    );
+    expect(verdict?.reasons).toEqual([
+      'Call [removed]',
+      'Call [removed]',
+      'Call [removed]',
+      'Open [removed]',
+      'Call [removed][removed]',
+    ]);
+    expect(verdict?.advice).toBe('Write to [removed]');
+  });
+
+  it('removes links of any scheme, phone numbers in any digits, and domains with other dots', () => {
+    // Found in review: these shapes passed every pattern.
+    const ideographicStop = String.fromCodePoint(0x3002);
+    const halfwidthStop = String.fromCodePoint(0xff61);
+    const verdict = parseVerdict(
+      JSON.stringify({
+        risk: 'safe',
+        reasons: [
+          'Confirm at ftp://evil.example/login',
+          'Call +49 30/1234 56789',
+          `Call +${arabicIndic('49')} ${arabicIndic('30')} ${arabicIndic('12345678')}`,
+          `Call 0170${String.fromCodePoint(0x2013)}1234567`,
+        ],
+        advice: `Log in at paypa1${halfwidthStop}secure${ideographicStop}example`,
+      }),
+    );
+    expect(verdict?.reasons).toEqual([
+      'Confirm at [removed]',
+      'Call [removed]',
+      'Call [removed]',
+      'Call [removed]',
+    ]);
+    expect(verdict?.advice).toBe('Log in at [removed]');
+  });
 });
 
 describe('cleanAiText', () => {
+  it('keeps dates and year ranges, which the phone pattern also matches', () => {
+    // Found in review: deadlines are the evidence of a reason ("pay by 19/11/2026").
+    const enDash = String.fromCodePoint(0x2013);
+    for (const date of [
+      '19.11.2026',
+      '19/11/2026',
+      '19/11/26',
+      '2026-11-19',
+      `2020${enDash}2025`,
+    ]) {
+      expect(cleanAiText(`Pay by ${date} or lose access.`)).toBe(`Pay by ${date} or lose access.`);
+    }
+  });
+
+  it('keeps a date next to a time or another date, but not a phone number next to it', () => {
+    // Found in review round 4: the time was part of the match, so the date went too.
+    expect(cleanAiText('Frist 19.11.2026 12:00 Uhr')).toBe('Frist 19.11.2026 12:00 Uhr');
+    expect(cleanAiText('Bis 19.11.2026 - 20.11.2026')).toBe('Bis 19.11.2026 - 20.11.2026');
+    expect(cleanAiText('Call +41 79 123 45 67 by 19.11.2026')).toBe('Call [removed] by 19.11.2026');
+    // A phone number right next to a date takes the date with it (the safe side).
+    expect(cleanAiText('Call 19.11.2026 079 123 45 67')).toBe('Call [removed]');
+    // Found in review round 5: a date between the groups split the number into short pieces.
+    expect(cleanAiText('Call 079 19.11.2026 123 4567')).toBe('Call [removed]');
+    expect(cleanAiText('Call 07912 19.11.2026 34567')).toBe('Call [removed]');
+  });
+
+  it('checks dates in other scripts by value too', () => {
+    // Found in review round 4: Arabic-Indic digits skipped the value check.
+    const implausible = `${arabicIndic('99')}.${arabicIndic('99')}.${arabicIndic('9999')}`;
+    const real = `${arabicIndic('19')}.${arabicIndic('11')}.${arabicIndic('2026')}`;
+    expect(cleanAiText(`Call ${implausible} now`)).toBe('Call [removed] now');
+    expect(cleanAiText(`Pay by ${real} now`)).toBe(`Pay by ${real} now`);
+  });
+
+  it('still removes phone numbers that are shaped like dates', () => {
+    // Found in review round 3: the first date check kept these as "dates".
+    for (const number of ['0791-2345', '555-12-3456', '079.12.3456', '41.79.123', '12.34.5678']) {
+      expect(cleanAiText(`Call ${number} to verify.`)).toBe('Call [removed] to verify.');
+    }
+  });
+
+  it('removes phone numbers grouped with any dash, the minus sign, dots or bullets', () => {
+    for (const code of [0x2212, 0x00b7, 0x2022, 0x301c, 0x2027, 0x30fb]) {
+      const separator = String.fromCodePoint(code);
+      expect(cleanAiText(`Call +49 30${separator}1234${separator}5678 now`)).toBe(
+        'Call [removed] now',
+      );
+    }
+  });
+
   it('stays fast on long hostile output', () => {
     const start = performance.now();
     cleanAiText(`${'a.'.repeat(50_000)}x`, { keepDomains: false });
+    // Long digit runs split by spaces, dates in between, digits of another script.
+    cleanAiText('1 '.repeat(5_000));
+    cleanAiText('19.11.2026 1 '.repeat(500));
+    cleanAiText(`${arabicIndic('1234567890').repeat(200)} `.repeat(2));
     expect(performance.now() - start).toBeLessThan(200);
   });
 });

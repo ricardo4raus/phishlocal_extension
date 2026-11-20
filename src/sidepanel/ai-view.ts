@@ -42,6 +42,15 @@ const ADVICE: Record<Risk, string> = {
 
 const AI_NOTE = 'On-device (Gemini Nano). AI can be wrong.';
 
+/** Percent-decoding that never throws: a link like `mailto:%E0` is attacker-written. */
+const decode = (text: string): string => {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+};
+
 /** The email's own addresses (sender, Reply-To): the AI may name them in its reasons. */
 const ownAddresses = (email: Email): ReadonlySet<string> =>
   new Set(
@@ -50,9 +59,7 @@ const ownAddresses = (email: Email): ReadonlySet<string> =>
       ...(email.headers?.replyTo.map((box) => box.address) ?? []),
       // mailto: links of the email itself.
       ...email.links.flatMap((link) =>
-        /^mailto:/i.test(link.href)
-          ? [decodeURIComponent(link.href.slice(7).split('?')[0] ?? '')]
-          : [],
+        /^mailto:/i.test(link.href) ? [decode(link.href.slice(7).split('?')[0] ?? '')] : [],
       ),
     ]
       .filter((address) => address !== '')
@@ -105,7 +112,9 @@ interface Request {
   email: Email;
   findings: Finding[] | undefined;
   language: string;
-  /** Same email, findings and language give the same key: one run serves them all. */
+  /**
+   * Same email, findings, language and own addresses give the same key: one run serves them all.
+   */
   key: string;
   /** When the request was queued or started (ms), for the waiting time shown. */
   since: number;
@@ -399,13 +408,23 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   const adoptable = (request: Request): boolean =>
     current?.key === request.key && !current.stop?.signal.aborted;
 
+  /**
+   * The same check is already running (e.g. Gmail showed the email again): its answer serves
+   * `request`. The running check takes over the new email and findings, which the key may not
+   * tell apart: rules that failed this time (`undefined`) give the same prompt as no findings,
+   * but must keep the verdict at "suspicious" at least (found by the monkey test).
+   */
+  const adopt = (request: Request): boolean => {
+    if (!current || !adoptable(request)) return false;
+    current.id = request.id;
+    current.email = request.email;
+    current.findings = request.findings;
+    startTicker();
+    return true;
+  };
+
   const enqueue = (request: Request): void => {
-    // The same check is already running (e.g. Gmail showed the email again): use its answer.
-    if (current && adoptable(request)) {
-      current.id = request.id;
-      startTicker();
-      return;
-    }
+    if (adopt(request)) return;
     // The running check is for an email that is no longer shown: free the model.
     stopRunning(request.key);
     waiting = request;
@@ -425,7 +444,13 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       email,
       findings,
       language,
-      key: `${language}|${JSON.stringify(promptData(email, findings ?? []))}`,
+      // The own addresses too: they decide which addresses the answer may name, and the prompt
+      // leaves Reply-To out, so two emails with the same prompt can differ in them.
+      key: [
+        language,
+        JSON.stringify(promptData(email, findings ?? [])),
+        [...ownAddresses(email)].toSorted().join(' '),
+      ].join('|'),
       since: performance.now(),
     };
     const known = answers.get(request.key);
@@ -440,11 +465,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       true,
     );
     // The same email is already being checked: use that run's answer.
-    if (current && adoptable(request)) {
-      current.id = request.id;
-      startTicker();
-      return;
-    }
+    if (adopt(request)) return;
     timer = setTimeout(() => enqueue(request), final ? STABLE_MS : waitMs);
   }
 
