@@ -45,8 +45,9 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
       a rule's danger finding
       (done Tue 17.11; on-device only; rule checks also in Italian and Portuguese; AI answers in
       it/pt only if Gemini Nano supports them, to be measured)
-- [ ] Fri 20.11. – Result UI: traffic light 🟢🟡🔴, reasons, highlighted suspicious links
+- [x] Fri 20.11. – Result UI: traffic light 🟢🟡🔴, reasons, highlighted suspicious links
       (show the link's domain prominently, shorten long URLs); test end to end
+      (done Wed 18.11; links are marked in the side panel, not in Gmail's page)
 
 ## Phase 4 · Hybrid & Firebase (main selling point)
 

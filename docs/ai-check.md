@@ -24,10 +24,21 @@ are its input and its lower limit.
      - up to 3,000 characters of body text.
 2. **Model** ([`src/ai.ts`](../src/ai.ts), `runAiCheck()`):
    - Firebase AI Logic with `InferenceMode.ONLY_ON_DEVICE`, so no email reaches the cloud.
+   - **Guard against a silent cloud call:** when Chrome's Prompt API (`LanguageModel`) is missing,
+     the SDK builds the model without its on-device path and then sends even `ONLY_ON_DEVICE`
+     requests to the cloud (`callCloudOrDevice` in the SDK). `runAiCheck()` checks for the API
+     right before the call; a test through the SDK's browser build proves it.
    - The SDK does not pass `systemInstruction` to the on-device model, so the system message is
      the session's first prompt (`initialPrompts`).
    - The answer is constrained to [`VERDICT_SCHEMA`](../src/ai/verdict.ts) (`responseConstraint`),
      using only basic JSON Schema keywords, because Chrome supports only part of JSON Schema.
+   - **Stopping a run:** the SDK has no stop signal for on-device prompts, but it hands our option
+     objects to Chrome's `create()` and `prompt()` by reference, so `runAiCheck()` sets a signal on
+     them per run. A run that is given up stops in Chrome too; otherwise Gemini Nano, which works
+     on one prompt at a time, would keep the next check waiting. A test through the SDK's browser
+     build fails if the SDK stops passing the options through.
+   - **Streamed answer:** an answer that grows past 4,000 characters (a real one is far shorter)
+     is cut off at once, and a stopped run reports how many characters the model had written.
 3. **Answer** (`parseVerdict()`):
    - checked field by field: risk, at most 5 reasons, advice, at most 300 characters each;
    - accepted also inside a code fence;
@@ -44,19 +55,57 @@ are its input and its lower limit.
      notes, with our own advice. Gemini Nano rated a real Google security notice as suspicious
      even with the sender checks in its data. Phishing from a confirmed but hijacked sender
      almost always trips the rules too (requests for identity, log-in or card details, payments).
-5. **When:**
-   - one check at a time; while one runs, only the newest email waits, and results for an email
-     that is no longer shown are dropped;
+5. **Traffic light:** the verdict is shown as a block above the email details, with a colour, a
+   symbol and a word per level (green ✓, yellow !, red ✕). Until the AI has answered, the rules'
+   verdict shows, except that "no red flags" stays grey ("Checking…"): the AI may still raise it,
+   and nobody should act on an early "safe". Without a model, the rules' verdict stands, green
+   included. If the AI check was meant to run and failed (timeout, error, unreadable answer), the
+   light still shows the rules' verdict, but the verdict line says "rule checks only: the AI check
+   failed" and the reason is shown in bold: the rules alone miss a well-written scam without
+   known tricks. Only the verdict line is a live region for screen readers; the status line with its
+   seconds is not.
+6. **When:**
+   - one check at a time, for the shown email: when another email is queued or the email is
+     hidden, the running check is stopped (in Chrome too); a check that waited for the model to
+     load is skipped if its email was left meanwhile; a late result for an email that is no
+     longer shown is dropped;
    - a check starts once the shown email has not changed for 0.5 s (Gmail shows an email several
      times within a moment); the same email with the same findings uses a running check's answer;
-   - the panel first waits for the model to load (that can take minutes in a bad Chrome state);
-     the run's 60 s limit starts when it asks the model; the status shows the seconds;
+   - the last 20 answers stay in memory while the panel is open: an email shown again gets its
+     answer at once; failed runs are not kept, so they are tried again;
+   - when the panel opens, it loads the model (measured 19 Nov 2026: 304.8 s right after a full
+     Chrome exit, 3.6–3.8 s on other days; afterwards every new session starts in 0.0–0.1 s,
+     whatever its settings);
+   - right before each check, the panel opens a session itself: 0.0 s while the model is loaded,
+     a full load when Chrome had unloaded it (once measured: 249 s minutes after a 3.6 s load).
+     So a load never runs inside the check's time limit, and the status says the check waits for
+     the model;
+   - the panel first waits for the model to load (that can take minutes); after 1 s of waiting
+     the status says "On-device model still loading… X s", that the rule checks are done (only if
+     they ran) and that the AI result appears by itself (shorter waits show "running", so the
+     text does not flash on every check);
+   - a run that fails (error, crash, timeout, unreadable answer) is tried once more while its
+     email is shown, after checking the model again, so a crashed model is reloaded outside the
+     time limit. Not retried: a stopped run, a missing model, a left email, errors that would come
+     back the same (input too large, quota) and a run that reached the time limit (a hung model
+     would most likely hang again). A second failure is shown as "failed after a second try",
+     with the last reason;
+   - after repeated crashes Chrome refuses new sessions for a while (from Chromium's source, not
+     Chrome's docs: 3 crashes, then a pause of 1 min growing to 1 h). The panel asks
+     `availability()` before each session, so it neither waits for nor retries against a blocked
+     model; the rules stand alone then;
+   - only the verdict line is a live region for screen readers; counters (seconds, download
+     percentage) sit next to live regions, never in them, so they are not announced every second;
+     the run's 60 s limit starts when it asks the model; the status shows the seconds; after the
+     limit the run is stopped, and the message says how far the model had come ("the model had
+     written N characters"): 0 means it hung, many means it did not stop writing;
    - without the model, the panel offers "Download the on-device model": Chrome starts the
-     download (about 4 GB, once) only after a user action;
+     download (about 4 GB, once) only after a user action; when it is done, the shown email is
+     checked again;
    - a Gmail email waits for its headers, but at most 3 s;
    - without a ready on-device model there is no AI check; the panel says so and the rules stand
      alone.
-6. **Language:** Chrome's UI language if the AI supports it (`AI_LANGUAGES`: en, de, fr, es, it,
+7. **Language:** Chrome's UI language if the AI supports it (`AI_LANGUAGES`: en, de, fr, es, it,
    pt), otherwise English. Each answer language gets its own on-device model with exactly that
    output language. Gemini Nano accepts Italian and Portuguese but marks them experimental
    (measured 17 Nov 2026; supported are de, en, es, fr, ja), so the panel says so.

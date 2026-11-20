@@ -18,7 +18,7 @@ function emailElements() {
   document.body.innerHTML = `
     <dl id="details" hidden><dd id="sender"></dd><dd id="subject"></dd><dd id="auth"></dd>
     <div id="rows" hidden><dd id="reply-to"></dd><dd id="return-path"></dd></div>
-    <dd><ul id="links"></ul></dd><dd id="body"></dd></dl>`;
+    <dd><ol id="links"></ol></dd><dd id="body"></dd></dl>`;
   return {
     details: get('details'),
     sender: get('sender'),
@@ -27,7 +27,7 @@ function emailElements() {
     headerRows: get('rows'),
     replyTo: get('reply-to'),
     returnPath: get('return-path'),
-    links: get('links') as HTMLUListElement,
+    links: get('links') as HTMLOListElement,
     body: get('body'),
   };
 }
@@ -46,7 +46,45 @@ describe('showEmail', () => {
     const els = emailElements();
     showEmail(email, els);
     expect(els.sender.textContent).toBe('PayPal <service@paypa1-secure.example>');
-    expect(els.links.textContent).toBe('paypal.com → https://paypa1-secure.example/login');
+    expect(els.links.textContent).toBe(
+      'paypa1-secure.examplepaypa1-secure.example/loginText: paypal.com',
+    );
+    expect(els.links.querySelector('.domain')?.textContent).toBe('paypa1-secure.example');
+    expect((els.links.querySelector('.url') as HTMLElement).title).toBe(
+      'https://paypa1-secure.example/login',
+    );
+  });
+
+  it('marks the links named by findings with their most severe finding', () => {
+    const els = emailElements();
+    const links = [
+      { text: 'Home', href: 'https://news.example/' },
+      { text: 'Help', href: 'https://www.google.com/url?q=https://evil.example/' },
+      { text: '<b>x</b>', href: 'not a link' },
+    ];
+    showEmail({ ...email, links }, els, undefined, [
+      { rule: 'redirect-link', severity: 'info', message: 'x', evidence: [], links: [1] },
+      { rule: 'lookalike-domain', severity: 'danger', message: 'x', evidence: [], links: [1] },
+      { rule: 'urgency', severity: 'warning', message: 'x', evidence: [] },
+    ]);
+    const items = [...els.links.children] as HTMLElement[];
+    expect(items.map((item) => item.className)).toEqual(['link', 'link danger', 'link']);
+    expect(items[1]?.firstElementChild?.textContent).toBe(
+      'Danger: google.com forwards to evil.example',
+    );
+    expect(items[2]?.textContent).toBe('Not a valid web addressnot a linkText: <b>x</b>');
+    expect(document.querySelector('b')).toBeNull();
+  });
+
+  it('reveals direction overrides in link texts, URLs and the tooltip', () => {
+    const els = emailElements();
+    const rlo = String.fromCodePoint(0x202e);
+    const href = `https://evil.example/${rlo}fdp.exe`;
+    showEmail({ ...email, links: [{ text: `${rlo}moc.lapyap`, href }] }, els);
+    expect(els.links.querySelector('.link-text')?.textContent).toBe('Text: <U+202E>moc.lapyap');
+    const url = els.links.querySelector('.url') as HTMLElement;
+    expect(url.title).toBe('https://evil.example/<U+202E>fdp.exe');
+    expect(url.textContent).not.toContain(rlo);
   });
 
   it('marks a cut body and says when there are no links', () => {

@@ -9,7 +9,10 @@
   <body>
     <main id="app">
       <h1>PhishLocal</h1>
-      <p id="model-status" class="model-status" role="status"></p>
+      <!-- Only state changes are announced; the counters next to them are not live regions. -->
+      <p class="model-status">
+        <span id="model-status" role="status"></span> <span id="model-progress"></span>
+      </p>
       <button id="model-download" type="button" hidden>
         Download the on-device model (about 4 GB, once)
       </button>
@@ -51,16 +54,18 @@
         </details>
 
         <p id="email-status" class="email-status" role="status"></p>
+        <div id="verdict" class="verdict" hidden>
+          <!-- Only the verdict line is announced; the status below counts seconds. -->
+          <p id="ai-overall" class="ai-overall" role="status"></p>
+          <p id="ai-status" class="hint"></p>
+          <ul id="ai-reasons" class="ai-reasons"></ul>
+          <p id="ai-advice" class="ai-advice"></p>
+        </div>
         <dl id="email-details" class="email-details" hidden>
-          <dt>Verdict</dt>
-          <dd class="ai-check">
-            <p id="ai-overall" class="ai-overall"></p>
-            <p id="ai-status" class="hint"></p>
-            <ul id="ai-reasons"></ul>
-            <p id="ai-advice" class="ai-advice"></p>
-          </dd>
           <dt>Red flags (rule checks)</dt>
           <dd><ul id="email-findings" class="findings"></ul></dd>
+          <dt>Links</dt>
+          <dd><ol id="email-links" class="links"></ol></dd>
           <dt>From</dt>
           <dd id="email-sender"></dd>
           <dt>Subject</dt>
@@ -73,8 +78,6 @@
             <dt>Return-Path</dt>
             <dd id="email-return-path"></dd>
           </div>
-          <dt>Links</dt>
-          <dd><ul id="email-links"></ul></dd>
           <dt>Text</dt>
           <dd id="email-body" class="email-body"></dd>
         </dl>
@@ -94,7 +97,9 @@ Is this email suspicious? Answer in two sentences.
 
       <button id="run" type="button">Run prompt</button>
 
-      <p id="status" role="status"></p>
+      <p class="prompt-status">
+        <span id="status" role="status"></span> <span id="progress"></span>
+      </p>
       <pre id="output"></pre>
     </main>
     <script type="module" src="./main.ts"></script>

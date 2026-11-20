@@ -156,6 +156,29 @@ describe('no HTML injection sinks in src/', () => {
   );
 });
 
+describe('network and script injection stay where they belong', () => {
+  // The Gmail host permission also lets extension pages (the side panel) make cookie-bearing
+  // requests to Gmail without CORS. Only the content script may load Gmail's "Show original"
+  // page, and only src/inject.ts may inject scripts. A guard against accidental use; the AST
+  // checks above catch remote code.
+  const srcDir = fromRoot('src');
+  const scripts = walkFiles(srcDir)
+    .filter((file) => /\.[cm]?tsx?$/.test(file))
+    .map((file) => [toPosixRelative(srcDir, file), readText(file)] as const);
+  const using = (pattern: RegExp): string[] =>
+    scripts.filter(([, code]) => pattern.test(code)).map(([name]) => name);
+
+  it('only the Gmail content script makes network requests', () => {
+    expect(using(/\b(?:fetch|XMLHttpRequest|sendBeacon|WebSocket|EventSource)\b/)).toEqual([
+      'content/gmail-original.ts',
+    ]);
+  });
+
+  it('only src/inject.ts uses chrome.scripting', () => {
+    expect(using(/\bscripting\b/)).toEqual(['inject.ts']);
+  });
+});
+
 describe('no invisible characters in the source', () => {
   // Invisible format characters (zero-width, bidi controls) can hide code or text from reviewers
   // ("Trojan Source"). Tests that need them write escapes such as \u200b.

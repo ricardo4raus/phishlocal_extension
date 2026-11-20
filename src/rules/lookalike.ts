@@ -88,19 +88,28 @@ function referencesOf(email: Email, sender: Host | undefined): Reference[] {
   return [...unique.values()];
 }
 
-function candidatesOf(email: Email, sender: Host | undefined): Host[] {
-  const hosts = new Map<string, Host>();
-  if (sender) hosts.set(sender.hostname, sender);
-  for (const link of email.links) {
+interface Candidate {
+  host: Host;
+  /** Positions of the links that go to this host (directly or by forwarding). */
+  links: number[];
+}
+
+function candidatesOf(email: Email, sender: Host | undefined): Candidate[] {
+  const candidates = new Map<string, Candidate>();
+  if (sender) candidates.set(sender.hostname, { host: sender, links: [] });
+  email.links.forEach((link, index) => {
     const url = parseUrl(link.href);
-    if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) continue;
+    if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) return;
     // The link's own host and, for forwarding links, the final target.
     for (const target of [url, forwardTarget(url)]) {
       const host = target && hostOf(target.hostname);
-      if (host?.domain && !hosts.has(host.hostname)) hosts.set(host.hostname, host);
+      if (!host?.domain) continue;
+      const candidate = candidates.get(host.hostname) ?? { host, links: [] };
+      if (candidate.links.at(-1) !== index) candidate.links.push(index);
+      candidates.set(host.hostname, candidate);
     }
-  }
-  return [...hosts.values()];
+  });
+  return [...candidates.values()];
 }
 
 /** The first way `candidate` imitates `reference`, as a finding. */
@@ -164,17 +173,25 @@ export function checkLookalikes(email: Email): Finding[] {
   const sender = hostOfAddress(email.sender.address);
   const references = referencesOf(email, sender);
   const findings = new Map<string, Finding>();
-  for (const candidate of candidatesOf(email, sender)) {
+  /** Per candidate domain: the links of every host that imitates a reference. */
+  const links = new Map<string, Set<number>>();
+  for (const { host, links: hostLinks } of candidatesOf(email, sender)) {
     for (const reference of references) {
-      const finding = compare(candidate, reference);
+      const finding = compare(host, reference);
       if (!finding) continue;
       // One finding per candidate domain: the strongest one.
-      const key = candidate.domain ?? candidate.hostname;
+      const key = host.domain ?? host.hostname;
       const known = findings.get(key);
       if (!known || STRENGTH[finding.severity] > STRENGTH[known.severity]) {
         findings.set(key, finding);
       }
+      const keyLinks = links.get(key) ?? new Set<number>();
+      for (const index of hostLinks) keyLinks.add(index);
+      links.set(key, keyLinks);
     }
   }
-  return [...findings.values()];
+  return [...findings].map(([key, finding]) => {
+    const marked = [...(links.get(key) ?? [])].toSorted((a, b) => a - b);
+    return marked.length > 0 ? { ...finding, links: marked } : finding;
+  });
 }

@@ -99,31 +99,139 @@ h2 {
   padding-left: 18px;
 }
 
-.findings .danger strong {
+.findings .danger strong,
+.links .danger .mark {
   color: #c62828;
 }
 
-.findings .warning strong {
-  color: #b26a00;
+/* #8a5300: 4.5:1 or more on white; #b26a00 (the light's amber) was 4.24:1 for this text. */
+.findings .warning strong,
+.links .warning .mark {
+  color: #8a5300;
 }
 
 @media (prefers-color-scheme: dark) {
-  .findings .danger strong {
+  .findings .danger strong,
+  .links .danger .mark {
     color: #ef9a9a;
   }
 
-  .findings .warning strong {
+  .findings .warning strong,
+  .links .warning .mark {
     color: #ffcc80;
   }
 }
 
-.ai-check p {
+.links .link {
+  margin-bottom: 4px;
+}
+
+.links .mark {
+  font-weight: 600;
+}
+
+/* A marked link stands out with a bar in its severity's colour. */
+.links .danger,
+.links .warning {
+  padding-left: 6px;
+  border-left: 3px solid;
+}
+
+.links .danger {
+  border-color: #c62828;
+}
+
+.links .warning {
+  border-color: #b26a00;
+}
+
+.links .url {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.links .link-text {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.links .empty {
+  list-style: none;
+}
+
+/*
+ * The traffic light. Each level has its own colour, symbol and word, so it reads without colour
+ * too. The symbols have a contrast of about 4.5:1 or more on their circles, and the circles at
+ * least 3:1 on white and on a dark background.
+ */
+.verdict {
+  --risk: #757575;
+  --risk-symbol-color: #fff;
+  padding: 8px 10px;
+  border: 1px solid var(--risk);
+  border-left-width: 6px;
+  border-radius: 6px;
+}
+
+.verdict[hidden] {
+  display: none;
+}
+
+.verdict[data-risk='safe'] {
+  --risk: #2e7d32;
+  --risk-symbol: '✓';
+}
+
+.verdict[data-risk='suspicious'] {
+  --risk: #b26a00;
+  --risk-symbol: '!';
+  --risk-symbol-color: #000;
+}
+
+.verdict[data-risk='dangerous'] {
+  --risk: #c62828;
+  --risk-symbol: '✕';
+}
+
+.verdict[data-risk='pending'] {
+  --risk-symbol: '…';
+}
+
+.verdict p {
   margin: 2px 0;
 }
 
 .ai-overall {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   font-weight: 600;
   font-size: 15px;
+}
+
+/* The symbol is decoration (empty alternative text): the word says the same. */
+.ai-overall::before {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--risk);
+  color: var(--risk-symbol-color);
+  font-size: 14px;
+  line-height: 22px;
+  text-align: center;
+  content: var(--risk-symbol, '') / '';
+}
+
+/* "The AI check failed (…)": the user must see that only the rules checked this email. */
+.verdict .ai-failed {
+  font-weight: 600;
+  opacity: 1;
+}
+
+.ai-reasons {
+  margin: 4px 0;
+  padding-left: 18px;
 }
 
 .ai-advice {
@@ -170,13 +278,24 @@ button:disabled {
   cursor: progress;
 }
 
-#status {
+.prompt-status {
   margin: 4px 0 0;
+}
+
+#status {
   font-weight: 600;
 }
 
 #status.error {
   color: #c62828;
+}
+
+/* The dark background needs a lighter red: #c62828 is only 3.3:1 there. */
+@media (prefers-color-scheme: dark) {
+  .email-status.error,
+  #status.error {
+    color: #ef9a9a;
+  }
 }
 
 #output {

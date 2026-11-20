@@ -60,6 +60,9 @@ _Current state, updated as features land._
   dangerous, with up to five reasons and one piece of advice in the user's language. The rule
   checks are its lower limit: the AI can raise the verdict, never lower it.
 - The rule checks cover English, German, French, Spanish, Italian and Portuguese.
+- The verdict is a traffic light at the top (green, yellow, red, each with a symbol and a word);
+  it stays grey until the AI has answered, unless the rules already found a warning. Each link
+  shows its real domain in bold and a shortened URL, and links behind a red flag are marked.
 
 ## How we built it
 
@@ -240,6 +243,23 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   That makes "read only while the panel is open" a property of the code, not a promise.
 - The tricks we flag in emails can fool our own UI: a right-to-left override reversed text in
   the side panel too, so the panel now shows it as `<U+202E>`.
+- A verdict UI is a security control too: showing "safe" in green before every check has
+  answered tells the user to act on half a result. Grey "Checking…" is the honest state.
+- A timeout that only stops waiting is not a timeout: the work goes on in the background and
+  blocks what comes next. Stopping it needs a signal that reaches the model, and the SDK had
+  none for on-device prompts.
+- `InferenceMode.ONLY_ON_DEVICE` is not a guarantee by itself: without Chrome's Prompt API the
+  SDK quietly uses the cloud. "Only on device" has to be checked by our own code too.
+- Count what the model wrote before a timeout: "0 characters" pointed straight at session
+  creation, not at a model that did not stop.
+- Test a theory before building on it: "Chrome loads the model once per settings" fitted one
+  measurement, and a second measurement after a Chrome restart disproved it. A warm-up at panel
+  start is not enough either, because Chrome can unload the model later; checking right before
+  each use is what holds.
+- A retry needs to know the platform's limits: Chrome counts model crashes and blocks the model
+  after three, so "try again" must first ask whether the model is available at all.
+- A live region with a ticking counter is a screen reader announcing every second. Keep live
+  regions for state changes and put counters next to them.
 
 ## Accomplishments we're proud of
 
@@ -474,3 +494,85 @@ _To fill in near the submission._
   counted against the 60 s limit, and Gmail's repeated display of an email still wasted runs.
   Fixed: a download button with progress, a separate wait for the model, and a check that starts
   only once the email has not changed for half a second.
+
+### Wed 18 Nov 2026
+
+**Session with Claude Code (continued):**
+
+- Ricardo tested the fixes in Chrome ("works now"); PR #13 (AI check) merged.
+- Result UI (`feat/result-ui`, planned for Fri 20 Nov). Reviewing the plan before coding changed
+  it in eight places. The biggest: lookalike findings cover a domain, not one link, so a finding
+  now names all its links; and a green light before the AI has answered would invite a click, so
+  the light stays grey until then.
+- Built in small commits: a helper that shows a link's real domain and a shortened URL (the host
+  is never cut, the decoy before an "@" is left out), link positions in the findings, a numbered
+  link list with marks, and the traffic light with a symbol and a word for each level.
+- Self-review found that an email shown again (Gmail renders it anew, or the user goes back to
+  it) started a new AI run and turned the light grey again. The panel now keeps the last 20
+  answers in memory; a test fails without the fix.
+- Chrome test: the traffic light and the links worked, but the AI check of the Google notice
+  failed with "no answer within 60 s" although the model was loaded in 4.2 s. Ricardo asked for
+  the logic issues behind the repeated failures. Tracing the path through the SDK found them:
+  - a run the panel gave up on kept running in Chrome, because the SDK passes no stop signal to
+    on-device prompts; Gemini Nano works on one prompt at a time, so the next checks waited
+    behind it;
+  - a check for an email the user had left kept the model busy, and one that waited for the
+    model ran even after its email was gone;
+  - an answer had no length limit, and a timeout did not say whether the model hung or kept
+    writing;
+  - after the model download, the email on screen was not checked again.
+    Fixed: the panel stops a run (in Chrome too) on timeout and when its email is left, the answer
+    is streamed and cut off after 4,000 characters, a timeout says how many characters the model
+    had written, and the download rechecks the shown email. Each fix has a test that fails without
+    it.
+- While testing through the real SDK, the first version of a test made a request to Google's
+  cloud with a made-up key and the word "prompt": the SDK's Node build has no on-device path and
+  sends `ONLY_ON_DEVICE` requests to the cloud. The browser build does the same when Chrome's
+  Prompt API is missing. `runAiCheck()` now checks for the API right before the call, and the
+  test stubs `fetch` so no test can reach the network.
+- Ricardo asked for three things. A failed AI check now says so on the verdict line ("rule checks
+  only: the AI check failed"); the light keeps the rules' colour. Gmail had to be reloaded after
+  every install or update of PhishLocal: Chrome injects manifest content scripts only on new page
+  loads. Ricardo chose automatic injection into open Gmail tabs, which needs the `scripting`
+  permission and host access to Gmail (the same install warning as before). The answer cache
+  stays in the panel's memory only, as Ricardo decided.
+
+### Thu 19 Nov 2026
+
+**Session with Claude Code (continued):**
+
+- Chrome test: the AI check worked once, then failed again with "no answer within 60 s; the
+  model had written 0 characters", so the model hung before its first word. Ricardo ran a
+  timing snippet in the side panel's console: the first session with the check's settings took
+  249 s to create, the next four 0.0 s, and each answer came in about 2 s. The snippet also
+  confirmed that Chrome streams the answer in pieces.
+- First theory: Chrome loads the model once per session settings, and the warm-up used other
+  settings than the check. The warm-up was changed to the check's settings. Ricardo wanted the
+  load to be fast for sure, not hopefully, so we tested the theory: after a full Chrome exit, the
+  panel's warm-up took 304.8 s, and then sessions with three different settings took 0.0–0.1 s.
+  The theory was wrong; the settings do not matter. Two facts remained: the first load after a
+  Chrome start takes about five minutes on this machine (3.8 s on 15 Nov), and Chrome can unload
+  the model while the panel is open, so a later session needs the full load again (the 249 s).
+- Fix in our control: right before each check, the panel opens a session itself, outside the
+  check's time limit. It takes 0.0 s while the model is loaded and reloads it otherwise, so a
+  reload shows as "waits for the on-device model to load" instead of a timeout. How long Chrome
+  takes to load the model is Chrome's; the extension cannot guarantee it.
+- Diagnosis in Chrome: `chrome://on-device-internals` logged "Terminated on-device session for
+  LanguageModel. Reason: Session crashed", so the model process had crashed, and the next session
+  needed a full reload. Setting Chrome to the NVIDIA GPU in Windows did not make the load faster.
+  The load time stays Chrome's.
+- For a polished experience anyway (Ricardo's request): a failed run is tried once more after
+  checking the model again, and a long load says what is happening ("Rule checks done. The
+  on-device AI is still loading…; the result appears here by itself") instead of a bare counter.
+  Planned and reviewed before coding; a research agent and two review agents (logic; security,
+  accessibility and wording) checked the change.
+- The research found a risk in Chromium's source: after 3 model crashes Chrome refuses new
+  sessions for a while (1 min, growing to 1 h). A retry must not hammer a blocked model, so the
+  panel now asks `availability()` before opening a session. The logic review found four small
+  bugs (a misleading "failed twice" when the two tries failed differently, retrying an input
+  that is too large, "Rule checks done" when the rules had failed, and a stopped run adopted for
+  an email shown again). The accessibility review found that two status lines with a seconds
+  counter were live regions (a screen reader could announce them every second), two text
+  colours below 4.5:1, and that the new Gmail permission deserves a guard: structure tests now
+  allow network requests only in the Gmail content script and `chrome.scripting` only in
+  `src/inject.ts`. All fixed, each with a test that fails without it where testable.

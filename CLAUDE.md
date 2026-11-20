@@ -55,6 +55,11 @@ explain every red flag, and work offline, with a cloud only as fallback."
   in a long-running Chrome session, many minutes; a full Chrome exit fixed it. Inference on a
   loaded model takes about 1 s for short answers; one run took 39 s, cause unknown. On-device
   needs `expectedInputs` / `expectedOutputs` with languages, otherwise Chrome warns.
+- Measured 19 Nov 2026: the first model load after a full Chrome exit took 304.8 s on the dev
+  machine (3.8 s on 15 Nov); afterwards sessions with any settings start in 0.0–0.1 s. Chrome can
+  unload the model while the panel is open (a later session once took 249 s). So the panel opens
+  a session right before each check (`ensureModelLoaded()` in `src/ai.ts`), outside the check's
+  time limit. The load time itself is Chrome's and cannot be guaranteed by the extension.
 - `PREFER_ON_DEVICE` falls back to the cloud silently; consent before cloud is the 21 Nov task.
   Real emails go only to the on-device model (`InferenceMode.ONLY_ON_DEVICE`, decided 17 Nov
   2026); never to the cloud until the consent step exists. The hybrid test prompt is for test
@@ -64,12 +69,24 @@ explain every red flag, and work offline, with a cloud only as fallback."
   the SDK does not pass `systemInstruction` on-device) and a JSON data block between random
   markers; the answer is constrained to `VERDICT_SCHEMA`, read strictly by `parseVerdict()`, and
   the rules are its lower limit. Details and limits: `docs/ai-check.md`.
+- Result UI (`feat/result-ui`): the verdict is a traffic light above the details (`data-risk` on
+  `#verdict`; grey "Checking…" until the AI answers if the rules found nothing). Links show the
+  real domain, a shortened URL (`src/sidepanel/link-display.ts`) and a mark when a finding names
+  them (`Finding.links`, set by the link and lookalike rules).
+- AI check runs are stoppable: `runAiCheck()` sets an `AbortSignal` on the check model's option
+  objects, which the SDK passes to Chrome by reference (tested through the SDK's browser build in
+  `tests/ai/sdk-on-device.test.ts`). The panel stops a run on timeout and when its email is left.
+  The SDK silently uses the cloud for `ONLY_ON_DEVICE` when `LanguageModel` is missing; keep the
+  guard in `runAiCheck()`. Tests must never reach the network (that test stubs `fetch`).
 - Automatic scan: while the side panel is open, it keeps a port to the active tab
   (`src/sidepanel/watch.ts`, `src/messages.ts`); the content script (`src/content/gmail-watch.ts`)
   reports every opened email and loads its "Show original" page for the headers
   (`gmail-original.ts`), which the panel parses (`src/raw/gmail-original-page.ts`, sender checks
   only from `mx.google.com`). Closing the panel stops all reading. "Check the open email again"
-  uses the same port. Gmail's selectors live in `SELECTORS` in
+  uses the same port. After an install or update, `src/inject.ts` injects the manifest's content
+  script into open Gmail tabs (`scripting` + Gmail host permission, added 18 Nov 2026), because
+  Chrome injects manifest content scripts only on new page loads. Gmail's selectors live in
+  `SELECTORS` in
   `src/content/gmail-extract.ts` (measured 15 Nov 2026). If Gmail changes its page, measure
   again with a DevTools snippet that prints only counts and class names, never email content.
 - "Or paste an email" in the side panel is the fallback when Gmail can't be read (and for the

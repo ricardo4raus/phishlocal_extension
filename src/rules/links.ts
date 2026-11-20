@@ -98,5 +98,7 @@ function checkLink(link: EmailLink): Finding[] {
 }
 
 export function checkLinks(links: readonly EmailLink[]): Finding[] {
-  return links.flatMap(checkLink);
+  return links.flatMap((link, index) =>
+    checkLink(link).map((finding) => ({ ...finding, links: [index] })),
+  );
 }

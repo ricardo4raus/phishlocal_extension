@@ -35,6 +35,8 @@ export interface Finding {
   message: string;
   /** The link, domain or phrases that triggered the rule (email content: untrusted data). */
   evidence: string[];
+  /** Positions in `email.links` of the links that triggered it, so the panel can mark them. */
+  links?: number[];
 }
 
 /** Evidence comes from the email, so it is capped before it is shown or put into a prompt. */

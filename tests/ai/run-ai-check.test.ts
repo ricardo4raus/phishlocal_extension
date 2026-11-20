@@ -13,9 +13,11 @@ interface ModelParams {
   };
 }
 
-const generateContent = vi.hoisted(() =>
-  vi.fn<(prompt: string) => Promise<{ response: { text(): string } }>>(),
-);
+interface StreamResult {
+  stream: AsyncGenerator<{ text(): string }>;
+  response: Promise<unknown>;
+}
+const generateContent = vi.hoisted(() => vi.fn<(prompt: string) => Promise<StreamResult>>());
 const models = vi.hoisted((): ModelParams[] => []);
 vi.mock('firebase/ai', () => ({
   InferenceMode: {
@@ -25,12 +27,18 @@ vi.mock('firebase/ai', () => ({
   },
   getGenerativeModel: (_ai: unknown, params: ModelParams) => {
     models.push(params);
-    return { generateContent };
+    return { generateContent, generateContentStream: generateContent };
   },
 }));
 vi.mock('../../src/firebase', () => ({ ai: {}, appCheckEnabled: false }));
 
-const answer = (text: string) => ({ response: { text: () => text } });
+/** A streamed answer in the given pieces. */
+function answer(...chunks: string[]): StreamResult {
+  async function* stream() {
+    for (const chunk of chunks) yield { text: () => chunk };
+  }
+  return { stream: stream(), response: Promise.resolve() };
+}
 
 let availability: string;
 
@@ -54,7 +62,9 @@ describe('runAiCheck', () => {
     const { VERDICT_SCHEMA } = await import('../../src/ai/verdict');
     const { SYSTEM_PROMPT } = await import('../../src/ai/prompt');
     const { runAiCheck } = await import('../../src/ai');
-    generateContent.mockResolvedValue(answer('{"risk":"safe","reasons":[],"advice":""}'));
+    generateContent.mockImplementation(async () =>
+      answer('{"risk":"safe","reasons":[],"advice":""}'),
+    );
     await runAiCheck('prompt', 'it');
     await runAiCheck('prompt', 'it');
     await runAiCheck('prompt', 'de');
@@ -78,9 +88,9 @@ describe('runAiCheck', () => {
     expect(models.filter((params) => params.mode === 'prefer_on_device')).toHaveLength(1);
   });
 
-  it('returns the checked verdict', async () => {
+  it('returns the checked verdict, read from the streamed pieces', async () => {
     generateContent.mockResolvedValue(
-      answer('{"risk":"dangerous","reasons":["Fake bank."],"advice":"Delete it."}'),
+      answer('{"risk":"dangerous",', '"reasons":["Fake bank."],', '"advice":"Delete it."}'),
     );
     const { runAiCheck } = await import('../../src/ai');
     const result = await runAiCheck('prompt', 'en');
@@ -110,6 +120,84 @@ describe('runAiCheck', () => {
     });
   });
 
+  it('cuts off an answer that does not end', async () => {
+    const { runAiCheck, MAX_ANSWER_CHARS } = await import('../../src/ai');
+    let pieces = 0;
+    async function* endless() {
+      for (;;) {
+        pieces++;
+        yield { text: () => ' '.repeat(100) };
+      }
+    }
+    generateContent.mockResolvedValueOnce({ stream: endless(), response: Promise.resolve() });
+    expect(await runAiCheck('prompt', 'en')).toEqual({
+      ok: false,
+      reason: 'failed',
+      detail: `the answer did not end (over ${MAX_ANSWER_CHARS} characters)`,
+    });
+    expect(pieces).toBe(MAX_ANSWER_CHARS / 100 + 1);
+  });
+
+  it('says how far a stopped run had come', async () => {
+    const { runAiCheck } = await import('../../src/ai');
+    const controller = new AbortController();
+    async function* stopped() {
+      yield { text: () => '{"risk":' };
+      controller.abort();
+      throw new DOMException('The operation was aborted.', 'AbortError');
+    }
+    generateContent.mockResolvedValueOnce({ stream: stopped(), response: Promise.resolve() });
+    expect(await runAiCheck('prompt', 'en', new Set(), controller.signal)).toEqual({
+      ok: false,
+      reason: 'stopped',
+      detail: 'the model had written 8 characters',
+    });
+  });
+
+  it('opens a session before each check, so an unloaded model is loaded outside the check', async () => {
+    const sessions: { destroyed: boolean }[] = [];
+    let fail = false;
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => 'available',
+      create: async () => {
+        if (fail) throw new Error('The model could not be loaded.');
+        const session = { destroyed: false, destroy: () => (session.destroyed = true) };
+        sessions.push(session);
+        return session;
+      },
+    });
+    const { ensureModelLoaded } = await import('../../src/ai');
+    expect(await ensureModelLoaded('de')).toBe(true);
+    expect(await ensureModelLoaded('de')).toBe(true);
+    // The warm-up's session and one per call; only the newest is kept open.
+    expect(sessions.map((session) => session.destroyed)).toEqual([true, true, false]);
+    fail = true;
+    expect(await ensureModelLoaded('de')).toBe(false);
+  });
+
+  it('opens no session while Chrome refuses the model (e.g. after repeated crashes)', async () => {
+    let creates = 0;
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => availability,
+      create: async () => {
+        creates++;
+        return { destroy: () => {} };
+      },
+    });
+    const { ensureModelLoaded } = await import('../../src/ai');
+    expect(await ensureModelLoaded('de')).toBe(true);
+    availability = 'unavailable';
+    expect(await ensureModelLoaded('de')).toBe(false);
+    // The warm-up's session and one for the first call; none while Chrome refuses.
+    expect(creates).toBe(2);
+  });
+
+  it('says the model is not ready when it is not downloaded', async () => {
+    availability = 'downloadable';
+    const { ensureModelLoaded } = await import('../../src/ai');
+    expect(await ensureModelLoaded('en')).toBe(false);
+  });
+
   it('downloads the model on request, reports progress, and then counts it as ready', async () => {
     availability = 'downloadable';
     const created: { monitor?: (monitor: { addEventListener: unknown }) => void }[] = [];
@@ -128,11 +216,11 @@ describe('runAiCheck', () => {
     });
     const { downloadOnDeviceModel, warmUpOnDevice } = await import('../../src/ai');
     const progress: number[] = [];
-    const result = await downloadOnDeviceModel((loaded) => progress.push(loaded));
+    const result = await downloadOnDeviceModel('de', (loaded) => progress.push(loaded));
     expect(result.state).toBe('ready');
     expect(progress).toEqual([0.5, 1]);
     // The warm-up now reports ready without loading again.
-    expect((await warmUpOnDevice()).state).toBe('ready');
+    expect((await warmUpOnDevice('de')).state).toBe('ready');
     expect(created).toHaveLength(1);
   });
 });

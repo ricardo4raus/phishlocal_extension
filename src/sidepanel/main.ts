@@ -1,11 +1,13 @@
 import { InferenceSource } from 'firebase/ai';
 import {
   downloadOnDeviceModel,
+  ensureModelLoaded,
   runAiCheck,
   runPrompt,
   warmUpOnDevice,
   type WarmUpResult,
 } from '../ai';
+import { answerLanguage } from '../ai/prompt';
 import { appCheckEnabled } from '../firebase';
 import type { Email } from '../email';
 import { checkEmail } from '../rules';
@@ -22,13 +24,15 @@ function byId<T extends HTMLElement>(id: string): T {
   return element;
 }
 
-const modelStatus = byId<HTMLParagraphElement>('model-status');
+const modelStatus = byId<HTMLElement>('model-status');
+const modelProgress = byId<HTMLElement>('model-progress');
 const modelDownload = byId<HTMLButtonElement>('model-download');
 const promptInput = byId<HTMLTextAreaElement>('prompt');
 const forceCloudRow = byId<HTMLLabelElement>('force-cloud-row');
 const forceCloudInput = byId<HTMLInputElement>('force-cloud');
 const runButton = byId<HTMLButtonElement>('run');
-const status = byId<HTMLParagraphElement>('status');
+const status = byId<HTMLElement>('status');
+const progress = byId<HTMLElement>('progress');
 const output = byId<HTMLPreElement>('output');
 
 // The cloud switch exists only to test the cloud path during development.
@@ -47,6 +51,23 @@ function sourceLabel(source: InferenceSource | undefined): string {
 
 const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)} s`;
 
+/**
+ * Counts seconds in `element` until the returned function is called, which clears it. The counter
+ * sits next to a live region, not in it, so a screen reader does not announce every second.
+ */
+function countSeconds(element: HTMLElement): () => void {
+  const start = performance.now();
+  const show = (): void => {
+    element.textContent = `${Math.round((performance.now() - start) / 1000)} s`;
+  };
+  show();
+  const timer = setInterval(show, 1000);
+  return () => {
+    clearInterval(timer);
+    element.textContent = '';
+  };
+}
+
 /** On-device model state, set by the warm-up. `failed`: the warm-up threw; a prompt retries it. */
 type ModelState = WarmUpResult['state'] | 'loading' | 'failed';
 let modelState: ModelState = 'loading';
@@ -58,15 +79,13 @@ function expectedRoute(forceCloud: boolean): 'cloud' | 'on-device' | 'unknown' {
   return 'unknown';
 }
 
-function progressText(forceCloud: boolean, elapsedMs: number): string {
-  const elapsed = seconds(elapsedMs);
+function progressText(forceCloud: boolean): string {
   const route = expectedRoute(forceCloud);
-  if (route === 'cloud') return `Running in the cloud… ${elapsed}`;
-  if (route === 'on-device') return `Running on-device… ${elapsed}`;
-  if (modelState === 'loading') {
-    return `Waiting for the on-device model… ${elapsed} (loading can take minutes)`;
-  }
-  return `Running… ${elapsed}`;
+  if (route === 'cloud') return 'Running in the cloud…';
+  if (route === 'on-device') return 'Running on-device…';
+  if (modelState === 'loading')
+    return 'Waiting for the on-device model (loading can take minutes)…';
+  return 'Running…';
 }
 
 async function run(): Promise<void> {
@@ -81,10 +100,8 @@ async function run(): Promise<void> {
   output.textContent = '';
 
   // Waiting for the model can take minutes, so show that the panel is alive and where it runs.
-  const start = performance.now();
-  const showProgress = (): void => setStatus(progressText(forceCloud, performance.now() - start));
-  showProgress();
-  const timer = setInterval(showProgress, 1000);
+  setStatus(progressText(forceCloud));
+  const stopCounting = countSeconds(progress);
 
   try {
     const result = await runPrompt(prompt, forceCloud);
@@ -100,7 +117,7 @@ async function run(): Promise<void> {
         : '';
     setStatus(`Error: ${message}${hint}`, true);
   } finally {
-    clearInterval(timer);
+    stopCounting();
     runButton.disabled = false;
   }
 }
@@ -117,14 +134,18 @@ const emailElements = {
   headerRows: byId<HTMLElement>('email-header-rows'),
   replyTo: byId<HTMLElement>('email-reply-to'),
   returnPath: byId<HTMLElement>('email-return-path'),
-  links: byId<HTMLUListElement>('email-links'),
+  links: byId<HTMLOListElement>('email-links'),
   body: byId<HTMLElement>('email-body'),
 };
 const findingsList = byId<HTMLUListElement>('email-findings');
 
+/** The AI check's answer language; the warm-up loads the model for exactly this one. */
+const checkLanguage = answerLanguage(chrome.i18n.getUILanguage());
+
 // The AI check of every shown email: on-device only, with the rules as its lower limit.
 const aiCheck = createAiCheck(
   {
+    verdict: byId<HTMLElement>('verdict'),
     overall: byId<HTMLElement>('ai-overall'),
     status: byId<HTMLElement>('ai-status'),
     reasons: byId<HTMLUListElement>('ai-reasons'),
@@ -133,7 +154,7 @@ const aiCheck = createAiCheck(
   {
     run: runAiCheck,
     uiLanguage: () => chrome.i18n.getUILanguage(),
-    modelReady: async () => (await warmUpOnDevice().catch(() => undefined))?.state === 'ready',
+    modelReady: ensureModelLoaded,
   },
 );
 
@@ -148,7 +169,7 @@ function setEmailStatus(text: string, isError = false): void {
  */
 function displayEmail(email: Email, message: string, headersNote?: string, final = true): void {
   const findings = showRuleCheck(() => checkEmail(email), findingsList);
-  showEmail(email, emailElements, headersNote);
+  showEmail(email, emailElements, headersNote, findings);
   setEmailStatus(email.truncated ? `${message} The text is long and was cut.` : message);
   aiCheck.shown(email, findings, final);
 }
@@ -201,15 +222,12 @@ setUpPaste(
 
 /** Loads the on-device model as soon as the panel opens, so the first check does not wait. */
 async function warmUp(): Promise<void> {
-  const start = performance.now();
-  const showLoading = (): void => {
-    modelStatus.textContent = `Loading on-device model… ${seconds(performance.now() - start)}`;
-  };
-  showLoading();
-  const timer = setInterval(showLoading, 1000);
+  modelStatus.textContent =
+    'Loading the on-device model (the first load after Chrome starts can take several minutes)…';
+  const stopCounting = countSeconds(modelProgress);
 
   try {
-    const result = await warmUpOnDevice();
+    const result = await warmUpOnDevice(checkLanguage);
     modelState = result.state;
     if (result.state === 'ready') {
       modelStatus.textContent = `On-device model ready (loaded in ${seconds(result.durationMs)})`;
@@ -219,34 +237,43 @@ async function warmUp(): Promise<void> {
       modelDownload.hidden = false;
     } else {
       modelStatus.textContent =
-        'On-device model not available on this device. Prompts use the cloud.';
+        'On-device model not available on this device. Emails get the rule checks only; test prompts use the cloud.';
     }
   } catch (error) {
     modelState = 'failed';
     const message = error instanceof Error ? error.message : String(error);
     modelStatus.textContent = `On-device model could not load: ${message}`;
   } finally {
-    clearInterval(timer);
+    stopCounting();
   }
 }
 
 /** Downloads the model on click: Chrome allows the download only after a user action. */
 async function downloadModel(): Promise<void> {
   modelDownload.disabled = true;
-  modelStatus.textContent = 'Downloading the on-device model… 0 %';
+  modelStatus.textContent = 'Downloading the on-device model…';
+  modelProgress.textContent = '0 %';
+  // A progress event can arrive after the download ended; it must not show a stale percentage.
+  let done = false;
   try {
-    const result = await downloadOnDeviceModel((loaded) => {
-      modelStatus.textContent = `Downloading the on-device model… ${Math.round(loaded * 100)} %`;
+    const result = await downloadOnDeviceModel(checkLanguage, (loaded) => {
+      if (!done) modelProgress.textContent = `${Math.round(loaded * 100)} %`;
     });
+    done = true;
+    modelProgress.textContent = '';
     modelState = result.state;
     if (result.state === 'ready') {
       modelStatus.textContent = 'On-device model ready.';
       modelDownload.hidden = true;
+      // The email on screen was checked by the rules only: give it the AI check now.
+      aiCheck.recheck();
     } else {
       modelStatus.textContent = 'On-device model not available on this device.';
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    done = true;
+    modelProgress.textContent = '';
     modelStatus.textContent = `The download failed: ${message}`;
   } finally {
     modelDownload.disabled = false;
