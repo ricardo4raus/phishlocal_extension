@@ -742,3 +742,11 @@ _To fill in near the submission._
   and the German capital ẞ. Also fixed: a "?" in a link's password, IPv6 links, Japanese reasons
   cut to their first sentence, greeting words that are surnames ("Dear Mr Gentile"), and focus on
   a disabled button.
+- Review round 4 found that names-first opened two leaks: a "[name]" in the middle of an address
+  or a host broke those patterns, so "hans.[name]@private.example" sent the first name and a
+  link whose host held a name kept its path and user ID. The fix keeps the order but lets each
+  name stand as one letter that normalized text cannot hold (a mathematical bold "N", which NFKC
+  folds away) until the end, so the address and link patterns still see whole words. A
+  mutation check (writing "[name]" at once again) fails the new test. The random monkeys found
+  one more: a body cut at its limit by a source that did not mark it as cut ended in half an
+  IBAN; a body at its limit now always counts as cut.

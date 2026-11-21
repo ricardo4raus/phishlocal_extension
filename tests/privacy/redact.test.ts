@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PROMPT_LIMITS } from '../../src/ai/prompt';
-import type { Email } from '../../src/email';
+import { type Email, MAX_BODY_CHARS } from '../../src/email';
 import {
   cloudCut,
   cloudData,
@@ -146,9 +146,22 @@ describe('nameVariants', () => {
       redact('Read [link: here. Muster said hi. https://evil.example/x', ['Anna Muster']),
     ).toBe('Read [link: here. [name] said hi. [link: evil.example]');
     expect(redact('Who is Muster.Anna? anna@muster-family.example', ['Anna Muster'])).toBe(
-      'Who is [name].[name]? [name]@[name]-family.example',
+      'Who is [name].[name]? [email]@[name]-family.example',
     );
-    expect(redact('See https://anna-bank.example/x', ['Anna'])).toBe('See [link]');
+    expect(redact('See https://anna-bank.example/x', ['Anna'])).toBe(
+      'See [link: [name]-bank.example]',
+    );
+    // Found in review round 4: a "[name]" broke the address and link patterns, so the rest went.
+    expect(
+      redact('Login hans.muster@private.example or kd4711-anna@x.example', ['Anna Muster']),
+    ).toBe('Login [email]@private.example or [email]@x.example');
+    expect(
+      redact('verify at secure.lumora-bank.example/verify?uid=7f3a9c2e1bd4', ['Lumora Bank']),
+    ).toBe('verify at [link: secure.[name]-[name].example]');
+    // Short parts do not take hosts' endings, and prose is no address.
+    expect(redact('Visit evil.li/x and bank/insurance, e-mail', ['Li Wei', 'Bank'])).toBe(
+      'Visit [link: evil.li] and bank/insurance, e-mail',
+    );
   });
 
   it('matches names in any case, except a lower-case word outside an address', () => {
@@ -254,6 +267,12 @@ describe('cloudCut', () => {
     const text = `${'word '.repeat(10)}call +41 79 123 45 67`;
     const cutAt = text.indexOf('79') + 5;
     expect(cloudCut(text, cutAt)).toBe(`${'word '.repeat(10)}call`);
+  });
+
+  it('trims a body at its limit even when no source marked it as cut', () => {
+    // Found by the monkey test: half an IBAN at the end of a body cut without the flag.
+    const bodyText = `Pay CH93 0076 ${'\t'.repeat(MAX_BODY_CHARS - 18)}2011`;
+    expect(cloudData(email({ bodyText }), [], []).json).not.toContain('0076');
   });
 
   it('also trims a field that was cut where the email was read', () => {

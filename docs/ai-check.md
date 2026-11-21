@@ -165,16 +165,21 @@ inference). Nothing is sent on its own:
      behind it, and may reach its limit (then the warning shows).
 3. **Privacy filter, on the device** ([`src/privacy/redact.ts`](../src/privacy/redact.ts),
    `cloudData()`), in this order:
+   - fields are cut to the prompt limits first; a cut field (also one already cut when the email
+     was read, or a body at its 20,000-character limit) loses its last word and the digits before
+     it, so no half number or address goes;
    - text normalized as for the answer reader (NFKC, invisible characters removed, whitespace
      joined);
-   - names become "[name]", first, so that no later placeholder can hide or change one, and a
-     name inside a link or an address goes with it. The names: the one after a greeting in the six
+   - names are replaced first among the patterns, so that a name inside a link or an address goes
+     with it. Until the end each one stands as a single letter that normalized text cannot hold,
+     so the link and address patterns below still see whole words ("hans.muster@…" goes as one
+     address), and then becomes "[name]". The names: the one after a greeting in the six
      languages ("Dear Anna Muster", "Guten Tag Frau Muster", "Grüezi Anna"; "Dear Customer"
      stays, it is evidence; a brand after a greeting is removed too), and Nano's names and their
-     parts (split at spaces and hyphens). They match in any case ("ANNA", "Strauß" for
-     "STRAUSS"), except that a single word written all in lower case counts only inside a host,
-     an address or a link ("muster-family.example"), so a name part does not hit ordinary words
-     ("will", "bank");
+     parts (split at spaces and hyphens). They match in any case ("ANNA", "STRAUẞ" for
+     "Strauß"), except that a single word written all in lower case counts only inside a host,
+     an address or a link ("muster-family.example"), and there only from 3 letters, so a name
+     part does not hit ordinary words ("will", "bank/insurance") or endings ("evil.li");
    - links become their host ("[link: evil.example]"): a phishing link's path and query often
      hold an ID that identifies the user;
    - links without a scheme but with a path, query or fragment ("login.example/verify?uid=…",
@@ -184,9 +189,7 @@ inference). Nothing is sent on its own:
      any script;
    - IBANs (in one piece or in groups of four, with at least 8 digits) become "[iban]";
    - phone, card, customer and account numbers become "[number]", with the answer reader's phone
-     pattern; dates stay, because deadlines are evidence;
-   - fields are cut to the prompt limits; a cut field (also one already cut when the email was
-     read) loses its last word and the digits before it, so no half number or address goes.
+     pattern; dates stay, because deadlines are evidence.
 4. **What goes:** the rule findings (rule, severity and cleaned message, no evidence; the
    messages of the invisible-character and mixed-alphabet rules quote words of the email, so they
    go as a fixed text), the sender
@@ -216,7 +219,8 @@ the deep check is not available. Development builds use the debug token.
 
 - A name Nano misses and no greeting announces stays readable; the preview shows it before
   anything is sent.
-- A link's host stays, also when the host itself names the user (rare).
+- A link's host stays, unless it holds a known name (then "[link: secure.[name]-bank.example]").
+- "STRAUSS" in capitals does not match "Strauß" (only "STRAUẞ" does).
 - Amounts written with spaces that reach 9 characters ("4 500 000.00") become "[number]".
 - A single-word name in lower case ("anna" alone, outside an address) stays: matching single
   words in any case would remove ordinary words. The other way round, a short name part also

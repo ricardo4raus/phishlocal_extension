@@ -15,7 +15,7 @@
  */
 import { FULL_URL, normalizeText, replacePhoneNumbers } from '../ai/patterns';
 import { PROMPT_LIMITS } from '../ai/prompt';
-import { type Email, FIELD_LIMITS } from '../email';
+import { type Email, FIELD_LIMITS, MAX_BODY_CHARS } from '../email';
 import type { Finding } from '../rules';
 import { parseUrl } from '../rules/domains';
 
@@ -285,12 +285,19 @@ export function nameVariants(names: readonly string[]): string[] {
 
 const count = (text: string, placeholder: string): number => text.split(placeholder).length - 1;
 
-/** A link in the text as its host only. */
+/**
+ * A link in the text as its host only. The host is read from the text itself, not through `URL`,
+ * which would turn the stand-in for a name into punycode.
+ */
 function linkPlaceholder(link: string): string {
-  const url = parseUrl(/^www\./i.test(link) ? `https://${link}` : link);
-  if (!url?.hostname) return '[link]';
+  const authority = link.replace(/^[a-z][a-z\d+.-]*:\/\//iu, '').split(/[/?#\\\s]/u)[0] ?? '';
+  const hostAndPort = authority.slice(authority.lastIndexOf('@') + 1);
+  const host = (
+    hostAndPort.startsWith('[') ? hostAndPort.split(']')[0] + ']' : hostAndPort.split(':')[0]
+  )?.toLowerCase();
+  if (!host) return '[link]';
   // An IP address would be read as a number by the next step and turn into "[number]".
-  return /^[\d.]+$|^\[/.test(url.hostname) ? '[link: IP address]' : `[link: ${url.hostname}]`;
+  return /^[\d.]+$|^\[/.test(host) ? '[link: IP address]' : `[link: ${host}]`;
 }
 
 /** An email address as its domain only. */
@@ -309,6 +316,9 @@ export function redactText(text: string, names: readonly string[], removed: Remo
   // Names first, before any placeholder exists: a placeholder can then neither hide a name nor be
   // changed by one, and a name inside a link or an address goes with it (found in review round 3:
   // shielding placeholders afterwards let "[link: " in an email shield the names behind it).
+  // Until the end, a name stands as one letter that normalized text cannot hold, so the link and
+  // address patterns still see a whole word ("hans.<name>@mail.example"; a "[name]" there broke
+  // them and the rest of the address went out; found in review round 4).
   let clean = replaceNames(normalizeText(text), names, removed).replaceAll(FULL_URL, (link) => {
     removed.links++;
     return linkPlaceholder(link);
@@ -330,32 +340,34 @@ export function redactText(text: string, names: readonly string[], removed: Remo
   const before = count(clean, PLACEHOLDER.number);
   clean = replacePhoneNumbers(clean, PLACEHOLDER.number);
   removed.numbers += count(clean, PLACEHOLDER.number) - before;
-  return clean.trim();
+  return clean.replaceAll(NAME_STAND_IN, PLACEHOLDER.name).trim();
 }
 
-/** Characters around a word that is part of a host, an address or a link ("muster-family"). */
-const IN_ADDRESS = /[@/:_-]/u;
-const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
+/**
+ * Stands for a removed name until the end of {@link redactText}: a letter (so the link and address
+ * patterns take it as part of a word) that NFKC folds away, so normalized text never holds it
+ * (U+1D40D, a mathematical bold capital N).
+ */
+const NAME_STAND_IN = String.fromCodePoint(0x1d40d);
 
 /**
- * The word at `start`..`end` of `text` sits in a host, an address or a link: next to "@", "/",
- * ":", "_" or "-", or next to a dot inside a name ("muster.anna", not "the bank.").
+ * The word at `start`..`end` of `text` sits in a host, an address or a link: the run of text
+ * without spaces around it holds an "@", a "://" or a dot followed by a letter or digit
+ * ("muster-family.example", "anna.muster@"), not prose ("bank/insurance", "e-mail").
  */
 function inAddress(text: string, start: number, end: number): boolean {
-  const [before = '', after = ''] = [text[start - 1], text[end]];
-  return (
-    IN_ADDRESS.test(before) ||
-    IN_ADDRESS.test(after) ||
-    (before === '.' && LETTER_OR_DIGIT.test(text[start - 2] ?? '')) ||
-    (after === '.' && LETTER_OR_DIGIT.test(text[end + 1] ?? ''))
-  );
+  const from = text.lastIndexOf(' ', start) + 1;
+  const to = text.indexOf(' ', end);
+  const token = text.slice(from, to < 0 ? text.length : to);
+  return /@|:\/\/|\.[\p{L}\p{N}]/u.test(token);
 }
 
 /**
  * Replaces the names in any case ("ANNA MUSTER", "Strauß" for "STRAUẞ"), with one exception, so a
  * name part does not hit ordinary words ("will" for "Will Smith", "bank"): a single word written
  * all in lower case counts only as written by Nano, or inside a host, an address or a link
- * ("muster-family.example", "anna.muster@"), where lower case is the rule.
+ * ("muster-family.example", "anna.muster@"), where lower case is the rule; there only from 3
+ * letters on, so a part like "Li" does not take endings like "evil.li".
  */
 function replaceNames(text: string, names: readonly string[], removed: Removed): string {
   if (names.length === 0) return text;
@@ -366,11 +378,13 @@ function replaceNames(text: string, names: readonly string[], removed: Removed):
   );
   return text.replaceAll(pattern, (match: string, offset: number) => {
     const lowerWord = !match.includes(' ') && match === match.toLowerCase();
-    if (lowerWord && !exact.has(match) && !inAddress(text, offset, offset + match.length)) {
-      return match;
-    }
+    const counts =
+      !lowerWord ||
+      exact.has(match) ||
+      (match.length >= 3 && inAddress(text, offset, offset + match.length));
+    if (!counts) return match;
     removed.names++;
-    return PLACEHOLDER.name;
+    return NAME_STAND_IN;
   });
 }
 
@@ -429,7 +443,12 @@ function cloudFields(email: Email) {
       .map((link) =>
         cloudCut(link.text, PROMPT_LIMITS.linkText, link.text.length >= FIELD_LIMITS.linkText),
       ),
-    body: cloudCut(email.bodyText, PROMPT_LIMITS.body, email.truncated),
+    // A body at its limit was cut where it was read, also when no source said so (monkey test).
+    body: cloudCut(
+      email.bodyText,
+      PROMPT_LIMITS.body,
+      email.truncated || email.bodyText.length >= MAX_BODY_CHARS,
+    ),
   };
 }
 
