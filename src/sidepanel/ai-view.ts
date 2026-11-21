@@ -25,14 +25,14 @@ export interface AiElements {
   advice: HTMLElement;
 }
 
-const LABEL: Record<Risk, string> = {
+export const LABEL: Record<Risk, string> = {
   safe: 'No signs of phishing',
   suspicious: 'Suspicious',
   dangerous: 'Dangerous',
 };
 
 /** Our own advice, used whenever the rules are stricter than the AI. */
-const ADVICE: Record<Risk, string> = {
+export const ADVICE: Record<Risk, string> = {
   safe: 'No signs of phishing found. Stay careful with unexpected requests.',
   suspicious:
     'Be careful: do not enter passwords or card details and do not pay. Check with the sender through a way you already know.',

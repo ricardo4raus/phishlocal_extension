@@ -2,7 +2,9 @@ import { InferenceSource } from 'firebase/ai';
 import {
   downloadOnDeviceModel,
   ensureModelLoaded,
+  findNames,
   runAiCheck,
+  runCloudCheck,
   runPrompt,
   warmUpOnDevice,
   type WarmUpResult,
@@ -12,6 +14,7 @@ import { appCheckEnabled } from '../firebase';
 import type { Email } from '../email';
 import { checkEmail } from '../rules';
 import { createAiCheck } from './ai-view';
+import { createDeepCheck } from './deep-check-view';
 import { showEmail } from './email-view';
 import { createGmailView } from './gmail-view';
 import { showRuleCheck } from './findings-view';
@@ -158,6 +161,32 @@ const aiCheck = createAiCheck(
   },
 );
 
+// The cloud deep check: only on request, with the data cleaned on the device and shown first.
+const deepCheck = createDeepCheck(
+  {
+    section: byId<HTMLElement>('deep-check'),
+    intro: byId<HTMLElement>('deep-check-intro'),
+    start: byId<HTMLButtonElement>('deep-check-start'),
+    preview: byId<HTMLElement>('deep-check-preview'),
+    removed: byId<HTMLElement>('deep-check-removed'),
+    data: byId<HTMLElement>('deep-check-data'),
+    send: byId<HTMLButtonElement>('deep-check-send'),
+    cancel: byId<HTMLButtonElement>('deep-check-cancel'),
+    status: byId<HTMLElement>('deep-check-status'),
+    result: byId<HTMLElement>('deep-check-result'),
+    overall: byId<HTMLElement>('deep-check-overall'),
+    note: byId<HTMLElement>('deep-check-note'),
+    reasons: byId<HTMLUListElement>('deep-check-reasons'),
+    advice: byId<HTMLElement>('deep-check-advice'),
+  },
+  {
+    available: appCheckEnabled,
+    uiLanguage: () => chrome.i18n.getUILanguage(),
+    findNames,
+    run: runCloudCheck,
+  },
+);
+
 function setEmailStatus(text: string, isError = false): void {
   emailStatus.textContent = text;
   emailStatus.classList.toggle('error', isError);
@@ -172,11 +201,13 @@ function displayEmail(email: Email, message: string, headersNote?: string, final
   showEmail(email, emailElements, headersNote, findings);
   setEmailStatus(email.truncated ? `${message} The text is long and was cut.` : message);
   aiCheck.shown(email, findings, final);
+  deepCheck.shown(email, findings);
 }
 
 function hideEmail(): void {
   emailElements.details.hidden = true;
   aiCheck.hidden();
+  deepCheck.hidden();
 }
 
 // While the panel is open, every email opened in Gmail is checked automatically.
