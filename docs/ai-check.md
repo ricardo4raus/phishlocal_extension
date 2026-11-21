@@ -47,9 +47,11 @@ are its input and its lower limit.
    - full links, planted email addresses and phone numbers are removed from it, and bare domains
      from the advice. The email's own addresses (sender, Reply-To) stay readable in the reasons.
      Anything else means "the AI answer could not be read". Details of the cleaning:
-     - **Normalized first** (NFKC, invisible characters removed, ideographic full stops read as
-       ".", whitespace joined), so a phone number split by line breaks or written in fullwidth
-       digits is caught too.
+     - **Normalized first** (invisible characters removed before and after NFKC, ideographic full
+       stops read as ".", whitespace joined), so a phone number split by line breaks or written in
+       fullwidth digits is caught too, and an accent behind an invisible mark joins its letter.
+     - **Cut at 300 characters** without the partial last word: a cut word could read as a
+       domain ("co.ukddri…"), and "https://" with the ellipsis right after it as a link.
      - **Links** of any scheme (`ftp://` too).
      - **Phone numbers** of at least 9 characters, in any script's digits (Arabic-Indic too),
        grouped with spaces, parentheses, any dash punctuation, the minus sign, dots (also middle
@@ -145,14 +147,21 @@ AI Logic, model `gemini-3.5-flash-lite`, the SDK's own default for the cloud sid
 inference). Nothing is sent on its own:
 
 1. **Request:** the user clicks "Prepare a deep check…" under the verdict. For Italian and
-   Portuguese, where Gemini Nano's answers are experimental, the panel recommends it.
+   Portuguese, where Gemini Nano's answers are experimental, the panel recommends it. A Gmail
+   email first waits for its headers (at most 3 s, like the on-device check).
 2. **Names, on the device** (`findNames()` in [`src/ai.ts`](../src/ai.ts)):
+   - The panel first waits for the on-device model to be loaded (that can take minutes; "Stop"
+     ends the wait), outside the search's time limit.
    - Gemini Nano gets the text that will be cleaned and lists the names of people in it, as a
      JSON array (`ONLY_ON_DEVICE`, with the same guard against the SDK's silent cloud call).
-   - Nano only points: the code removes only strings that appear in the text, so an injection can
-     hide a name from the list but never add text to what is sent.
-   - After 20 s, or without the model, the data is built without Nano's list: then the sender's
-     name is removed entirely, and the preview warns that names may remain.
+   - Nano only points: the code removes only strings that appear in the text, in any case, so an
+     injection can hide a name from the list but never add text to what is sent. A list in one
+     entry ("Peter Meier, Claudia Schneider") is split.
+   - After 20 s, without the model, or when names had to be left out (more than 50, or longer
+     than 60 characters), the preview warns that names may remain. Without Nano's list the
+     sender's name is removed entirely.
+   - Nano works on one prompt at a time: a search started while the on-device check runs waits
+     behind it, and may reach its limit (then the warning shows).
 3. **Privacy filter, on the device** ([`src/privacy/redact.ts`](../src/privacy/redact.ts),
    `cloudData()`), in this order:
    - text normalized as for the answer reader (NFKC, invisible characters removed, whitespace
@@ -161,15 +170,19 @@ inference). Nothing is sent on its own:
      hold an ID that identifies the user;
    - email addresses become "[email]@domain", also without a top-level domain or with letters of
      any script;
+   - links without a scheme but with a path, query or fragment ("login.example/verify?uid=…")
+     become their host too; a bare domain stays;
    - IBANs (in one piece or in groups of four, with at least 8 digits) become "[iban]";
    - phone, card, customer and account numbers become "[number]", with the answer reader's phone
      pattern; dates stay, because deadlines are evidence;
-   - names become "[name]": Nano's names and their parts, and the name after a greeting in the
-     six languages ("Dear Anna Muster", "Sehr geehrte Frau Muster"; "Dear Customer" stays, it is
-     evidence);
+   - names become "[name]", in any case: the name after a greeting in the six languages ("Dear
+     Anna Muster", "Guten Tag Frau Muster", "Grüezi Anna"; "Dear Customer" stays, it is evidence),
+     and Nano's names and their parts of 3 letters or more;
    - fields are cut to the prompt limits; a cut field (also one already cut when the email was
      read) loses its last word and the digits before it, so no half number or address goes.
-4. **What goes:** the rule findings (rule, severity and cleaned message, no evidence), the sender
+4. **What goes:** the rule findings (rule, severity and cleaned message, no evidence; the
+   messages of the invisible-character and mixed-alphabet rules quote words of the email, so they
+   go as a fixed text), the sender
    check results (SPF, DKIM with signing domain, DMARC), the sender as "[email]@domain" with the
    cleaned name, the Reply-To domains, the cleaned subject, link texts with their target host,
    and up to 3,000 characters of cleaned body. **Never:** raw headers (they hold the user's
@@ -177,11 +190,15 @@ inference). Nothing is sent on its own:
    links, the user's own address.
 5. **Consent:** the panel shows exactly that data (the JSON that is sent) and a summary of what
    was removed. Only "Send to the cloud" sends it, once; "Cancel" sends nothing. Consent is asked
-   every time, for every email. The sent data stays on screen as the record.
+   every time, for every email. The sent data stays on screen as the record. When the email
+   changes under a preview, a request or a result (Gmail shows it again with new details), the
+   panel says so: a running request's data had been sent, its answer is dropped.
 6. **Cloud call** (`runCloudCheck()`): its own system message (the same task and rules, plus what
    the placeholders mean), the verdict schema as `responseJsonSchema`, a 30 s limit in the SDK
-   and 40 s in the panel. Another email or closing the panel stops it; a request that ignores
-   its stop is given up after 2 s. The answer is read by `parseVerdict()` like the on-device one.
+   and 40 s in the panel. "Stop", another email or closing the panel stops it; a request that
+   ignores its stop is given up after 2 s. Errors are shown in short words ("the cloud refused
+   the request (HTTP 403)"), without the request URL. The answer is read by `parseVerdict()`
+   like the on-device one.
 7. **Result:** its own block under the on-device verdict, labelled "Deep check", with the same
    rules as the lower limit and the same exception for confirmed senders.
 
@@ -194,6 +211,10 @@ the deep check is not available. Development builds use the debug token.
   anything is sent.
 - A link's host stays, also when the host itself names the user (rare).
 - Amounts written with spaces that reach 9 characters ("4 500 000.00") become "[number]".
+- Not detected: postal addresses ("Bahnhofstrasse 12, 8001 Zürich"), numbers shorter than 9
+  characters (an 8-digit phone number, "555-1234", a card's security code), dates of birth
+  (dates stay as evidence), numbers grouped with commas ("079,123,45,67"), and address parts
+  with rare characters ("o'brien@" keeps "o'"). The preview shows them before anything is sent.
 
 ## Prompt injection (OWASP LLM01) and unsafe output (LLM05)
 

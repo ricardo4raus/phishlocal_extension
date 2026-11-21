@@ -703,3 +703,22 @@ _To fill in near the submission._
   regression tests:
   - an address cut short at the end of a field;
   - half an IBAN at the end of a subject that was already cut where the email was read.
+- Random 100× runs of all monkeys found three older gaps in the AI answer reader (already on
+  `main`), all fixed with regression tests:
+  - an accent behind an invisible mark did not join its letter, so the sender's address passed
+    and then showed as "examplé";
+  - the cut at 300 characters turned the end of a long word into a valid-looking domain;
+  - "https://" before a space became "https://…" after the cut.
+- Two review agents checked the branch (privacy and security; logic and UI). No way to send
+  without consent, but real gaps, all fixed with tests:
+  - the invisible-character rule's message quoted the email's words, so a name split by a
+    zero-width space went to the cloud; such messages now go as a fixed text;
+  - names were matched case-sensitively ("ANNA MUSTER" stayed);
+  - a flood or a list from Nano dropped names silently; lists are split, and the preview warns;
+  - links without a scheme kept their path ("login.example/verify?uid=…");
+  - Gmail showing the email again (with its headers) wiped a running request's record without a
+    word; the deep check now waits for the headers, and the panel says what happened;
+  - a model load of minutes ran inside the name search's 20 s limit; the panel now waits for the
+    model first;
+  - the name search and the request could not be stopped; a Stop button, focus handling, the
+    warning in the live status, and short cloud errors without the request URL.

@@ -58,8 +58,8 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 - Email content is shown only as text, never rendered as HTML, so pasted emails can't load
   tracking pixels or run scripts.
 - The cloud deep check runs only when you ask for it and agree to the data shown: personal data
-  is removed on the device first, raw headers are never sent, and you see every character that
-  goes. Each email needs its own consent.
+  is removed on the device first, raw headers are never sent, and you see exactly the email data
+  that goes (besides PhishLocal's fixed instructions). Each email needs its own consent.
 - Permissions: the side panel, and Gmail only (`https://mail.google.com/*`). The `scripting`
   permission is used once after an install or update, to start PhishLocal's Gmail script in
   Gmail tabs that were already open, so you don't have to reload Gmail.
