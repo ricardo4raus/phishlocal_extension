@@ -181,6 +181,8 @@ describe('cleanAiText', () => {
     // Review round 5: after a time zone, the "+" is an offset and the date a deadline.
     const deadline = 'Pay by UTC+1 19.11.2026 14:00 or GMT+01 19/11/2026 9h';
     expect(cleanAiText(deadline)).toBe(deadline);
+    // Review round 6: but not a phone number glued to a time zone.
+    expect(cleanAiText('Call GMT+49 30/12/34 56789 now')).toBe('Call GMT[removed] now');
   });
 
   it('checks dates in other scripts by value too', () => {

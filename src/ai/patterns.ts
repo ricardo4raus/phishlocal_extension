@@ -78,7 +78,11 @@ export function replacePhoneNumbers(text: string, replacement: string): string {
     // A "+" starts only phone numbers, never a date: "+49 30/12/34 56789" holds a date-shaped
     // group, and the rest alone is too short to read as a number (found by the monkey test). Not
     // after a time zone: "UTC+1 19.11.2026" is a deadline (found in review).
-    const timeZone = /(?:UTC|GMT)$/iu.test(text.slice(Math.max(0, offset - 3), offset));
+    // After a time zone, only the offset and a time ("14" of "14:00") may stand next to the date;
+    // a longer group is a phone number glued to it ("GMT+49 30/12/34 56789"; review round 6).
+    const timeZone =
+      /(?:UTC|GMT)$/iu.test(text.slice(Math.max(0, offset - 3), offset)) &&
+      parts.slice(1).every((part) => isDate(part) || /^\p{Nd}{1,2}$/u.test(part));
     if (match.startsWith('+') && !timeZone) return replacement;
     const rest = parts.filter((part) => !isDate(part)).join(' ');
     const phoneInRest = [...rest.matchAll(new RegExp(PHONE_NUMBER.source, 'gu'))].some(

@@ -299,10 +299,42 @@ describe('cloudCut', () => {
     });
   });
 
+  it('keeps "www." hosts as hosts and shows the host a link really goes to', () => {
+    // Found in review round 6: the full filter turned "www." hosts into link placeholders, and a
+    // host written to hide another one ("%2E") showed the false one.
+    const data = cloudData(
+      email({
+        sender: { name: '', address: 'info@www.shop.example' },
+        links: [
+          { text: 'a', href: 'https://www.bank.example/login' },
+          { text: 'b', href: 'https://lumorabank.example%2Eevil.example/x' },
+          { text: 'c', href: 'https:evil.example/x' },
+        ],
+      }),
+      [],
+      [],
+    );
+    expect(JSON.parse(data.json)).toMatchObject({
+      email: {
+        from: { address: '[email]@www.shop.example' },
+        links: [
+          { goes_to: 'www.bank.example' },
+          { goes_to: 'lumorabank.example.evil.example' },
+          { goes_to: 'evil.example' },
+        ],
+      },
+    });
+    expect(data.removed.links).toBe(0);
+    expect(redact('see https://lumorabank.example%2Eevil.example/x')).toBe(
+      'see [link: lumorabank.example.evil.example]',
+    );
+  });
+
   it('reads only a clean host from a link', () => {
     // Found in review round 5: a percent-encoded path or punctuation rode along in the host.
     expect(redact('a https://evil.example%2Fuid%3D12345/x b')).toBe('a [link: evil.example] b');
-    expect(redact('a https://%41nna.example b')).toBe('a [link] b');
+    // The host the browser reads holds the name the text hid.
+    expect(redact('a https://%41nna.example b', ['Anna'])).toBe('a [link: [name].example] b');
     expect(redact('(see https://evil.example).')).toBe('(see [link: evil.example]');
     expect(redact('a login.example\\verify?uid=7f3a9c2e b')).toBe('a [link: login.example] b');
   });

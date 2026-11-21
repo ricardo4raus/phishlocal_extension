@@ -758,3 +758,9 @@ _To fill in near the submission._
   through it, as written instead of punycode. It also found that the "+" rule removed deadlines
   after a time zone ("UTC+1 19.11.2026"), and that hosts read from the text kept percent-encoded
   paths or punctuation. All fixed with tests.
+- Review round 6 found that running hosts through the whole filter turned "www.bank.example" into
+  a link placeholder, that a host read only as written could show a false target
+  ("lumorabank.example%2Eevil.example"), and that the time-zone exception let "GMT+49 30/12/34
+  56789" through. Hosts now get their own filter (names and numbers only), a host is taken as
+  written only when a browser reads the same host, and after a time zone only a time may stand
+  next to the date.

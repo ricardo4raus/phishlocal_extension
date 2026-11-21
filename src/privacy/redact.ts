@@ -287,14 +287,16 @@ export function nameVariants(names: readonly string[]): string[] {
 const count = (text: string, placeholder: string): number => text.split(placeholder).length - 1;
 
 /**
- * A link in the text as its host only. The host is read from the text itself, not through `URL`,
- * which would turn the stand-in for a name into punycode.
+ * A link in the text as its host only (see {@link trueHost}). The host goes through the name and
+ * number filter too: the host `URL` reads can hold a name the text hid ("%41nna.example").
  */
-function linkPlaceholder(link: string): string {
-  const host = linkHost(link);
+function linkPlaceholder(link: string, names: readonly string[], removed: Removed): string {
+  const host = trueHost(/^www\./iu.test(link) ? `https://${link}` : link);
   if (!host) return '[link]';
   // An IP address would be read as a number by the next step and turn into "[number]".
-  return IP_ADDRESS.test(host) ? '[link: IP address]' : `[link: ${host}]`;
+  return IP_ADDRESS.test(host)
+    ? '[link: IP address]'
+    : `[link: ${redactHost(host, names, removed)}]`;
 }
 
 /** An IPv4 address, or an IPv6 address in brackets, as a link's host. */
@@ -313,6 +315,25 @@ export function linkHost(link: string): string {
     : (/^[\p{L}\p{N}.-]*/u.exec(hostAndPort)?.[0] ?? '').replace(/\.+$/u, '');
   return host.toLowerCase();
 }
+
+/**
+ * The host a browser goes to, as written in the link (so a name in it can be found, rather than
+ * its punycode) when that is the same host; otherwise the host `URL` reads. A link written to
+ * show another host than it goes to ("lumorabank.example%2Eevil.example", "https:evil.example")
+ * then shows the real one (found in review round 6). The stand-in for a removed name is a letter
+ * `URL` would fold, so it is compared as a plain letter.
+ */
+export function trueHost(link: string): string {
+  const written = linkHost(link);
+  const parsed = parseUrl(plain(link))?.hostname ?? '';
+  if (!parsed) return written;
+  if (parseUrl(`https://${plain(written)}`)?.hostname === parsed) return written;
+  // `URL` also takes punctuation into a host ("evil.example)."): only the host characters count.
+  return linkHost(`https://${parsed}`);
+}
+
+/** Text with the stand-in for a name as a plain letter, as `URL` can read it. */
+const plain = (text: string): string => text.replaceAll(NAME_STAND_IN, 'x');
 
 /** An email address as its domain only. */
 export function addressPlaceholder(address: string): string {
@@ -335,12 +356,12 @@ export function redactText(text: string, names: readonly string[], removed: Remo
   // them and the rest of the address went out; found in review round 4).
   let clean = replaceNames(normalizeText(text), names, removed).replaceAll(FULL_URL, (link) => {
     removed.links++;
-    return linkPlaceholder(link);
+    return linkPlaceholder(link, names, removed);
   });
   // Before the addresses: "anna:pw@host.example/x" is a link with a user name, not an address.
   clean = clean.replaceAll(BARE_LINK, (link) => {
     removed.links++;
-    return linkPlaceholder(`https://${link}`);
+    return linkPlaceholder(`https://${link}`, names, removed);
   });
   clean = clean.replaceAll(ANY_ADDRESS, (address) => {
     removed.emails++;
@@ -365,6 +386,24 @@ export function redactText(text: string, names: readonly string[], removed: Remo
 const NAME_STAND_IN = String.fromCodePoint(0x1d40d);
 
 /**
+ * A host or domain on its own (a link target, an address domain, a DKIM domain): names and
+ * numbers go, but no link or address pattern runs on it, so "www.bank.example" stays a host
+ * (found in review round 6). Every word in it counts as part of a host. IP addresses stay.
+ */
+export function redactHost(host: string, names: readonly string[], removed: Removed): string {
+  if (IP_ADDRESS.test(host)) return host;
+  const before = count(host, PLACEHOLDER.number);
+  // A host from the text is normalized already; normalizing it again would fold the stand-in.
+  const normalized = host.includes(NAME_STAND_IN) ? host : normalizeText(host);
+  const clean = replacePhoneNumbers(
+    replaceNames(normalized, names, removed, { host: true }),
+    PLACEHOLDER.number,
+  );
+  removed.numbers += count(clean, PLACEHOLDER.number) - before;
+  return clean.replaceAll(NAME_STAND_IN, PLACEHOLDER.name).trim();
+}
+
+/**
  * The word at `start`..`end` of `text` sits in a host, an address or a link: the run of text
  * without spaces around it holds an "@", a "://" or a dot followed by a letter or digit
  * ("muster-family.example", "anna.muster@"), not prose ("bank/insurance", "e-mail").
@@ -383,7 +422,12 @@ function inAddress(text: string, start: number, end: number): boolean {
  * ("muster-family.example", "anna.muster@"), where lower case is the rule; there only from 3
  * letters on, so a part like "Li" does not take endings like "evil.li".
  */
-function replaceNames(text: string, names: readonly string[], removed: Removed): string {
+function replaceNames(
+  text: string,
+  names: readonly string[],
+  removed: Removed,
+  { host = false }: { host?: boolean } = {},
+): string {
   if (names.length === 0) return text;
   const exact = new Set(names);
   const pattern = new RegExp(
@@ -395,7 +439,7 @@ function replaceNames(text: string, names: readonly string[], removed: Removed):
     const counts =
       !lowerWord ||
       exact.has(match) ||
-      (match.length >= 3 && inAddress(text, offset, offset + match.length));
+      (match.length >= 3 && (host || inAddress(text, offset, offset + match.length)));
     if (!counts) return match;
     removed.names++;
     return NAME_STAND_IN;
@@ -487,10 +531,9 @@ export function cloudData(
   const fromModel = modelNames(foundNames ?? []);
   const names = nameVariants([...greetingNames(nameSearchText(email)), ...fromModel.names]);
   const clean = (text: string): string => redactText(text, names, removed);
-  // Hosts and domains go through the name filter too: "secure.anna-muster.example" is a host,
-  // and a name in it is still a name (found in review round 5). IP addresses stay as they are;
-  // the number filter would take them for a phone number.
-  const cleanHost = (host: string): string => (IP_ADDRESS.test(host) ? host : clean(host));
+  // Hosts and domains go through the name and number filter too: "secure.anna-muster.example" is
+  // a host, and a name in it is still a name (found in review round 5).
+  const cleanHost = (host: string): string => redactHost(host, names, removed);
   const auth = email.headers?.auth;
   let senderName = clean(fields.name);
   if (!foundNames && senderName !== '') {
@@ -531,7 +574,7 @@ export function cloudData(
         text: clean(fields.linkTexts[index] ?? ''),
         // As written (not punycode), so a name in it is found.
         goes_to: parseUrl(link.href)?.hostname
-          ? cleanHost(linkHost(link.href) || '(no host)')
+          ? cleanHost(trueHost(link.href) || '(no host)')
           : '(not a web link)',
       })),
       body: clean(fields.body),
