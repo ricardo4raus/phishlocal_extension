@@ -330,6 +330,39 @@ describe('cloudCut', () => {
     );
   });
 
+  it('finds names in hosts that end a sentence, in punycode, next to digits or full-width', () => {
+    // Found in review round 7.
+    expect(redact('Visit https://anna-muster.example. now', ['Anna Muster'])).toBe(
+      'Visit [link: [name]-[name].example] now',
+    );
+    expect(redact('go https://m%C3%BCller.example/x', ['Müller'])).toBe(
+      'go [link: [name].example]',
+    );
+    const data = JSON.parse(
+      cloudData(
+        email({
+          sender: { name: '', address: 'x@ANNA1985.example' },
+          bodyText: 'Dear Email User, Dear Anna,',
+          links: [
+            { text: 'a', href: 'https://müller.example./x' },
+            {
+              text: 'b',
+              href: `https://${String.fromCodePoint(0xff41, 0xff4e, 0xff4e, 0xff41)}.example/`,
+            },
+          ],
+        }),
+        [],
+        ['Müller'],
+      ).json,
+    ) as unknown;
+    expect(data).toMatchObject({
+      email: {
+        from: { address: '[email]@[name]1985.example' },
+        links: [{ goes_to: '[name].example' }, { goes_to: '[name].example' }],
+      },
+    });
+  });
+
   it('reads only a clean host from a link', () => {
     // Found in review round 5: a percent-encoded path or punctuation rode along in the host.
     expect(redact('a https://evil.example%2Fuid%3D12345/x b')).toBe('a [link: evil.example] b');

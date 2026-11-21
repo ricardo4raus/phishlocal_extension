@@ -228,7 +228,11 @@ the deep check is not available. Development builds use the debug token.
 - A name Nano misses and no greeting announces stays readable; the preview shows it before
   anything is sent.
 - A link's host stays, unless it holds a known name (then "[link: secure.[name]-bank.example]").
-- "STRAUSS" in capitals does not match "Strauß" (only "STRAUẞ" does).
+- "STRAUSS" in capitals does not match "Strauß" (only "STRAUẞ" does), and a Turkish dotted
+  "İ" in capitals does not match "i".
+- A name with letters beyond ASCII in a host that only `URL` could read (written differently
+  than it is read) is found only when it is a whole label ("xn--mller-kva.example"), not inside
+  a longer one ("müller-family" in punycode).
 - Amounts written with spaces that reach 9 characters ("4 500 000.00") become "[number]".
 - A single-word name in lower case ("anna" alone, outside an address) stays: matching single
   words in any case would remove ordinary words. The other way round, a short name part also

@@ -764,3 +764,9 @@ _To fill in near the submission._
   56789" through. Hosts now get their own filter (names and numbers only), a host is taken as
   written only when a browser reads the same host, and after a time zone only a time may stand
   next to the date.
+- Review round 7 found that a trailing dot ("müller.example.") made the browser's host differ,
+  so its punycode went out unfiltered; hosts now compare without it, names are also matched as
+  punycode labels, digits next to a name in a host no longer hide it ("anna1985.example"),
+  only an address's domain goes through the host filter ("Dear Email User" broke "[email]"),
+  and raw hosts are always normalized. The remaining edge cases (a name inside a longer
+  punycode label, the Turkish dotted İ) are documented limits.
