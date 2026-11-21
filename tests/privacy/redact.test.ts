@@ -1,0 +1,213 @@
+import { describe, expect, it } from 'vitest';
+import { PROMPT_LIMITS } from '../../src/ai/prompt';
+import type { Email } from '../../src/email';
+import {
+  cloudCut,
+  cloudData,
+  greetingNames,
+  nameSearchText,
+  nameVariants,
+  redactText,
+  type Removed,
+} from '../../src/privacy/redact';
+import type { Finding } from '../../src/rules';
+
+const counts = (): Removed => ({ names: 0, emails: 0, numbers: 0, ibans: 0, links: 0 });
+const redact = (text: string, names: string[] = []): string =>
+  redactText(text, nameVariants(names), counts());
+
+const email = (overrides: Partial<Email> = {}): Email => ({
+  sender: { name: 'Lumora Bank', address: 'service@lumorabank.example' },
+  subject: 'Your account',
+  bodyText: 'Hello',
+  links: [],
+  truncated: false,
+  ...overrides,
+});
+
+describe('redactText', () => {
+  it('keeps only the host of links, also of links with an ID in them', () => {
+    expect(redact('Log in at https://evil.example/login?user=anna.muster&id=829301 now')).toBe(
+      'Log in at [link: evil.example] now',
+    );
+    expect(redact('See www.evil.example/a/b')).toBe('See [link: www.evil.example]');
+  });
+
+  it('keeps only the domain of email addresses', () => {
+    expect(redact('Sent to Anna.Muster+news@Mail.Example today')).toBe(
+      'Sent to [email]@mail.example today',
+    );
+  });
+
+  it('removes IBANs, written in one piece or in groups', () => {
+    expect(redact('Pay to CH93 0076 2011 6238 5295 7 today')).toBe('Pay to [iban] today');
+    expect(redact('IBAN DE89370400440532013000.')).toBe('IBAN [iban].');
+    // Letters after a code that looks like a country and two digits are no IBAN.
+    expect(redact('Room AB12 this test word')).toBe('Room AB12 this test word');
+  });
+
+  it('removes phone, card and account numbers, but keeps dates and short amounts', () => {
+    expect(redact('Call +41 79 123 45 67 or 044/123 45 67')).toBe('Call [number] or [number]');
+    expect(redact('Card 4111 1111 1111 1111 expires')).toBe('Card [number] expires');
+    expect(redact('Customer no. 0012345678')).toBe('Customer no. [number]');
+    expect(redact('Pay 1,250.00 EUR by 19.11.2026')).toBe('Pay 1,250.00 EUR by 19.11.2026');
+  });
+
+  it('replaces names and their parts as whole words only', () => {
+    expect(redact('Anna Muster, Anna and Muster, not Annabel', ['Anna Muster'])).toBe(
+      '[name], [name] and [name], not Annabel',
+    );
+  });
+
+  it('treats names as text, not as patterns', () => {
+    expect(redact('Hi A.B, AxB, C+D and CCD', ['A.B', 'C+D', '(['])).toBe(
+      'Hi [name], AxB, [name] and CCD',
+    );
+  });
+
+  it('counts what it removed', () => {
+    const removed = counts();
+    redactText(
+      'Anna: https://a.example x@y.example +41 79 123 45 67 CH93 0076 2011 6238 5295 7',
+      nameVariants(['Anna']),
+      removed,
+    );
+    expect(removed).toEqual({ names: 1, emails: 1, numbers: 1, ibans: 1, links: 1 });
+  });
+
+  it('sees through invisible characters and line breaks', () => {
+    const zeroWidth = String.fromCodePoint(0x200b);
+    expect(redact(`Call +41 79${zeroWidth} 123\n45 67`)).toBe('Call [number]');
+  });
+});
+
+describe('greetingNames', () => {
+  it.each([
+    ['Dear Anna Muster,', 'Anna Muster'],
+    ['Dear Mr. John Smith,', 'John Smith'],
+    ['Hallo Anna,', 'Anna'],
+    ['Sehr geehrte Frau Muster', 'Muster'],
+    ['Bonjour Marie Dupont', 'Marie Dupont'],
+    ['Chère Marie,', 'Marie'],
+    ['Hola Lucía,', 'Lucía'],
+    ['Ciao Giulia,', 'Giulia'],
+    ['Olá João,', 'João'],
+    ['dear Anna', 'Anna'],
+  ])('finds the name in "%s"', (text, name) => {
+    expect(greetingNames(text)).toEqual([name]);
+  });
+
+  it.each([
+    'Dear Customer,',
+    'Dear valued customer,',
+    'Sehr geehrte Damen und Herren,',
+    'Hallo Kunde,',
+    'Hello there',
+    'This is fine',
+  ])('finds no name in "%s"', (text) => {
+    expect(greetingNames(text)).toEqual([]);
+  });
+});
+
+describe('nameVariants', () => {
+  it('gives each name and its parts, longest first, without titles', () => {
+    expect(nameVariants(['Frau Anna Muster'])).toEqual(['Frau Anna Muster', 'Muster', 'Anna']);
+  });
+
+  it('ignores strings that are no names', () => {
+    expect(nameVariants(['', 'A', '42', 'x'.repeat(61)])).toEqual([]);
+  });
+
+  it('takes at most 50 names', () => {
+    const many = Array.from({ length: 80 }, (_, i) => `Name${String(i).padStart(2, '0')}`);
+    expect(nameVariants(many)).toHaveLength(50);
+  });
+});
+
+describe('cloudCut', () => {
+  it('drops the cut word and any digits before it, so no half phone number goes', () => {
+    const text = `${'word '.repeat(10)}call +41 79 123 45 67`;
+    const cutAt = text.indexOf('79') + 5;
+    expect(cloudCut(text, cutAt)).toBe(`${'word '.repeat(10)}call`);
+  });
+
+  it('keeps short text as it is, normalized', () => {
+    expect(cloudCut('  a\n b ', 10)).toBe('a b');
+  });
+});
+
+describe('cloudData', () => {
+  const findings: Finding[] = [
+    { rule: 'urgency', severity: 'warning', message: 'Time pressure', evidence: ['raw text'] },
+  ];
+
+  it('sends no raw headers, no full addresses and no raw evidence', () => {
+    const data = cloudData(
+      email({
+        sender: { name: 'Anna Muster', address: 'anna.muster@mail.example' },
+        bodyText: 'Dear Anna Muster, call +41 79 123 45 67.',
+        links: [{ text: 'Log in', href: 'https://evil.example/login?id=anna' }],
+        headers: {
+          replyTo: [{ name: 'X', address: 'collect@evil.example' }],
+          returnPath: 'bounce-anna=mail.example@lists.example',
+          auth: {
+            server: 'mx.google.com',
+            spf: 'pass',
+            dkim: [{ result: 'pass', domain: 'mail.example' }],
+            dmarc: 'pass',
+          },
+        },
+      }),
+      findings,
+      ['Anna Muster'],
+    );
+    const parsed = JSON.parse(data.json) as unknown;
+    expect(parsed).toEqual({
+      rule_findings: [{ rule: 'urgency', severity: 'warning', message: 'Time pressure' }],
+      sender_checks: {
+        spf: 'pass',
+        dkim: ['pass (mail.example)'],
+        dmarc: 'pass',
+        sender_domain_confirmed: true,
+      },
+      email: {
+        from: { name: '[name]', address: '[email]@mail.example' },
+        reply_to: ['[email]@evil.example'],
+        subject: 'Your account',
+        links: [{ text: 'Log in', goes_to: 'evil.example' }],
+        body: 'Dear [name], call [number].',
+        body_cut: false,
+      },
+    });
+    expect(data.json).not.toMatch(/anna|bounce|mx\.google|raw text/i);
+    expect(data.namesChecked).toBe(true);
+    expect(data.removed).toEqual({ names: 2, emails: 0, numbers: 1, ibans: 0, links: 0 });
+  });
+
+  it("keeps a company's sender name when Nano found no person's name in it", () => {
+    const data = JSON.parse(cloudData(email(), [], []).json) as { email: { from: unknown } };
+    expect(data.email.from).toEqual({ name: 'Lumora Bank', address: '[email]@lumorabank.example' });
+  });
+
+  it('removes the sender name entirely when Nano could not look for names', () => {
+    const data = cloudData(email(), [], undefined);
+    expect(JSON.parse(data.json)).toMatchObject({ email: { from: { name: '[name]' } } });
+    expect(data.namesChecked).toBe(false);
+    expect(data.removed.names).toBe(1);
+  });
+
+  it('removes greeting names even without Nano', () => {
+    const data = cloudData(email({ bodyText: 'Hallo Anna, bitte zahlen.' }), [], undefined);
+    expect(JSON.parse(data.json)).toMatchObject({ email: { body: 'Hallo [name], bitte zahlen.' } });
+  });
+
+  it('says when the body was cut, and Nano reads exactly the text that is sent', () => {
+    const long = email({ bodyText: `Hello ${'word '.repeat(PROMPT_LIMITS.body)}` });
+    const data = JSON.parse(cloudData(long, [], []).json) as {
+      email: { body: string; body_cut: boolean };
+    };
+    expect(data.email.body_cut).toBe(true);
+    expect(data.email.body.length).toBeLessThanOrEqual(PROMPT_LIMITS.body);
+    expect(nameSearchText(long)).toContain(data.email.body);
+  });
+});
