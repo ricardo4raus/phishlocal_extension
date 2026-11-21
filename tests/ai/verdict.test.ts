@@ -178,6 +178,9 @@ describe('cleanAiText', () => {
     expect(cleanAiText('Call 07912 19.11.2026 34567')).toBe('Call [removed]');
     // Found by the monkey test: a date-shaped group, and the rest too short on its own.
     expect(cleanAiText('Call +49 30/12/34 56789 now')).toBe('Call [removed] now');
+    // Review round 5: after a time zone, the "+" is an offset and the date a deadline.
+    const deadline = 'Pay by UTC+1 19.11.2026 14:00 or GMT+01 19/11/2026 9h';
+    expect(cleanAiText(deadline)).toBe(deadline);
   });
 
   it('checks dates in other scripts by value too', () => {

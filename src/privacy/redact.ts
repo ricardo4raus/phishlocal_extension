@@ -57,7 +57,8 @@ const BARE_LINK = new RegExp(
     String.raw`(?:[\p{L}\p{N}._%+-]+(?::[^\s@/?#\\]*)?@)?` +
     // A host name with a letter or punycode ending, or an IP address (found in review).
     String.raw`(?:(?:[\p{L}\p{N}-]+\.)+(?:\p{L}{2,24}|xn--[a-z\d-]+)|\d{1,3}(?:\.\d{1,3}){3}|\[[\da-f:.]+\])` +
-    String.raw`(?::\d+)?[/?#]\S*`,
+    // Also a backslash path ("login.example\verify?uid="), which browsers read as "/".
+    String.raw`(?::\d+)?[/?#\\]\S*`,
   'giu',
 );
 
@@ -290,14 +291,27 @@ const count = (text: string, placeholder: string): number => text.split(placehol
  * which would turn the stand-in for a name into punycode.
  */
 function linkPlaceholder(link: string): string {
-  const authority = link.replace(/^[a-z][a-z\d+.-]*:\/\//iu, '').split(/[/?#\\\s]/u)[0] ?? '';
-  const hostAndPort = authority.slice(authority.lastIndexOf('@') + 1);
-  const host = (
-    hostAndPort.startsWith('[') ? hostAndPort.split(']')[0] + ']' : hostAndPort.split(':')[0]
-  )?.toLowerCase();
+  const host = linkHost(link);
   if (!host) return '[link]';
   // An IP address would be read as a number by the next step and turn into "[number]".
-  return /^[\d.]+$|^\[/.test(host) ? '[link: IP address]' : `[link: ${host}]`;
+  return IP_ADDRESS.test(host) ? '[link: IP address]' : `[link: ${host}]`;
+}
+
+/** An IPv4 address, or an IPv6 address in brackets, as a link's host. */
+const IP_ADDRESS = /^(?:[\d.]+|\[[\da-f:.]+\])$/iu;
+
+/**
+ * The host of a link as written, lower case, or '' if there is none. Only letters, digits, dots
+ * and hyphens (or an IPv6 address in brackets): anything else ends it, so a percent-encoded path
+ * or trailing punctuation does not ride along ("evil.example%2Fuid%3D1", "evil.example).").
+ */
+export function linkHost(link: string): string {
+  const authority = link.replace(/^[a-z][a-z\d+.-]*:\/\//iu, '').split(/[/?#\\\s]/u)[0] ?? '';
+  const hostAndPort = authority.slice(authority.lastIndexOf('@') + 1);
+  const host = hostAndPort.startsWith('[')
+    ? (/^\[[\da-f:.]+\]/iu.exec(hostAndPort)?.[0] ?? '')
+    : (/^[\p{L}\p{N}.-]*/u.exec(hostAndPort)?.[0] ?? '').replace(/\.+$/u, '');
+  return host.toLowerCase();
 }
 
 /** An email address as its domain only. */
@@ -473,6 +487,10 @@ export function cloudData(
   const fromModel = modelNames(foundNames ?? []);
   const names = nameVariants([...greetingNames(nameSearchText(email)), ...fromModel.names]);
   const clean = (text: string): string => redactText(text, names, removed);
+  // Hosts and domains go through the name filter too: "secure.anna-muster.example" is a host,
+  // and a name in it is still a name (found in review round 5). IP addresses stay as they are;
+  // the number filter would take them for a phone number.
+  const cleanHost = (host: string): string => (IP_ADDRESS.test(host) ? host : clean(host));
   const auth = email.headers?.auth;
   let senderName = clean(fields.name);
   if (!foundNames && senderName !== '') {
@@ -493,21 +511,28 @@ export function cloudData(
       ? {
           spf: auth.spf ?? 'none',
           dkim: auth.dkim.map((entry) =>
-            entry.domain ? `${entry.result} (${entry.domain})` : entry.result,
+            entry.domain ? `${entry.result} (${cleanHost(entry.domain)})` : entry.result,
           ),
           dmarc: auth.dmarc ?? 'none',
           sender_domain_confirmed: auth.dmarc === 'pass',
         }
       : 'not available',
     email: {
-      from: { name: senderName, address: addressPlaceholder(email.sender.address) },
+      from: { name: senderName, address: cleanHost(addressPlaceholder(email.sender.address)) },
       ...(email.headers
-        ? { reply_to: email.headers.replyTo.map((box) => addressPlaceholder(box.address)) }
+        ? {
+            reply_to: email.headers.replyTo.map((box) =>
+              cleanHost(addressPlaceholder(box.address)),
+            ),
+          }
         : {}),
       subject: clean(fields.subject),
       links: email.links.slice(0, PROMPT_LIMITS.links).map((link, index) => ({
         text: clean(fields.linkTexts[index] ?? ''),
-        goes_to: parseUrl(link.href)?.hostname || '(not a web link)',
+        // As written (not punycode), so a name in it is found.
+        goes_to: parseUrl(link.href)?.hostname
+          ? cleanHost(linkHost(link.href) || '(no host)')
+          : '(not a web link)',
       })),
       body: clean(fields.body),
       body_cut: email.truncated || fields.body.length < normalizeText(email.bodyText).trim().length,

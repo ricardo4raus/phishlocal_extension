@@ -65,7 +65,7 @@ are its input and its lower limit.
        date ("19.11.2026 12:00") keeps the date, and a date placed between the groups of a phone
        number ("079 19.11.2026 123 4567") does not save it. A phone number right next to a date
        takes the date with it, and so does a match that starts with "+" ("+49 30/12/34 56789"):
-       a date never does.
+       a date never does, except after a time zone ("UTC+1 19.11.2026" stays).
      - **Known gaps:** a phone number that is a plausible date ("12.11.2026") or a 19xx/20xx
        year range ("2001-2002") stays; other separators ("|", "[") split a number; fragments
        shorter than 9 characters stay, so that amounts like "12,345.67 EUR" stay readable; a
@@ -196,7 +196,9 @@ inference). Nothing is sent on its own:
    go as a fixed text), the sender
    check results (SPF, DKIM with signing domain, DMARC), the sender as "[email]@domain" with the
    cleaned name, the Reply-To domains, the cleaned subject, link texts with their target host,
-   and up to 3,000 characters of cleaned body. **Never:** raw headers (they hold the user's
+   and up to 3,000 characters of cleaned body. Hosts and domains (link targets, address domains,
+   DKIM signing domains) go through the name filter too, as written rather than as punycode, so
+   "secure.anna-muster.example" goes as "secure.[name]-[name].example". **Never:** raw headers (they hold the user's
    address and server IP addresses), the Return-Path (often holds the user's address), full
    links, the user's own address.
 5. **Consent:** the panel shows exactly that data (the JSON that is sent) and a summary of what

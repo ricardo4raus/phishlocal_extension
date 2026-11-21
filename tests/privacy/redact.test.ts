@@ -269,6 +269,44 @@ describe('cloudCut', () => {
     expect(cloudCut(text, cutAt)).toBe(`${'word '.repeat(10)}call`);
   });
 
+  it('removes names from link targets, address domains and DKIM domains too', () => {
+    // Found in review round 5: these fields went out without the name filter.
+    const data = JSON.parse(
+      cloudData(
+        email({
+          sender: { name: '', address: 'info@anna-muster-secure.example' },
+          bodyText: 'Dear Anna Muster,',
+          links: [{ text: 'Open', href: 'https://secure.anna-muster.example/x?id=1' }],
+          headers: {
+            replyTo: [{ name: '', address: 'x@muster.example' }],
+            auth: {
+              server: 'mx.google.com',
+              dkim: [{ result: 'pass', domain: 'anna-muster-secure.example' }],
+            },
+          },
+        }),
+        [],
+        [],
+      ).json,
+    ) as unknown;
+    expect(JSON.stringify(data)).not.toMatch(/anna|muster/i);
+    expect(data).toMatchObject({
+      email: {
+        from: { address: '[email]@[name]-[name]-secure.example' },
+        reply_to: ['[email]@[name].example'],
+        links: [{ goes_to: 'secure.[name]-[name].example' }],
+      },
+    });
+  });
+
+  it('reads only a clean host from a link', () => {
+    // Found in review round 5: a percent-encoded path or punctuation rode along in the host.
+    expect(redact('a https://evil.example%2Fuid%3D12345/x b')).toBe('a [link: evil.example] b');
+    expect(redact('a https://%41nna.example b')).toBe('a [link] b');
+    expect(redact('(see https://evil.example).')).toBe('(see [link: evil.example]');
+    expect(redact('a login.example\\verify?uid=7f3a9c2e b')).toBe('a [link: login.example] b');
+  });
+
   it('trims a body at its limit even when no source marked it as cut', () => {
     // Found by the monkey test: half an IBAN at the end of a body cut without the flag.
     const bodyText = `Pay CH93 0076 ${'\t'.repeat(MAX_BODY_CHARS - 18)}2011`;

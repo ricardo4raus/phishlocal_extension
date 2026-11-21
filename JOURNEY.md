@@ -750,3 +750,11 @@ _To fill in near the submission._
   mutation check (writing "[name]" at once again) fails the new test. The random monkeys found
   one more: a body cut at its limit by a source that did not mark it as cut ended in half an
   IBAN; a body at its limit now always counts as cut.
+- Random runs also found an older gap in the AI answer reader: "+49 30/12/34 56789" holds a
+  date-shaped group, and the rest alone is too short to look like a phone number. A "+" never
+  starts a date, so such a match is now removed.
+- PR #16 opened. Review round 5 found one more leak: link targets, address domains and DKIM
+  domains skipped the name filter ("secure.anna-muster.example" went out as is). They now go
+  through it, as written instead of punycode. It also found that the "+" rule removed deadlines
+  after a time zone ("UTC+1 19.11.2026"), and that hosts read from the text kept percent-encoded
+  paths or punctuation. All fixed with tests.
