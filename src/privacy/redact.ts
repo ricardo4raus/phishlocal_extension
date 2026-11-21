@@ -46,6 +46,13 @@ const none = (): Removed => ({ names: 0, emails: 0, numbers: 0, ibans: 0, links:
 const ANY_ADDRESS = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]*(?:\.[\p{L}\p{N}-]*)*/gu;
 
 /**
+ * A link without a scheme that has a path, query or fragment ("login.example/verify?uid=7f3a"):
+ * its path can hold an ID that identifies the user too (found in review). A bare domain without
+ * one stays; it names no one.
+ */
+const BARE_LINK = /(?<![\p{L}\p{N}.-])(?:[\p{L}\p{N}-]+\.)+\p{L}{2,24}[/?#]\S*/gu;
+
+/**
  * An IBAN: country code, check digits, then 11 to 30 letters or digits, written in one piece or in
  * groups of four. At least 8 digits in it, so that words after "AB12" are not taken for one.
  */
@@ -56,6 +63,9 @@ const MIN_IBAN_DIGITS = 8;
 /** Greetings in the six languages; the capitalized words after one are taken as a name. */
 const GREETINGS = [
   'dear',
+  'good morning',
+  'good afternoon',
+  'good evening',
   'hello',
   'hi',
   'hey',
@@ -64,6 +74,11 @@ const GREETINGS = [
   'liebes',
   'hallo',
   'guten tag',
+  'guten morgen',
+  'grüezi',
+  'grüss gott',
+  'moin',
+  'servus',
   'sehr geehrte',
   'sehr geehrter',
   'bonjour',
@@ -72,6 +87,8 @@ const GREETINGS = [
   'cher',
   'chère',
   'hola',
+  'buenos días',
+  'buenas tardes',
   'estimado',
   'estimada',
   'querido',
@@ -84,6 +101,8 @@ const GREETINGS = [
   'buongiorno',
   'olá',
   'oi',
+  'bom dia',
+  'boa tarde',
   'prezado',
   'prezada',
 ];
@@ -163,9 +182,15 @@ const NOT_NAMES = new Set([
   ...TITLES,
 ]);
 
-/** A greeting pattern for one word, capitalized or not ("dear" matches "Dear" and "dear"). */
-const greetingPattern = (word: string): string =>
-  `[${word[0]?.toUpperCase()}${word[0]}]${word.slice(1)}`;
+/**
+ * A greeting pattern, each word capitalized or not ("guten tag" matches "Guten Tag" and "guten
+ * tag").
+ */
+const greetingPattern = (greeting: string): string =>
+  greeting
+    .split(' ')
+    .map((word) => `[${word[0]?.toUpperCase()}${word[0]}]${word.slice(1)}`)
+    .join(' ');
 
 const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
@@ -195,23 +220,38 @@ export function greetingNames(text: string): string[] {
   return names;
 }
 
-/** Longest name taken from the model; longer strings are no name. */
+/** Longest name taken from the model; a longer entry is no name. */
 const MAX_NAME = 60;
-/** Most names used; more are ignored (an injection could send a flood). */
+/** Most names taken from the model (an injection could send a flood). */
 const MAX_NAMES = 50;
 
 /**
- * The names to replace: each full name and its parts ("Anna Muster", "Anna", "Muster"), at least
- * 2 characters and with a letter, without titles. Longest first, so a full name goes in one piece.
+ * Nano's names, ready for {@link nameVariants}: a list in one entry ("Peter Meier, Claudia
+ * Schneider") is split; at most {@link MAX_NAMES} names of at most {@link MAX_NAME} characters.
+ * `dropped`: some were left out, so names may remain (found in review: they were dropped silently).
+ */
+export function modelNames(found: readonly string[]): { names: string[]; dropped: boolean } {
+  const names = found
+    .flatMap((entry) => entry.split(/[,;/&]|\band\b|\bund\b|\bet\b|\by\b|\be\b/u))
+    .map((name) => normalizeText(name).trim())
+    .filter((name) => name !== '');
+  const usable = names.filter((name) => name.length <= MAX_NAME).slice(0, MAX_NAMES);
+  return { names: usable, dropped: usable.length < names.length };
+}
+
+/**
+ * The names to replace: each full name and its parts ("Anna Muster", "Anna", "Muster"), with a
+ * letter and without titles. A full name needs 2 characters, a part 3: names are matched in any
+ * case, and a 2-letter part would also remove words like "al" or "de". Longest first, so a full
+ * name goes in one piece.
  */
 export function nameVariants(names: readonly string[]): string[] {
   const variants = new Set<string>();
-  for (const raw of names.slice(0, MAX_NAMES)) {
+  for (const raw of names) {
     const name = normalizeText(raw).trim();
-    if (name.length > MAX_NAME) continue;
     for (const part of [name, ...name.split(' ')]) {
       const bare = part.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
-      if (bare.length < 2 || !/\p{L}/u.test(bare)) continue;
+      if (bare.length < (part === name ? 2 : 3) || !/\p{L}/u.test(bare)) continue;
       if (TITLES.includes(bare.toLowerCase())) continue;
       variants.add(bare);
     }
@@ -230,8 +270,9 @@ function linkPlaceholder(link: string): string {
 /** An email address as its domain only. */
 export function addressPlaceholder(address: string): string {
   const at = address.lastIndexOf('@');
-  const domain = at >= 0 ? address.slice(at + 1).toLowerCase() : '';
-  return domain ? `${PLACEHOLDER.email}@${domain}` : PLACEHOLDER.email;
+  // Only what looks like a domain: a pasted "anna@mail.example (Anna Muster)" ends in a name.
+  const domain = at >= 0 ? (/^[\p{L}\p{N}.-]*/u.exec(address.slice(at + 1))?.[0] ?? '') : '';
+  return domain ? `${PLACEHOLDER.email}@${domain.toLowerCase()}` : PLACEHOLDER.email;
 }
 
 /**
@@ -247,6 +288,10 @@ export function redactText(text: string, names: readonly string[], removed: Remo
     removed.emails++;
     return addressPlaceholder(address);
   });
+  clean = clean.replaceAll(BARE_LINK, (link) => {
+    removed.links++;
+    return linkPlaceholder(`https://${link}`);
+  });
   clean = clean.replaceAll(IBAN, (iban) => {
     if ((iban.match(/\d/g)?.length ?? 0) < MIN_IBAN_DIGITS) return iban;
     removed.ibans++;
@@ -258,7 +303,8 @@ export function redactText(text: string, names: readonly string[], removed: Remo
   if (names.length > 0) {
     const pattern = new RegExp(
       String.raw`(?<![\p{L}\p{N}])(?:${names.map(escapeRegex).join('|')})(?![\p{L}\p{N}])`,
-      'gu',
+      // Any case: "ANNA MUSTER" and "anna muster" are the same name (found in review).
+      'giu',
     );
     clean = clean.replaceAll(pattern, () => {
       removed.names++;
@@ -273,9 +319,21 @@ export interface CloudData {
   /** The data block, exactly as it is shown and sent. */
   json: string;
   removed: Removed;
-  /** True if Gemini Nano looked for names; otherwise only greetings and the sender name count. */
+  /**
+   * True if Gemini Nano looked for names and every name it found could be used; otherwise names
+   * may remain.
+   */
   namesChecked: boolean;
 }
+
+/**
+ * Rule messages that quote words of the email (which can be names, split by the very characters
+ * the rule found): the cloud gets a fixed text instead (found in review).
+ */
+const FIXED_MESSAGES: Partial<Record<Finding['rule'], string>> = {
+  'hidden-characters': 'Words contain invisible characters, a trick to slip past filters.',
+  'mixed-script': 'Words mix Latin letters with Cyrillic or Greek letters that look the same.',
+};
 
 /**
  * A field as far as it goes to the cloud, normalized. A cut can split a phone number, an address
@@ -333,7 +391,8 @@ export function cloudData(
 ): CloudData {
   const removed = none();
   const fields = cloudFields(email);
-  const names = nameVariants([...(foundNames ?? []), ...greetingNames(nameSearchText(email))]);
+  const fromModel = modelNames(foundNames ?? []);
+  const names = nameVariants([...greetingNames(nameSearchText(email)), ...fromModel.names]);
   const clean = (text: string): string => redactText(text, names, removed);
   const auth = email.headers?.auth;
   let senderName = clean(fields.name);
@@ -344,8 +403,13 @@ export function cloudData(
   const data = {
     rule_findings: findings
       .slice(0, PROMPT_LIMITS.findings)
-      // Messages hold only limited email content (hostnames, our phrases), cleaned anyway.
-      .map(({ rule, severity, message }) => ({ rule, severity, message: clean(message) })),
+      // Messages hold only limited email content (hostnames, our phrases), cleaned anyway; the
+      // ones that quote words of the email get a fixed text.
+      .map(({ rule, severity, message }) => ({
+        rule,
+        severity,
+        message: FIXED_MESSAGES[rule] ?? clean(message),
+      })),
     sender_checks: auth
       ? {
           spf: auth.spf ?? 'none',
@@ -370,5 +434,9 @@ export function cloudData(
       body_cut: email.truncated || fields.body.length < normalizeText(email.bodyText).trim().length,
     },
   };
-  return { json: JSON.stringify(data, null, 2), removed, namesChecked: foundNames !== undefined };
+  return {
+    json: JSON.stringify(data, null, 2),
+    removed,
+    namesChecked: foundNames !== undefined && !fromModel.dropped,
+  };
 }

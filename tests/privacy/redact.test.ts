@@ -5,6 +5,7 @@ import {
   cloudCut,
   cloudData,
   greetingNames,
+  modelNames,
   nameSearchText,
   nameVariants,
   redactText,
@@ -123,12 +124,79 @@ describe('nameVariants', () => {
   });
 
   it('ignores strings that are no names', () => {
-    expect(nameVariants(['', 'A', '42', 'x'.repeat(61)])).toEqual([]);
+    expect(nameVariants(['', 'A', '42'])).toEqual([]);
   });
 
-  it('takes at most 50 names', () => {
+  it('keeps 2-letter parts out, so names in any case do not hit short words', () => {
+    expect(nameVariants(['Al Smith'])).toEqual(['Al Smith', 'Smith']);
+    expect(redact('Al Smith, AL SMITH, smith; al cliente', ['Al Smith'])).toBe(
+      '[name], [name], [name]; al cliente',
+    );
+  });
+});
+
+describe('modelNames', () => {
+  it('splits a list in one entry and says when names were left out', () => {
+    // Found in review: such entries were skipped, and the cap dropped names silently.
+    expect(modelNames(['Peter Meier, Claudia Schneider-Rossi & Johann und Eva'])).toEqual({
+      names: ['Peter Meier', 'Claudia Schneider-Rossi', 'Johann', 'Eva'],
+      dropped: false,
+    });
     const many = Array.from({ length: 80 }, (_, i) => `Name${String(i).padStart(2, '0')}`);
-    expect(nameVariants(many)).toHaveLength(50);
+    expect(modelNames(many).names).toHaveLength(50);
+    expect(modelNames(many).dropped).toBe(true);
+    expect(modelNames(['x'.repeat(61)])).toEqual({ names: [], dropped: true });
+  });
+});
+
+describe('review round 1 fixes', () => {
+  it('matches names in any case', () => {
+    expect(redact('Anna Muster, holder: ANNA MUSTER, login anna muster.', ['Anna Muster'])).toBe(
+      '[name], holder: [name], login [name].',
+    );
+  });
+
+  it('keeps only the host of links without a scheme that have a path', () => {
+    expect(redact('Login at secure-login.example/verify?uid=7f3a9c2e1bd4 now')).toBe(
+      'Login at [link: secure-login.example] now',
+    );
+    expect(redact('Visit lumorabank.example today.')).toBe('Visit lumorabank.example today.');
+  });
+
+  it('keeps only a domain-shaped part after the @', () => {
+    const data = JSON.parse(
+      cloudData(email({ sender: { name: '', address: 'anna@mail.example (Anna Muster)' } }), [], [])
+        .json,
+    ) as { email: { from: { address: string } } };
+    expect(data.email.from.address).toBe('[email]@mail.example');
+  });
+
+  it('sends a fixed text for rule messages that quote words of the email', () => {
+    const zeroWidth = String.fromCodePoint(0x200b);
+    const finding: Finding = {
+      rule: 'hidden-characters',
+      severity: 'warning',
+      message: `Words contain invisible characters, a trick to slip past filters: An${zeroWidth}na.`,
+      evidence: [],
+    };
+    expect(cloudData(email(), [finding], ['Anna']).json).not.toMatch(/An.?na/);
+  });
+
+  it('uses greeting names even when Nano sends a flood, and then warns', () => {
+    const flood = Array.from({ length: 60 }, (_, i) => `Person${i}`);
+    const data = cloudData(email({ bodyText: 'Dear Anna Muster, verify.' }), [], flood);
+    expect(data.json).not.toContain('Anna');
+    expect(data.namesChecked).toBe(false);
+  });
+
+  it.each([
+    ['Guten Tag Anna Muster', 'Anna Muster'],
+    ['Grüezi Anna', 'Anna'],
+    ['Buenos días Lucía', 'Lucía'],
+    ['Good morning Anna,', 'Anna'],
+    ['Bom dia João', 'João'],
+  ])('finds the name in "%s"', (text, name) => {
+    expect(greetingNames(text)).toEqual([name]);
   });
 });
 

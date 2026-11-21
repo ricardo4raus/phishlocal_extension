@@ -259,6 +259,8 @@ const PRIVATE = [
   '+41 79 555 12 34',
   'CH93 0076 2011 6238 5295 7',
   'https://track.example/u?id=zqtoken',
+  'login.example/verify?uid=zqpath',
+  'ZORBALD QUINT',
 ].join(' ');
 
 describe('monkey: privacy filter in front of the cloud', () => {
@@ -284,15 +286,15 @@ describe('monkey: privacy filter in front of the cloud', () => {
       const { json } = data;
       expect(() => JSON.parse(json) as unknown).not.toThrow();
       // (The checking server's name may appear: rule messages name it, and it is Google's.)
-      for (const secret of ['zq.canary', 'zqtoken', 'bounce']) {
+      for (const secret of ['zq.canary', 'zqtoken', 'zqpath', 'bounce']) {
         expect(json, secret).not.toContain(secret);
       }
       expect(json.replace(/\D/g, ''), 'phone number').not.toContain('41795551234');
       expect(json.replace(/\s/g, ''), 'IBAN').not.toContain('CH930076');
       // Names: everywhere when Nano looked; without it, at least the sender name goes.
-      expect(nanoLooked && /Zorbald|Quint/.test(json), 'name').toBe(false);
+      expect(nanoLooked && /Zorbald|Quint/i.test(json), 'name').toBe(false);
       const parsed = JSON.parse(json) as { email: { from: { name: string } } };
-      expect(parsed.email.from.name).not.toMatch(/Zorbald|Quint/);
+      expect(parsed.email.from.name).not.toMatch(/Zorbald|Quint/i);
       expect(data.namesChecked).toBe(nanoLooked);
       // The same email, the same data.
       expect(
