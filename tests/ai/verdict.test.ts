@@ -48,8 +48,29 @@ describe('parseVerdict', () => {
       }),
     );
     expect(verdict?.reasons).toHaveLength(MAX_REASONS);
-    expect(verdict?.reasons[0]?.length).toBe(MAX_AI_TEXT);
-    expect(verdict?.advice.length).toBe(MAX_AI_TEXT);
+    // The cut drops the partial last word.
+    expect(verdict?.reasons[0]).toBe('Reason 0…');
+    expect(verdict?.advice).toBe('…');
+    const words = parseVerdict(
+      JSON.stringify({ risk: 'safe', reasons: ['word '.repeat(100)], advice: '' }),
+    );
+    expect(words?.reasons[0]?.length).toBeLessThanOrEqual(MAX_AI_TEXT);
+    expect(words?.reasons[0]).toMatch(/^(?:word )*word…$/);
+  });
+
+  it('never leaves a domain or a loose accent that a cut or an invisible mark made', () => {
+    // Found by the monkey test: the cut shortened a 30-letter ending to a valid-looking domain.
+    const advice = `${'x'.repeat(280)} 0;.co.uk${'d'.repeat(30)}`;
+    expect(cleanAiText(advice, { keepDomains: false })).toBe(`${'x'.repeat(280)}…`);
+    // Found by the monkey test: "https://" before a space is no link, but "https://…" reads as one.
+    const scheme = `${'y'.repeat(280)} see https:// ${'z'.repeat(30)}`;
+    expect(cleanAiText(scheme)).toBe(`${'y'.repeat(280)} see…`);
+    // Found by the monkey test: an accent behind a direction mark stayed loose, so the known
+    // address passed and then showed as "examplé".
+    const known = new Set(['news@lumorabank.example']);
+    const marked = `From news@lumorabank.example${String.fromCodePoint(0x200f, 0x0301)} today`;
+    // Joined, "lumorabank.examplé" is no longer the known address, so it is removed.
+    expect(cleanAiText(marked, { knownAddresses: known })).toBe('From [removed]é today');
   });
 
   it('removes links, addresses and phone numbers an injection could plant', () => {

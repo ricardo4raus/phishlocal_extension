@@ -44,6 +44,12 @@ export interface AiVerdict {
  */
 const BARE_DOMAIN = /\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,24}\b(?:\/\S*)?/gi;
 
+/** A link that ends the text (not global: used with test()). */
+const LINK_AT_END = new RegExp(String.raw`(?:${FULL_URL.source})$`, 'i');
+
+/** The text without its last word (a cut leaves a partial one). */
+const dropLastWord = (words: string): string => words.replace(/\S*$/u, '').trimEnd();
+
 /** Model output is short; longer text is cut before the patterns run. */
 const MAX_RAW_AI_TEXT = 2_000;
 
@@ -72,7 +78,13 @@ export function cleanAiText(
   );
   if (!keepDomains) cleaned = cleaned.replaceAll(BARE_DOMAIN, '[removed]');
   cleaned = cleaned.trim();
-  return cleaned.length > MAX_AI_TEXT ? `${cleaned.slice(0, MAX_AI_TEXT - 1)}…` : cleaned;
+  if (cleaned.length <= MAX_AI_TEXT) return cleaned;
+  // The cut drops its partial last word: cutting a long word could leave a piece that reads as a
+  // domain ("co.ukddri…" from a 30-letter ending; found by the monkey test).
+  let kept = dropLastWord(cleaned.slice(0, MAX_AI_TEXT - 1));
+  // "https:// x" is no link, but with the ellipsis right after it, "https://…" reads as one.
+  while (LINK_AT_END.test(`${kept}…`)) kept = dropLastWord(kept);
+  return `${kept}…`;
 }
 
 const isRisk = (value: unknown): value is Risk =>

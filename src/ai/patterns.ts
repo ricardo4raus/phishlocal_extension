@@ -92,10 +92,13 @@ const IDEOGRAPHIC_STOP = /\u3002/g;
 /**
  * The text as it is shown, so the patterns see what a reader sees: a phone number split by line
  * breaks, invisible characters or fullwidth digits would otherwise slip past them (found by the
+ * monkey test). Invisible characters go before NFKC too, so an accent behind one joins its letter
+ * ("example" + U+200F + U+0301 is "examplé", not "example" with a loose accent; found by the
  * monkey test).
  */
 export function normalizeText(text: string): string {
   return text
+    .replace(INVISIBLE, '')
     .normalize('NFKC')
     .replace(INVISIBLE, '')
     .replace(IDEOGRAPHIC_STOP, '.')
