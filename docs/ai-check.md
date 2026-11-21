@@ -64,7 +64,8 @@ are its input and its lower limit.
        date stays only if the rest, without the dates, reads as no phone number: a time after a
        date ("19.11.2026 12:00") keeps the date, and a date placed between the groups of a phone
        number ("079 19.11.2026 123 4567") does not save it. A phone number right next to a date
-       takes the date with it.
+       takes the date with it, and so does a match that starts with "+" ("+49 30/12/34 56789"):
+       a date never does.
      - **Known gaps:** a phone number that is a plausible date ("12.11.2026") or a 19xx/20xx
        year range ("2001-2002") stays; other separators ("|", "[") split a number; fragments
        shorter than 9 characters stay, so that amounts like "12,345.67 EUR" stay readable; a

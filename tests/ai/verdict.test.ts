@@ -176,6 +176,8 @@ describe('cleanAiText', () => {
     // Found in review round 5: a date between the groups split the number into short pieces.
     expect(cleanAiText('Call 079 19.11.2026 123 4567')).toBe('Call [removed]');
     expect(cleanAiText('Call 07912 19.11.2026 34567')).toBe('Call [removed]');
+    // Found by the monkey test: a date-shaped group, and the rest too short on its own.
+    expect(cleanAiText('Call +49 30/12/34 56789 now')).toBe('Call [removed] now');
   });
 
   it('checks dates in other scripts by value too', () => {

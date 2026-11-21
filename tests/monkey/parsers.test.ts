@@ -261,6 +261,8 @@ const PRIVATE = [
   'https://track.example/u?id=zqtoken',
   'login.example/verify?uid=zqpath',
   'ZORBALD QUINT',
+  'kd4711-zorbald@private.example',
+  'secure.quint-bank.example/verify?uid=zqhost',
 ].join(' ');
 
 describe('monkey: privacy filter in front of the cloud', () => {
@@ -286,7 +288,7 @@ describe('monkey: privacy filter in front of the cloud', () => {
       const { json } = data;
       expect(() => JSON.parse(json) as unknown).not.toThrow();
       // (The checking server's name may appear: rule messages name it, and it is Google's.)
-      for (const secret of ['zq.canary', 'zqtoken', 'zqpath', 'bounce']) {
+      for (const secret of ['zq.canary', 'zqtoken', 'zqpath', 'zqhost', 'kd4711', 'bounce']) {
         expect(json, secret).not.toContain(secret);
       }
       expect(json.replace(/\D/g, ''), 'phone number').not.toContain('41795551234');

@@ -75,6 +75,9 @@ export function replacePhoneNumbers(text: string, replacement: string): string {
     if (isDate(match)) return match;
     const parts = match.split(' ');
     if (!parts.some(isDate)) return replacement;
+    // A "+" starts only phone numbers, never a date: "+49 30/12/34 56789" holds a date-shaped
+    // group, and the rest alone is too short to read as a number (found by the monkey test).
+    if (match.startsWith('+')) return replacement;
     const rest = parts.filter((part) => !isDate(part)).join(' ');
     const phoneInRest = [...rest.matchAll(new RegExp(PHONE_NUMBER.source, 'gu'))].some(
       ([number]) => !isDate(number),
