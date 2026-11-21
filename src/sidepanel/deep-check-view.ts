@@ -181,6 +181,8 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
   let stop: AbortController | undefined;
   /** Changes whenever the email changes or the user cancels: late results are dropped. */
   let generation = 0;
+  // The status can take the focus from a button that disappears (not by Tab).
+  elements.status.tabIndex = -1;
 
   const language = (): string => answerLanguage(deps.uiLanguage());
 
@@ -219,9 +221,12 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     elements.send.disabled = false;
     elements.cancel.disabled = false;
     set(elements.intro, intro());
-    // Focus on a button that was just hidden (Stop, Send) would be lost: move it to the start.
+    // Focus on a button that was just hidden (Stop, Send) would be lost: move it to the start, or
+    // to the status while the start waits (found in review round 3).
     const focused = document.activeElement;
     if (focused && elements.section.contains(focused) && focused.closest('[hidden]')) {
+      (elements.start.disabled ? elements.status : elements.start).focus();
+    } else if (focused === elements.status && !elements.start.disabled) {
       elements.start.focus();
     }
   }

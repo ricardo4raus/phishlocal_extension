@@ -52,7 +52,7 @@ are its input and its lower limit.
        fullwidth digits is caught too, and an accent behind an invisible mark joins its letter.
      - **Cut at 300 characters** without the partial last word: a cut word could read as a
        domain ("co.ukddri…"), and "https://" with the ellipsis right after it as a link. Text
-       without spaces (e.g. Japanese) is cut before its first "." or "@" instead of dropped.
+       without spaces (e.g. Japanese, where "。" reads as ".") keeps its whole sentences instead.
      - **Links** of any scheme (`ftp://` too).
      - **Phone numbers** of at least 9 characters, in any script's digits (Arabic-Indic too),
        grouped with spaces, parentheses, any dash punctuation, the minus sign, dots (also middle
@@ -155,8 +155,8 @@ inference). Nothing is sent on its own:
      ends the wait), outside the search's time limit.
    - Gemini Nano gets the text that will be cleaned and lists the names of people in it, as a
      JSON array (`ONLY_ON_DEVICE`, with the same guard against the SDK's silent cloud call).
-   - Nano only points: the code removes only strings that appear in the text, in any case, so an
-     injection can hide a name from the list but never add text to what is sent. A list in one
+   - Nano only points: the code removes only strings that appear in the text, so an injection
+     can hide a name from the list but never add text to what is sent. A list in one
      entry ("Peter Meier, Claudia Schneider") is split.
    - After 20 s, without the model, or when names had to be left out (more than 50, or longer
      than 60 characters), the preview warns that names may remain. Without Nano's list the
@@ -167,22 +167,24 @@ inference). Nothing is sent on its own:
    `cloudData()`), in this order:
    - text normalized as for the answer reader (NFKC, invisible characters removed, whitespace
      joined);
+   - names become "[name]", first, so that no later placeholder can hide or change one, and a
+     name inside a link or an address goes with it. The names: the one after a greeting in the six
+     languages ("Dear Anna Muster", "Guten Tag Frau Muster", "Grüezi Anna"; "Dear Customer"
+     stays, it is evidence; a brand after a greeting is removed too), and Nano's names and their
+     parts (split at spaces and hyphens). They match in any case ("ANNA", "Strauß" for
+     "STRAUSS"), except that a single word written all in lower case counts only inside a host,
+     an address or a link ("muster-family.example"), so a name part does not hit ordinary words
+     ("will", "bank");
    - links become their host ("[link: evil.example]"): a phishing link's path and query often
      hold an ID that identifies the user;
-   - email addresses become "[email]@domain", also without a top-level domain or with letters of
-     any script;
    - links without a scheme but with a path, query or fragment ("login.example/verify?uid=…",
      also with a port, a punycode ending or a user name in front) become their host too, an IP
-     address "[link: IP address]"; a bare domain stays;
+     address (v4 or v6) "[link: IP address]"; a bare domain stays;
+   - email addresses become "[email]@domain", also without a top-level domain or with letters of
+     any script;
    - IBANs (in one piece or in groups of four, with at least 8 digits) become "[iban]";
    - phone, card, customer and account numbers become "[number]", with the answer reader's phone
      pattern; dates stay, because deadlines are evidence;
-   - names become "[name]": the name after a greeting in the six languages ("Dear Anna Muster",
-     "Guten Tag Frau Muster", "Grüezi Anna"; "Dear Customer" stays, it is evidence; a brand after
-     a greeting is removed too), and Nano's names and their parts. A full name matches in any case
-     ("ANNA MUSTER", "anna muster"); a single word only as written or in capitals ("Li", "LI"),
-     so a name part does not hit ordinary words ("will", "bank"). Placeholders made before are
-     never changed;
    - fields are cut to the prompt limits; a cut field (also one already cut when the email was
      read) loses its last word and the digits before it, so no half number or address goes.
 4. **What goes:** the rule findings (rule, severity and cleaned message, no evidence; the
@@ -216,8 +218,9 @@ the deep check is not available. Development builds use the debug token.
   anything is sent.
 - A link's host stays, also when the host itself names the user (rare).
 - Amounts written with spaces that reach 9 characters ("4 500 000.00") become "[number]".
-- A single-word name in lower case ("anna" alone) stays: matching single words in any case
-  would remove ordinary words.
+- A single-word name in lower case ("anna" alone, outside an address) stays: matching single
+  words in any case would remove ordinary words. The other way round, a short name part also
+  removes the same word written with a capital ("Al" in "Al hacer clic").
 - Not detected: postal addresses ("Bahnhofstrasse 12, 8001 Zürich"), numbers shorter than 9
   characters (an 8-digit phone number, "555-1234", a card's security code), dates of birth
   (dates stay as evidence), numbers grouped with commas ("079,123,45,67"), and address parts

@@ -56,14 +56,21 @@ const MAX_PARTIAL_WORD = 30;
 /**
  * The end of a cut: cutting a word could leave a piece that reads as a domain ("co.ukddri…" from
  * a 30-letter ending; found by the monkey test). A short partial word is dropped. A longer one
- * (text without spaces, e.g. Japanese) is kept up to its first "." or "@", so its end can form no
- * domain or address (found in review: a whole Japanese reason became "…").
+ * (text without spaces, e.g. Japanese, where "。" reads as ".") is kept up to its last sentence
+ * end, a "." followed by no letter or digit of a domain, so its end can form no domain or address
+ * (found in review: a whole Japanese reason became "…", then only its first sentence stayed).
+ * Without one, it is kept up to its first "." or "@".
  */
 function cutEnd(cut: string): string {
   const last = /\S*$/u.exec(cut)?.[0] ?? '';
   if (last.length <= MAX_PARTIAL_WORD) return dropLastWord(cut);
+  const start = cut.length - last.length;
+  const sentenceEnds = [...last.matchAll(/\.(?=[^A-Za-z\d-])/gu)];
+  const lastEnd = sentenceEnds.at(-1)?.index;
+  // Up to and with the ".": what follows it there (a sentence) and here ("…") ends any domain.
+  if (lastEnd !== undefined) return cut.slice(0, start + lastEnd + 1);
   const end = last.search(/[.@]/u);
-  return end < 0 ? cut : cut.slice(0, cut.length - last.length + end).trimEnd();
+  return end < 0 ? cut : cut.slice(0, start + end).trimEnd();
 }
 
 /** Model output is short; longer text is cut before the patterns run. */

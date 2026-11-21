@@ -67,6 +67,10 @@ describe('parseVerdict', () => {
     // Found in review: text without spaces lost everything but the ellipsis.
     const japanese = 'メール'.repeat(120);
     expect(cleanAiText(japanese)).toBe(`${japanese.slice(0, MAX_AI_TEXT - 1)}…`);
+    // Review round 3: sentences end in "。" (read as "."); all whole sentences stay.
+    const sentence = `${'メール'.repeat(9)}。`;
+    const kept = cleanAiText(sentence.repeat(20));
+    expect(kept).toBe(`${sentence.replace('。', '.').repeat(10)}…`);
     // Found by the monkey test: "https://" before a space is no link, but "https://…" reads as one.
     const scheme = `${'y'.repeat(280)} see https:// ${'z'.repeat(30)}`;
     expect(cleanAiText(scheme)).toBe(`${'y'.repeat(280)} see…`);

@@ -139,10 +139,23 @@ describe('nameVariants', () => {
     );
   });
 
-  it('never changes a placeholder made before', () => {
+  it('removes names before anything else, also inside links and addresses', () => {
+    // Found in review round 3: shielding placeholders let a "[link: " in the email shield the
+    // names behind it, and names in hosts were lower-cased and kept.
     expect(
-      redact('See https://anna-bank.example/x and Anna@bank.example', ['Anna', 'Bank', 'Link']),
-    ).toBe('See [link: anna-bank.example] and [email]@bank.example');
+      redact('Read [link: here. Muster said hi. https://evil.example/x', ['Anna Muster']),
+    ).toBe('Read [link: here. [name] said hi. [link: evil.example]');
+    expect(redact('Who is Muster.Anna? anna@muster-family.example', ['Anna Muster'])).toBe(
+      'Who is [name].[name]? [name]@[name]-family.example',
+    );
+    expect(redact('See https://anna-bank.example/x', ['Anna'])).toBe('See [link]');
+  });
+
+  it('matches names in any case, except a lower-case word outside an address', () => {
+    // Found in review round 3: only "as written" and capitals were tried.
+    expect(redact('Dear ANNA, thanks, Anna. Herr STRAUẞ', ['ANNA MUSTER', 'Strauß'])).toBe(
+      'Dear [name], thanks, [name]. Herr [name]',
+    );
   });
 });
 
@@ -184,6 +197,11 @@ describe('review round 1 fixes', () => {
     expect(redact('a login.xn--p1ai/v?uid=zq b')).toBe('a [link: login.xn--p1ai] b');
     expect(redact('a 192.168.10.20/v?uid=zq b')).toBe('a [link: IP address] b');
     expect(redact('a anna.muster:pw@host.example/x b')).toBe('a [link: host.example] b');
+    // Found in review round 3: a "?" in the password, and IPv6 addresses.
+    expect(redact('a anna:1234?x@evil.example/verify b')).toBe(
+      'a anna:1234?[link: evil.example] b',
+    );
+    expect(redact('a [2001:db8::1]/verify?uid=zq b')).toBe('a [link: IP address] b');
     expect(redact('Visit lumorabank.example today.')).toBe('Visit lumorabank.example today.');
   });
 
@@ -213,7 +231,14 @@ describe('review round 1 fixes', () => {
     expect(data.namesChecked).toBe(false);
   });
 
+  it('splits names at hyphens too', () => {
+    expect(nameVariants(['Claudia Schneider-Rossi'])).toContain('Rossi');
+  });
+
   it.each([
+    // Found in review round 3: greeting words later in the name are surnames.
+    ['Dear Mr Gentile,', 'Gentile'],
+    ['Dear Anna Morgen,', 'Anna Morgen'],
     ['Guten Tag Anna Muster', 'Anna Muster'],
     ['Grüezi Anna', 'Anna'],
     ['Buenos días Lucía', 'Lucía'],

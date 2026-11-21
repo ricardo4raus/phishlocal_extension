@@ -53,9 +53,10 @@ const ANY_ADDRESS = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]*(?:\.[\p{L}\p{N}-]*)*/gu;
 const BARE_LINK = new RegExp(
   String.raw`(?<![\p{L}\p{N}.-])` +
     // A user name (and password) in front goes with it: "anna:pw@host.example/x".
-    String.raw`(?:[\p{L}\p{N}._%+-]+(?::[^\s@/]*)?@)?` +
-    // A host name with a letter or punycode ending, or an IPv4 address (found in review).
-    String.raw`(?:(?:[\p{L}\p{N}-]+\.)+(?:\p{L}{2,24}|xn--[a-z\d-]+)|\d{1,3}(?:\.\d{1,3}){3})` +
+    // (No "?" or "#" in the password: "anna:1234?x@host" would read "anna" as the host.)
+    String.raw`(?:[\p{L}\p{N}._%+-]+(?::[^\s@/?#\\]*)?@)?` +
+    // A host name with a letter or punycode ending, or an IP address (found in review).
+    String.raw`(?:(?:[\p{L}\p{N}-]+\.)+(?:\p{L}{2,24}|xn--[a-z\d-]+)|\d{1,3}(?:\.\d{1,3}){3}|\[[\da-f:.]+\])` +
     String.raw`(?::\d+)?[/?#]\S*`,
   'giu',
 );
@@ -207,8 +208,7 @@ const GREETING_WORDS = new Set(
   ),
 );
 
-const notName = (word: string): boolean =>
-  NOT_NAMES.has(word.toLowerCase()) || GREETING_WORDS.has(word.toLowerCase());
+const isGreetingWord = (word: string): boolean => GREETING_WORDS.has(word.toLowerCase());
 
 const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
@@ -227,9 +227,11 @@ export function greetingNames(text: string): string[] {
   const names: string[] = [];
   for (const [, words = ''] of normalizeText(text).matchAll(GREETING)) {
     const name: string[] = [];
-    for (const word of words.replace(/^,/, '').trim().split(' ')) {
+    for (const [index, word] of words.replace(/^,/, '').trim().split(' ').entries()) {
       const bare = word.replace(/\.$/, '');
-      if (notName(bare)) {
+      // A greeting word counts only right after the greeting ("Hello Dear Customer"); later it can
+      // be a surname ("Dear Mr Gentile", "Dear Anna Morgen"; found in review round 3).
+      if (NOT_NAMES.has(bare.toLowerCase()) || (index === 0 && isGreetingWord(bare))) {
         if (name.length > 0) break;
         continue;
       }
@@ -270,7 +272,8 @@ export function nameVariants(names: readonly string[]): string[] {
   const variants = new Set<string>();
   for (const raw of names) {
     const name = normalizeText(raw).trim();
-    for (const part of [name, ...name.split(' ')]) {
+    // Parts at spaces and hyphens: "Schneider-Rossi" gives "Schneider" and "Rossi" too.
+    for (const part of [name, ...name.split(/[ -]/u)]) {
       const bare = part.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
       if (bare.length < 2 || !/\p{L}/u.test(bare)) continue;
       if (TITLES.includes(bare.toLowerCase())) continue;
@@ -303,7 +306,10 @@ export function addressPlaceholder(address: string): string {
  * the variants from {@link nameVariants}.
  */
 export function redactText(text: string, names: readonly string[], removed: Removed): string {
-  let clean = normalizeText(text).replaceAll(FULL_URL, (link) => {
+  // Names first, before any placeholder exists: a placeholder can then neither hide a name nor be
+  // changed by one, and a name inside a link or an address goes with it (found in review round 3:
+  // shielding placeholders afterwards let "[link: " in an email shield the names behind it).
+  let clean = replaceNames(normalizeText(text), names, removed).replaceAll(FULL_URL, (link) => {
     removed.links++;
     return linkPlaceholder(link);
   });
@@ -324,28 +330,45 @@ export function redactText(text: string, names: readonly string[], removed: Remo
   const before = count(clean, PLACEHOLDER.number);
   clean = replacePhoneNumbers(clean, PLACEHOLDER.number);
   removed.numbers += count(clean, PLACEHOLDER.number) - before;
-  // A full name in any case ("ANNA MUSTER", "anna muster"); a single word only as written or in
-  // capitals, so a name part does not hit ordinary words ("Will", "Bank"; found in review).
-  const full = names.filter((name) => name.includes(' '));
-  const words = names
-    .filter((name) => !name.includes(' '))
-    .flatMap((name) => [name, name.toUpperCase()]);
-  clean = replaceNames(clean, full, 'giu', removed);
-  clean = replaceNames(clean, words, 'gu', removed);
   return clean.trim();
 }
 
-/** A placeholder made earlier, which a name must not change ("[link: bank-name.example]"). */
-const PLACEHOLDER_TOKEN = String.raw`\[(?:link(?:: [^\]]*)?|email|number|iban|name)\](?:@[\p{L}\p{N}.-]*)?`;
+/** Characters around a word that is part of a host, an address or a link ("muster-family"). */
+const IN_ADDRESS = /[@/:_-]/u;
+const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
 
-function replaceNames(text: string, names: readonly string[], flags: string, removed: Removed) {
-  if (names.length === 0) return text;
-  const pattern = new RegExp(
-    String.raw`(${PLACEHOLDER_TOKEN})|(?<![\p{L}\p{N}])(?:${names.map(escapeRegex).join('|')})(?![\p{L}\p{N}])`,
-    flags,
+/**
+ * The word at `start`..`end` of `text` sits in a host, an address or a link: next to "@", "/",
+ * ":", "_" or "-", or next to a dot inside a name ("muster.anna", not "the bank.").
+ */
+function inAddress(text: string, start: number, end: number): boolean {
+  const [before = '', after = ''] = [text[start - 1], text[end]];
+  return (
+    IN_ADDRESS.test(before) ||
+    IN_ADDRESS.test(after) ||
+    (before === '.' && LETTER_OR_DIGIT.test(text[start - 2] ?? '')) ||
+    (after === '.' && LETTER_OR_DIGIT.test(text[end + 1] ?? ''))
   );
-  return text.replaceAll(pattern, (match, placeholder: string | undefined) => {
-    if (placeholder) return match;
+}
+
+/**
+ * Replaces the names in any case ("ANNA MUSTER", "Strauß" for "STRAUẞ"), with one exception, so a
+ * name part does not hit ordinary words ("will" for "Will Smith", "bank"): a single word written
+ * all in lower case counts only as written by Nano, or inside a host, an address or a link
+ * ("muster-family.example", "anna.muster@"), where lower case is the rule.
+ */
+function replaceNames(text: string, names: readonly string[], removed: Removed): string {
+  if (names.length === 0) return text;
+  const exact = new Set(names);
+  const pattern = new RegExp(
+    String.raw`(?<![\p{L}\p{N}])(?:${names.map(escapeRegex).join('|')})(?![\p{L}\p{N}])`,
+    'giu',
+  );
+  return text.replaceAll(pattern, (match: string, offset: number) => {
+    const lowerWord = !match.includes(' ') && match === match.toLowerCase();
+    if (lowerWord && !exact.has(match) && !inAddress(text, offset, offset + match.length)) {
+      return match;
+    }
     removed.names++;
     return PLACEHOLDER.name;
   });
