@@ -167,6 +167,7 @@ const deepCheck = createDeepCheck(
     section: byId<HTMLElement>('deep-check'),
     intro: byId<HTMLElement>('deep-check-intro'),
     start: byId<HTMLButtonElement>('deep-check-start'),
+    stop: byId<HTMLButtonElement>('deep-check-stop'),
     preview: byId<HTMLElement>('deep-check-preview'),
     removed: byId<HTMLElement>('deep-check-removed'),
     data: byId<HTMLElement>('deep-check-data'),
@@ -182,6 +183,7 @@ const deepCheck = createDeepCheck(
   {
     available: appCheckEnabled,
     uiLanguage: () => chrome.i18n.getUILanguage(),
+    modelReady: ensureModelLoaded,
     findNames,
     run: runCloudCheck,
   },
@@ -201,7 +203,7 @@ function displayEmail(email: Email, message: string, headersNote?: string, final
   showEmail(email, emailElements, headersNote, findings);
   setEmailStatus(email.truncated ? `${message} The text is long and was cut.` : message);
   aiCheck.shown(email, findings, final);
-  deepCheck.shown(email, findings);
+  deepCheck.shown(email, findings, final);
 }
 
 function hideEmail(): void {

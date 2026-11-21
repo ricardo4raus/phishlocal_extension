@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-// The cloud deep check in the side panel, with Nano's name finder and the cloud replaced by fakes.
+// The cloud deep check in the side panel, with the model, Nano's name finder and the cloud
+// replaced by fakes.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiCheckResult } from '../src/ai';
 import type { Email } from '../src/email';
 import type { Finding } from '../src/rules';
-import { STOP_GRACE_MS } from '../src/sidepanel/ai-view';
+import { HEADERS_WAIT_MS, STOP_GRACE_MS } from '../src/sidepanel/ai-view';
 import {
   CLOUD_LIMIT_MS,
   createDeepCheck,
@@ -26,15 +27,14 @@ const other: Email = { ...email, subject: 'Another one' };
 
 const danger: Finding = { rule: 'dangerous-link', severity: 'danger', message: 'x', evidence: [] };
 
+const BUTTONS = ['start', 'stop', 'send', 'cancel'] as const;
 const IDS = [
   'section',
   'intro',
-  'start',
+  ...BUTTONS,
   'preview',
   'removed',
   'data',
-  'send',
-  'cancel',
   'status',
   'result',
   'overall',
@@ -42,21 +42,39 @@ const IDS = [
   'reasons',
   'advice',
 ] as const;
+type Id = (typeof IDS)[number];
 
-const get = (id: (typeof IDS)[number]) => document.getElementById(id) as HTMLElement;
-const text = (id: (typeof IDS)[number]): string => get(id).textContent ?? '';
-const click = (id: 'start' | 'send' | 'cancel'): void => get(id).click();
+const get = (id: Id) => document.getElementById(id) as HTMLElement;
+const text = (id: Id): string => get(id).textContent ?? '';
+const click = (id: (typeof BUTTONS)[number]): void => get(id).click();
 
 let nameCalls: { text: string; signal: AbortSignal; resolve: (names?: string[]) => void }[];
 let runs: { prompt: string; signal: AbortSignal; resolve: (result: AiCheckResult) => void }[];
 let check: DeepCheck;
 
+/** A fresh panel (new elements, so no listeners of an earlier instance) and a deep check on it. */
 function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
+  document.body.replaceChildren(
+    ...IDS.map((id) => {
+      const tag = (BUTTONS as readonly string[]).includes(id)
+        ? 'button'
+        : id === 'reasons'
+          ? 'ul'
+          : 'div';
+      const element = document.createElement(tag);
+      element.id = id;
+      // As in index.html: the data and the result can take the focus.
+      if (id === 'data') element.tabIndex = 0;
+      if (id === 'result') element.tabIndex = -1;
+      return element;
+    }),
+  );
   return createDeepCheck(
     {
       section: get('section'),
       intro: get('intro'),
       start: get('start') as HTMLButtonElement,
+      stop: get('stop') as HTMLButtonElement,
       preview: get('preview'),
       removed: get('removed'),
       data: get('data'),
@@ -72,6 +90,7 @@ function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
     {
       available: true,
       uiLanguage: () => 'en-GB',
+      modelReady: async () => true,
       findNames: (searched, _language, signal) =>
         new Promise((resolve) => nameCalls.push({ text: searched, signal, resolve })),
       run: (prompt, signal) =>
@@ -97,18 +116,6 @@ async function prepare(names: string[] | undefined = ['Anna Muster']): Promise<v
 
 beforeEach(() => {
   vi.useFakeTimers();
-  document.body.innerHTML = '';
-  for (const id of IDS) {
-    const element = document.createElement(
-      id === 'start' || id === 'send' || id === 'cancel'
-        ? 'button'
-        : id === 'reasons'
-          ? 'ul'
-          : 'div',
-    );
-    element.id = id;
-    document.body.append(element);
-  }
   nameCalls = [];
   runs = [];
   check = create();
@@ -129,6 +136,7 @@ describe('the deep check', () => {
     expect(shownData).not.toMatch(/anna|CH93|123 45 67|pay\?user/i);
     expect(shownData).toContain('"goes_to": "evil.example"');
     expect(text('removed')).toContain('2 names');
+    expect(document.activeElement).toBe(get('data'));
     expect(runs).toHaveLength(0);
 
     click('send');
@@ -141,6 +149,7 @@ describe('the deep check', () => {
     expect(get('result').dataset.risk).toBe('dangerous');
     expect(text('advice')).toBe('Cloud advice.');
     expect(get('send').hidden).toBe(true);
+    expect(document.activeElement).toBe(get('result'));
     // The data stays as the record of what was sent.
     expect(text('data')).toBe(shownData);
   });
@@ -155,24 +164,46 @@ describe('the deep check', () => {
     expect(runs).toHaveLength(0);
   });
 
-  it('stops the name search and the request when the email is left, and drops late answers', async () => {
+  it('waits for the sender checks of a Gmail email', async () => {
+    check.shown(email, [], false);
+    expect((get('start') as HTMLButtonElement).disabled).toBe(true);
+    expect(text('intro')).toContain('Waiting for the sender checks');
+    check.shown(email, [], true);
+    expect((get('start') as HTMLButtonElement).disabled).toBe(false);
+    // Headers that never come: like the on-device check, it goes on without them.
+    check.shown(other, [], false);
+    expect((get('start') as HTMLButtonElement).disabled).toBe(true);
+    await vi.advanceTimersByTimeAsync(HEADERS_WAIT_MS);
+    expect((get('start') as HTMLButtonElement).disabled).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('stops the name search when the email is left, and drops its late answer', async () => {
     check.shown(email, []);
     click('start');
     await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
     check.shown(other, []);
     expect(nameCalls[0]?.signal.aborted).toBe(true);
+    expect(text('status')).toContain('Nothing was sent');
     nameCalls[0]?.resolve(['Anna Muster']);
     await vi.advanceTimersByTimeAsync(0);
     expect(get('preview').hidden).toBe(true);
+  });
 
-    nameCalls = [];
+  it('says so when the email changes while the data is on its way', async () => {
+    // Found in review: Gmail showing the email again wiped the record without a word.
+    check.shown(email, []);
     await prepare();
     click('send');
-    check.hidden();
+    check.shown({ ...email, headers: { replyTo: [] } }, []);
     expect(runs[0]?.signal.aborted).toBe(true);
+    expect(text('status')).toBe(
+      'The email changed while the deep check ran: the data shown had been sent, its answer was dropped.',
+    );
     await vi.advanceTimersByTimeAsync(0);
-    expect(get('section').hidden).toBe(true);
     expect(get('result').hidden).toBe(true);
+    check.hidden();
+    expect(get('section').hidden).toBe(true);
   });
 
   it('keeps the preview when Gmail shows the same email again', async () => {
@@ -184,6 +215,40 @@ describe('the deep check', () => {
     expect(runs).toHaveLength(1);
   });
 
+  it('can be stopped while it looks for names and while it sends', async () => {
+    check.shown(email, []);
+    click('start');
+    await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
+    expect(get('stop').hidden).toBe(false);
+    click('stop');
+    expect(nameCalls[0]?.signal.aborted).toBe(true);
+    expect(text('status')).toBe('Stopped. Nothing was sent.');
+
+    nameCalls = [];
+    await prepare();
+    click('send');
+    click('stop');
+    expect(runs[0]?.signal.aborted).toBe(true);
+    await vi.waitFor(() => expect(text('status')).toContain('The deep check was stopped'));
+    expect(get('stop').hidden).toBe(true);
+  });
+
+  it('does not count the model load against the name search', async () => {
+    // Found in review: a model load of minutes ran inside the 20 s limit.
+    let loaded: ((ready: boolean) => void) | undefined;
+    check = create({ modelReady: () => new Promise((resolve) => (loaded = resolve)) });
+    check.shown(email, []);
+    click('start');
+    expect(text('status')).toBe('Waiting for the on-device model…');
+    await vi.advanceTimersByTimeAsync(NAMES_TIMEOUT_MS * 10);
+    loaded?.(true);
+    await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
+    expect(nameCalls[0]?.signal.aborted).toBe(false);
+    nameCalls[0]?.resolve([]);
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    expect(text('status')).not.toContain('names may remain');
+  });
+
   it('removes the sender name and warns when Nano could not look for names', async () => {
     check.shown(email, []);
     click('start');
@@ -193,8 +258,17 @@ describe('the deep check', () => {
     // A late answer after the time limit is not trusted to be complete.
     nameCalls[0]?.resolve([]);
     await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
-    expect(text('removed')).toContain('names may remain');
+    expect(text('status')).toContain('names may remain');
     expect(JSON.parse(text('data'))).toMatchObject({ email: { from: { name: '[name]' } } });
+  });
+
+  it('warns when the model is not ready, without asking it', async () => {
+    check = create({ modelReady: async () => false });
+    check.shown(email, []);
+    click('start');
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    expect(nameCalls).toHaveLength(0);
+    expect(text('status')).toContain('names may remain');
   });
 
   it('never waits forever, also not for work that ignores its stop signal', async () => {
@@ -209,14 +283,16 @@ describe('the deep check', () => {
     click('start');
     await vi.advanceTimersByTimeAsync(NAMES_TIMEOUT_MS + STOP_GRACE_MS);
     expect(get('preview').hidden).toBe(false);
-    expect(text('removed')).toContain('names may remain');
+    expect(text('status')).toContain('names may remain');
     click('send');
     await vi.advanceTimersByTimeAsync(CLOUD_LIMIT_MS);
     expect(runs[0]?.signal.aborted).toBe(true);
     await vi.advanceTimersByTimeAsync(STOP_GRACE_MS);
     expect(text('status')).toBe(
-      `The deep check failed (no answer within ${CLOUD_LIMIT_MS / 1000} s). The checks above still apply.`,
+      `The deep check failed (no answer within ${CLOUD_LIMIT_MS / 1000} s). The on-device and rule checks still apply.`,
     );
+    // Nothing left running once zero-delay tasks have run.
+    await vi.advanceTimersByTimeAsync(1);
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -229,7 +305,7 @@ describe('the deep check', () => {
     check.shown(email, []);
     click('start');
     await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
-    expect(text('removed')).toContain('names may remain');
+    expect(text('status')).toContain('names may remain');
   });
 
   it('keeps the rules as the lower limit', async () => {
@@ -267,8 +343,8 @@ describe('the deep check', () => {
     check.shown(email, []);
     await prepare();
     click('send');
-    runs[0]?.resolve({ ok: false, reason: 'failed', detail: 'App Check token invalid' });
-    await vi.waitFor(() => expect(text('status')).toContain('App Check token invalid'));
+    runs[0]?.resolve({ ok: false, reason: 'failed', detail: 'the cloud refused the request' });
+    await vi.waitFor(() => expect(text('status')).toContain('the cloud refused the request'));
     expect(get('result').hidden).toBe(true);
     expect(get('start').hidden).toBe(false);
   });

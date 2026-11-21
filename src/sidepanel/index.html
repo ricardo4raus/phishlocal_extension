@@ -65,16 +65,22 @@
           <h3 id="deep-check-heading">Deep check in the cloud</h3>
           <p id="deep-check-intro" class="hint"></p>
           <button id="deep-check-start" type="button">Prepare a deep check…</button>
+          <button id="deep-check-stop" type="button" hidden>Stop</button>
           <div id="deep-check-preview" class="deep-check-preview" hidden>
             <p id="deep-check-removed"></p>
-            <pre id="deep-check-data" class="deep-check-data" tabindex="0"></pre>
+            <pre
+              id="deep-check-data"
+              class="deep-check-data"
+              tabindex="0"
+              aria-label="Data that will be sent to the cloud"
+            ></pre>
             <div class="row">
               <button id="deep-check-send" type="button">Send to the cloud</button>
               <button id="deep-check-cancel" type="button">Cancel</button>
             </div>
           </div>
           <p id="deep-check-status" class="hint" role="status"></p>
-          <div id="deep-check-result" class="verdict" hidden>
+          <div id="deep-check-result" class="verdict" tabindex="-1" hidden>
             <p id="deep-check-overall" class="ai-overall"></p>
             <p id="deep-check-note" class="hint"></p>
             <ul id="deep-check-reasons" class="ai-reasons"></ul>

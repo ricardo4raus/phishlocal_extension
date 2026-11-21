@@ -235,6 +235,9 @@ export async function findNames(
   const warmUp = await warmUpOnDevice(language).catch(() => undefined);
   // Without Chrome's Prompt API the SDK would send even ONLY_ON_DEVICE requests to the cloud.
   if (warmUp?.state !== 'ready' || typeof LanguageModel === 'undefined') return undefined;
+  // The option objects are shared per language, like the check's: a search stopped while it
+  // waited must not take the next one's signal (the panel runs one search at a time).
+  if (signal?.aborted) return undefined;
   let names = nameModels.get(language);
   if (!names) {
     names = createNameModel(language);
@@ -298,9 +301,20 @@ export async function runCloudCheck(prompt: string, signal?: AbortSignal): Promi
     return { ok: true, verdict, durationMs: performance.now() - start };
   } catch (error) {
     if (signal?.aborted) return { ok: false, reason: 'stopped' };
-    const detail = error instanceof Error ? error.message : String(error);
-    return { ok: false, reason: 'failed', detail };
+    return { ok: false, reason: 'failed', detail: cloudError(error) };
   }
+}
+
+/**
+ * A short reason for a failed cloud request. The SDK's messages are long and name the request URL
+ * with the project ID ("Error fetching from https://…: [403 ] …").
+ */
+export function cloudError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/timeout|timed out/i.test(message)) return `no answer within ${CLOUD_TIMEOUT_MS / 1000} s`;
+  const status = /\[(\d{3})\b/.exec(message)?.[1];
+  if (status) return `the cloud refused the request (HTTP ${status})`;
+  return navigator.onLine ? 'the cloud request failed' : 'no connection to the cloud';
 }
 
 export type WarmUpResult =

@@ -98,7 +98,31 @@ describe('runCloudCheck through the Firebase SDK', () => {
     answer = 'not json';
     expect(await runCloudCheck('x')).toEqual({ ok: false, reason: 'unreadable-answer' });
     answer = async () => new Response('{"error":{"message":"denied"}}', { status: 403 });
-    expect(await runCloudCheck('x')).toMatchObject({ ok: false, reason: 'failed' });
+    // Short, without the request URL and its project ID.
+    expect(await runCloudCheck('x')).toEqual({
+      ok: false,
+      reason: 'failed',
+      detail: 'the cloud refused the request (HTTP 403)',
+    });
+  });
+
+  it('reports a request that reaches its time limit in short words', async () => {
+    vi.useFakeTimers();
+    answer = (request) =>
+      new Promise((_resolve, reject) => {
+        request.signal?.addEventListener('abort', () =>
+          reject(request.signal?.reason ?? new Error('aborted')),
+        );
+      });
+    const { CLOUD_TIMEOUT_MS, runCloudCheck } = await import('../../src/ai');
+    const result = runCloudCheck('x');
+    await vi.advanceTimersByTimeAsync(CLOUD_TIMEOUT_MS);
+    expect(await result).toEqual({
+      ok: false,
+      reason: 'failed',
+      detail: `no answer within ${CLOUD_TIMEOUT_MS / 1000} s`,
+    });
+    vi.useRealTimers();
   });
 
   it('stops the request when its signal is aborted', async () => {
@@ -150,6 +174,17 @@ describe('findNames through the Firebase SDK', () => {
       items: { type: 'string' },
     });
     expect(sent).toHaveLength(0);
+  });
+
+  it('passes its stop signal to Chrome, and does not start once stopped', async () => {
+    const { findNames } = await import('../../src/ai');
+    const stop = new AbortController();
+    await findNames('Dear Anna', 'en', stop.signal);
+    expect(prompts[0]?.options.signal?.aborted).toBe(false);
+    stop.abort();
+    expect(prompts[0]?.options.signal?.aborted).toBe(true);
+    expect(await findNames('Dear Anna', 'en', stop.signal)).toBeUndefined();
+    expect(prompts).toHaveLength(1);
   });
 
   it('returns undefined for an unreadable answer', async () => {
