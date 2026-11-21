@@ -281,6 +281,13 @@ describe('monkey: privacy filter in front of the cloud', () => {
           },
         };
       }
+      // A link whose target host holds the name (review round 5).
+      if (rng.chance(0.3)) {
+        email.links = [
+          { text: 'Open', href: 'https://secure.zorbald-quint.example/x?id=zqlink' },
+          ...email.links,
+        ];
+      }
       const nanoLooked = rng.chance(0.7);
       const data = timed('cloudData', () =>
         cloudData(email, checkEmail(email), nanoLooked ? ['Zorbald Quint'] : undefined),
@@ -288,7 +295,15 @@ describe('monkey: privacy filter in front of the cloud', () => {
       const { json } = data;
       expect(() => JSON.parse(json) as unknown).not.toThrow();
       // (The checking server's name may appear: rule messages name it, and it is Google's.)
-      for (const secret of ['zq.canary', 'zqtoken', 'zqpath', 'zqhost', 'kd4711', 'bounce']) {
+      for (const secret of [
+        'zq.canary',
+        'zqtoken',
+        'zqpath',
+        'zqhost',
+        'zqlink',
+        'kd4711',
+        'bounce',
+      ]) {
         expect(json, secret).not.toContain(secret);
       }
       expect(json.replace(/\D/g, ''), 'phone number').not.toContain('41795551234');
