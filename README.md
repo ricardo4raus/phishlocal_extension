@@ -37,6 +37,11 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 - **Links at a glance:** every link shows where it really goes (the domain in bold, also the final
   target of a forwarding link), a shortened URL (the full one as tooltip) and its text. Links
   behind a red flag are marked, and each red flag names its links ("link 2").
+- **Deep check in the cloud, only on request:** a larger Gemini model in the cloud checks the
+  email again. Before anything is sent, Gemini Nano finds names on the device, and a privacy
+  filter replaces names, email addresses (domain kept), phone and other long numbers, IBANs and
+  full links (host kept). The panel shows exactly what will be sent; only "Send to the cloud"
+  sends it. Details: [`docs/ai-check.md`](docs/ai-check.md#deep-check-in-the-cloud).
 - **Hybrid AI:** a test prompt runs through Firebase AI Logic with
   `InferenceMode.PREFER_ON_DEVICE`. Gemini Nano answers on the device; the cloud (Gemini
   Developer API) is the fallback. The panel loads the on-device model when it opens and shows
@@ -52,8 +57,9 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 - No email is stored: everything is gone when the side panel closes.
 - Email content is shown only as text, never rendered as HTML, so pasted emails can't load
   tracking pixels or run scripts.
-- A cloud check will only happen with explicit consent, after personal data has been removed on
-  the device (planned).
+- The cloud deep check runs only when you ask for it and agree to the data shown: personal data
+  is removed on the device first, raw headers are never sent, and you see every character that
+  goes. Each email needs its own consent.
 - Permissions: the side panel, and Gmail only (`https://mail.google.com/*`). The `scripting`
   permission is used once after an install or update, to start PhishLocal's Gmail script in
   Gmail tabs that were already open, so you don't have to reload Gmail.
@@ -74,7 +80,7 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 
 2. **Configure Firebase:** copy [`.env.example`](.env.example) to `.env.local` and fill in the
    `VITE_FIREBASE_*` values of your Firebase web app. `.env.local` is git-ignored.
-3. **Optional, for the cloud path:** create an App Check debug token in the Firebase console
+3. **Optional, for the cloud path (deep check, test prompt):** create an App Check debug token in the Firebase console
    (App Check > Apps > Manage debug tokens) and set `VITE_APPCHECK_DEBUG_TOKEN`. It is a secret.
    Only development builds (`npm run dev`) use it; release builds leave it out, so their cloud
    requests fail until App Check is set up for them.

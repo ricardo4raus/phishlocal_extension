@@ -63,6 +63,9 @@ _Current state, updated as features land._
 - The verdict is a traffic light at the top (green, yellow, red, each with a symbol and a word);
   it stays grey until the AI has answered, unless the rules already found a warning. Each link
   shows its real domain in bold and a shortened URL, and links behind a red flag are marked.
+- On request, a deep check in the cloud (Gemini through Firebase AI Logic): Gemini Nano finds
+  names on the device, a privacy filter replaces names, addresses, numbers, IBANs and full links,
+  and the panel shows exactly the data that will be sent. Only "Send to the cloud" sends it.
 
 ## How we built it
 
@@ -144,6 +147,10 @@ _Current state, updated as features land._
   several times. All four came from combinations nobody writes by hand: a phone number split by a
   tab, a link glued to a digit, two low surrogates in a row, rules failing on the second showing
   of the same email.
+- **Cleaning data that is already cut:** the privacy filter worked on every hand-written case,
+  and its monkey still found two leaks at 100 times the cases. Both came from text that had been
+  cut before the filter saw it: an address cut to "anna@private." no longer looked like an
+  address, and a subject cut at its limit ended in half an IBAN that no pattern recognizes.
 
 ## What we learned
 
@@ -271,6 +278,12 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   seed in the failure message replays them.
 - Run a filter on the text as the user will see it: cleaning that joins whitespace after the
   filter has run can rebuild what the filter removed.
+- Let a small model point, not write: Gemini Nano only lists the names it sees, and our code
+  removes only strings that are really in the text. A prompt injection can then make it miss a
+  name, but never add anything to what leaves the device. Showing the exact data before sending
+  covers the miss.
+- A filter in front of the network should assume its input was already cut somewhere: patterns
+  that need a whole address or IBAN miss the half that a field limit leaves behind.
 
 ## Accomplishments we're proud of
 
@@ -650,3 +663,43 @@ _To fill in near the submission._
   followed by a space-grouped amount ("bis 19.11.2026 4 500 000.00 CHF"); keeping it would
   reopen the leak, so it is a documented limit. The monkey's own phone check got a test of its
   own, after the review showed it also hid one planted number.
+
+### Fri 20 Nov 2026
+
+- PR #14 (result UI) and PR #15 (monkey tests) merged after a last check on `main` (853 tests).
+
+### Sat 21 Nov 2026
+
+**Session with Claude Code:**
+
+- Planned the cloud deep check, and Ricardo approved the plan:
+  - consent every time;
+  - names found by Gemini Nano plus greetings;
+  - sender check results sent, raw headers never;
+  - the SDK's default cloud model.
+- The privacy filter (`src/privacy/redact.ts`) runs on the device:
+  - links become their host;
+  - addresses keep only their domain;
+  - IBANs and long numbers become placeholders, dates stay;
+  - names become "[name]".
+    The answer reader's link, address and phone patterns moved to a shared module for it.
+- Gemini Nano finds the names (`findNames()`, `ONLY_ON_DEVICE` with the guard against the SDK's
+  silent cloud call). It only points; the code removes only strings that are in the text.
+- The cloud call (`runCloudCheck()`) has:
+  - its own system message;
+  - the verdict schema as `responseJsonSchema`;
+  - a time limit and a stop signal.
+    Tests run it through the SDK's browser build with `fetch` faked, and check that the request
+    holds exactly the prompt.
+- Side panel:
+  - "Prepare a deep check…" shows the exact JSON and what was removed;
+  - only "Send to the cloud" sends it, once;
+  - another email stops it, and late answers are dropped;
+  - work that ignores its stop signal is given up after 2 s.
+    A mutation test (the panel sending by itself) failed both the view tests and the UI monkey,
+    which now checks that no cloud request goes without a click on Send with the data on screen.
+- A privacy monkey plants a name, an address, a phone number, an IBAN, a user-ID link and hostile
+  headers in random emails. At 100 times the cases it found two leaks, both fixed with
+  regression tests:
+  - an address cut short at the end of a field;
+  - half an IBAN at the end of a subject that was already cut where the email was read.
