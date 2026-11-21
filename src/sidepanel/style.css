@@ -238,6 +238,51 @@ h2 {
   font-style: italic;
 }
 
+.deep-check {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.deep-check[hidden],
+.deep-check-preview[hidden] {
+  display: none;
+}
+
+.deep-check h3 {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+.deep-check-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.deep-check-preview p {
+  margin: 0;
+}
+
+.deep-check .row {
+  display: flex;
+  gap: 8px;
+}
+
+/* Exactly what will be sent: monospace, scrollable, never cut. */
+.deep-check-data {
+  margin: 0;
+  padding: 6px;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid #9e9e9e;
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .email-body {
   white-space: pre-wrap;
   max-height: 200px;

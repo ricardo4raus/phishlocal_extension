@@ -60,10 +60,13 @@ explain every red flag, and work offline, with a cloud only as fallback."
   unload the model while the panel is open (a later session once took 249 s). So the panel opens
   a session right before each check (`ensureModelLoaded()` in `src/ai.ts`), outside the check's
   time limit. The load time itself is Chrome's and cannot be guaranteed by the extension.
-- `PREFER_ON_DEVICE` falls back to the cloud silently; consent before cloud is the 21 Nov task.
-  Real emails go only to the on-device model (`InferenceMode.ONLY_ON_DEVICE`, decided 17 Nov
-  2026); never to the cloud until the consent step exists. The hybrid test prompt is for test
-  text only.
+- `PREFER_ON_DEVICE` falls back to the cloud silently, so the hybrid test prompt is for test
+  text only. Real emails go to the on-device model (`InferenceMode.ONLY_ON_DEVICE`, decided 17 Nov
+  2026), and to the cloud only through the deep check (21 Nov 2026,
+  `src/sidepanel/deep-check-view.ts`): on request, Nano finds names on the device (`findNames()`),
+  `cloudData()` in `src/privacy/redact.ts` builds the cleaned data, the panel shows exactly that
+  JSON, and only "Send to the cloud" sends it (`runCloudCheck()`), once per consent. Never send
+  anything else from an email to the cloud, and never raw headers. Details: `docs/ai-check.md`.
 - AI check (`src/ai/`, `runAiCheck()` in `src/ai.ts`, `src/sidepanel/ai-view.ts`): every shown
   email goes on-device to Gemini Nano with a fixed system message (as `initialPrompts`, because
   the SDK does not pass `systemInstruction` on-device) and a JSON data block between random
@@ -177,8 +180,9 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - `tests/` holds structure tests for the source, the manifest and the `dist` build output
   (e.g. no remote code). When adding a manifest permission, host permission or content-script
   match, update the allow-list in `tests/manifest.test.ts` on purpose.
-- Monkey tests (`tests/monkey/`, added 19 Nov 2026): random hostile input for the parsers, rules
-  and AI answer reader, and random event orders for the AI check and the whole side panel
+- Monkey tests (`tests/monkey/`, added 19 Nov 2026): random hostile input for the parsers, rules,
+  AI answer reader and the privacy filter (planted personal data must not reach the cloud data),
+  and random event orders for the AI check and the whole side panel
   (`main.ts` with fake Chrome and model). CI runs a fixed seed. Before a PR that touches parsing,
   the AI check or the panel, also run them with a random seed and 100 times the cases
   (`MONKEY_SEED=random`, `MONKEY_RUNS=100`; command in the README). A failure names

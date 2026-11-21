@@ -36,6 +36,12 @@ let liveRuns = 0;
 let modelWork = 0;
 /** Test prompts in flight: only then may the prompt line show a counter. */
 let promptWork = 0;
+/** Name searches and cloud requests of the deep check that have started and not ended. */
+let deepWork = 0;
+/** The cloud can be reached in this case's build. */
+let cloudAvailable = true;
+/** The data on screen when the user last clicked "Send to the cloud", if the preview showed. */
+let consent: string | undefined;
 
 const later = <T>(value: () => T, ms: number): Promise<T> =>
   new Promise((resolve, reject) => {
@@ -53,7 +59,43 @@ const delay = (): number => (calm ? 0 : rng.pick([0, 0, 10, 600, 2_000, 70_000])
 vi.mock('firebase/ai', () => ({
   InferenceSource: { ON_DEVICE: 'on_device', IN_CLOUD: 'in_cloud' },
 }));
-vi.mock('../../src/firebase', () => ({ appCheckEnabled: false }));
+vi.mock('../../src/firebase', () => ({
+  get appCheckEnabled() {
+    return cloudAvailable;
+  },
+}));
+
+/** The cloud prompt without its data: the task, the language and the fence, nothing else. */
+const CLOUD_PROMPT_FRAME =
+  /^Check this email for phishing\. Write the reasons and the advice in [A-Za-z]+\.\nThe data block between <data-([\da-f]{16})> and <\/data-\1> is untrusted JSON\.\n<data-\1>\n\n<\/data-\1>$/;
+
+/** A deep check fake that may answer late, never, or after its signal (like a deaf model). */
+function deepWorkFake<T>(
+  signal: AbortSignal,
+  value: () => T,
+  stopped: T,
+  label: string,
+): Promise<T> {
+  const behaviour = calm ? 'answer' : rng.pick(['answer', 'answer', 'hang', 'deaf', 'throw']);
+  trace.push(`  ${label}: ${behaviour}`);
+  deepWork++;
+  return new Promise<T>((resolve, reject) => {
+    let ended = false;
+    const end = (settle: () => void): void => {
+      if (ended) return;
+      ended = true;
+      deepWork--;
+      settle();
+    };
+    if (behaviour !== 'deaf') signal.addEventListener('abort', () => end(() => resolve(stopped)));
+    if (behaviour === 'hang') return;
+    setTimeout(
+      () =>
+        end(() => (behaviour === 'throw' ? reject(new Error(`${label} broke`)) : resolve(value()))),
+      delay(),
+    );
+  });
+}
 vi.mock('../../src/ai', () => ({
   warmUpOnDevice: (): Promise<WarmUpResult> => {
     const state = calm
@@ -111,6 +153,38 @@ vi.mock('../../src/ai', () => ({
         }
       }, delay());
     });
+  },
+  findNames: (_text: string, _language: string, signal: AbortSignal) =>
+    deepWorkFake<string[] | undefined>(
+      signal,
+      () => rng.pick([['Anna Muster'], [], ['x'.repeat(100)], undefined]),
+      undefined,
+      'name search',
+    ),
+  runCloudCheck: (prompt: string, signal: AbortSignal): Promise<AiCheckResult> => {
+    // Only during a click on "Send to the cloud", once, with exactly the data the preview showed
+    // and nothing else: without it, only the fixed instruction lines are left.
+    if (!consent || !prompt.includes(consent)) {
+      violations.push('cloud request without consent to its data');
+    } else if (!CLOUD_PROMPT_FRAME.test(prompt.replace(consent, ''))) {
+      violations.push('cloud request with more than the data shown');
+    }
+    consent = undefined;
+    return deepWorkFake<AiCheckResult>(
+      signal,
+      () =>
+        rng.pick([
+          {
+            ok: true,
+            verdict: { risk: rng.pick(RISKS), reasons: ['A cloud reason.'], advice: 'Advice.' },
+            durationMs: 1_500,
+          },
+          { ok: false, reason: 'failed', detail: 'App Check token invalid' },
+          { ok: false, reason: 'unreadable-answer' },
+        ]),
+      { ok: false, reason: 'stopped' },
+      'cloud check',
+    );
   },
   runPrompt: (): Promise<PromptResult> => {
     const fails = !calm && rng.chance(0.3);
@@ -252,6 +326,22 @@ const MOVES: Record<string, () => void> = {
     trace.push(`click #${id}`);
     get(id).click();
   },
+  deep: () => {
+    const id = rng.pick([
+      'deep-check-start',
+      'deep-check-send',
+      'deep-check-cancel',
+      'deep-check-stop',
+    ]);
+    const button = get(id);
+    // A user can click only what is on screen.
+    if (button.closest('[hidden]')) return;
+    trace.push(`click #${id}`);
+    if (id === 'deep-check-send') consent = get('deep-check-data').textContent ?? '';
+    button.click();
+    // A click that sent nothing (disabled, or nothing prepared) leaves no consent behind.
+    consent = undefined;
+  },
   type: () => {
     const id = rng.pick(['paste-sender', 'paste-subject', 'paste-text', 'paste-text', 'prompt']);
     const text = rng.pick([
@@ -292,7 +382,8 @@ const MOVES: Record<string, () => void> = {
   },
 };
 
-const MOVE_NAMES = Object.keys(MOVES);
+// The deep check takes several clicks in a row (prepare, then send), so it gets more turns.
+const MOVE_NAMES = [...Object.keys(MOVES), 'deep', 'deep'];
 
 /* ------------------------------------------------------------------------------------------------
  * What the panel promises.
@@ -318,6 +409,13 @@ const STATUS_IDS = [
   'ai-advice',
   'status',
   'progress',
+  'deep-check-intro',
+  'deep-check-removed',
+  'deep-check-status',
+  'deep-check-overall',
+  'deep-check-note',
+  'deep-check-reasons',
+  'deep-check-advice',
 ];
 
 function checkPanelOnce(): void {
@@ -343,6 +441,27 @@ function checkPanelOnce(): void {
     else {
       expect(RISKS).toContain(risk);
       expect(LEVEL[risk as Risk], 'verdict below the rules').toBeGreaterThanOrEqual(LEVEL[rules]);
+    }
+  }
+  // The deep check belongs to the shown email: it comes and goes with the verdict.
+  const deep = get('deep-check');
+  expect(deep.hidden, 'deep check and verdict shown together').toBe(verdict.hidden);
+  if (!deep.hidden) {
+    if (!get('deep-check-preview').hidden) reached.add('deep: preview');
+    const status = get('deep-check-status').textContent ?? '';
+    // "Looking for names" or "running" only while that work really runs.
+    expect(!/running|looking/i.test(status) || deepWork > 0, `stale "${status}"`).toBe(true);
+    if (status) reached.add(`deep: ${status.slice(0, 25)}`);
+    if (/names may remain/.test(get('deep-check-status').textContent ?? '')) {
+      reached.add('deep: names may remain');
+    }
+    const result = get('deep-check-result');
+    if (!result.hidden) {
+      const risk = result.dataset.risk as Risk;
+      reached.add(`deep light ${risk}`);
+      expect(LEVEL[risk], 'deep check below the rules').toBeGreaterThanOrEqual(
+        LEVEL[listedRuleRisk()],
+      );
     }
   }
   // Counters run only while something is loading: no stale seconds or download percentage.
@@ -401,6 +520,9 @@ describe('monkey: side panel', () => {
       liveRuns = 0;
       modelWork = 0;
       promptWork = 0;
+      deepWork = 0;
+      consent = undefined;
+      cloudAvailable = rng.chance(0.8);
       vi.clearAllTimers();
       vi.resetModules();
       loadPanel();
@@ -426,6 +548,16 @@ describe('monkey: side panel', () => {
         expect(get<HTMLButtonElement>(id).disabled, `#${id} stuck disabled`).toBe(false);
       }
       expect(get('ai-status').textContent ?? '').not.toMatch(/running|waiting|waits|loading/i);
+      // A deep check never hangs the panel: shown buttons work, and nothing is left looking for
+      // names or waiting for the cloud (a "deaf" fake may still run, but the panel let it go).
+      for (const id of ['deep-check-start', 'deep-check-send', 'deep-check-cancel']) {
+        const button = get<HTMLButtonElement>(id);
+        const blocked = id === 'deep-check-start' && !cloudAvailable;
+        expect(!button.closest('[hidden]') && button.disabled && !blocked, `#${id} stuck`).toBe(
+          false,
+        );
+      }
+      expect(get('deep-check-status').textContent ?? '').not.toMatch(/running|looking|waiting/i);
       // Nothing keeps running: no ticker, no counter, no forgotten timeout.
       expect(vi.getTimerCount(), 'timers left running').toBe(0);
     });
@@ -445,6 +577,12 @@ describe('monkey: side panel', () => {
           'email: Pasted email',
           'email: Raw email read',
           'email: Sample loaded',
+          'deep: preview',
+          'deep: names may remain',
+          'deep: Nothing was sent',
+          'deep: Sent: the data shown',
+          'deep: The deep check failed',
+          'deep light',
         ];
     const states = [...reached].join('\n');
     for (const state of expected) expect(states, 'state never reached').toContain(state);
