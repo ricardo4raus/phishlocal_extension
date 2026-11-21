@@ -51,7 +51,8 @@ are its input and its lower limit.
        stops read as ".", whitespace joined), so a phone number split by line breaks or written in
        fullwidth digits is caught too, and an accent behind an invisible mark joins its letter.
      - **Cut at 300 characters** without the partial last word: a cut word could read as a
-       domain ("co.ukddri…"), and "https://" with the ellipsis right after it as a link.
+       domain ("co.ukddri…"), and "https://" with the ellipsis right after it as a link. Text
+       without spaces (e.g. Japanese) is cut before its first "." or "@" instead of dropped.
      - **Links** of any scheme (`ftp://` too).
      - **Phone numbers** of at least 9 characters, in any script's digits (Arabic-Indic too),
        grouped with spaces, parentheses, any dash punctuation, the minus sign, dots (also middle
@@ -170,14 +171,18 @@ inference). Nothing is sent on its own:
      hold an ID that identifies the user;
    - email addresses become "[email]@domain", also without a top-level domain or with letters of
      any script;
-   - links without a scheme but with a path, query or fragment ("login.example/verify?uid=…")
-     become their host too; a bare domain stays;
+   - links without a scheme but with a path, query or fragment ("login.example/verify?uid=…",
+     also with a port, a punycode ending or a user name in front) become their host too, an IP
+     address "[link: IP address]"; a bare domain stays;
    - IBANs (in one piece or in groups of four, with at least 8 digits) become "[iban]";
    - phone, card, customer and account numbers become "[number]", with the answer reader's phone
      pattern; dates stay, because deadlines are evidence;
-   - names become "[name]", in any case: the name after a greeting in the six languages ("Dear
-     Anna Muster", "Guten Tag Frau Muster", "Grüezi Anna"; "Dear Customer" stays, it is evidence),
-     and Nano's names and their parts of 3 letters or more;
+   - names become "[name]": the name after a greeting in the six languages ("Dear Anna Muster",
+     "Guten Tag Frau Muster", "Grüezi Anna"; "Dear Customer" stays, it is evidence; a brand after
+     a greeting is removed too), and Nano's names and their parts. A full name matches in any case
+     ("ANNA MUSTER", "anna muster"); a single word only as written or in capitals ("Li", "LI"),
+     so a name part does not hit ordinary words ("will", "bank"). Placeholders made before are
+     never changed;
    - fields are cut to the prompt limits; a cut field (also one already cut when the email was
      read) loses its last word and the digits before it, so no half number or address goes.
 4. **What goes:** the rule findings (rule, severity and cleaned message, no evidence; the
@@ -211,6 +216,8 @@ the deep check is not available. Development builds use the debug token.
   anything is sent.
 - A link's host stays, also when the host itself names the user (rare).
 - Amounts written with spaces that reach 9 characters ("4 500 000.00") become "[number]".
+- A single-word name in lower case ("anna" alone) stays: matching single words in any case
+  would remove ordinary words.
 - Not detected: postal addresses ("Bahnhofstrasse 12, 8001 Zürich"), numbers shorter than 9
   characters (an 8-digit phone number, "555-1234", a card's security code), dates of birth
   (dates stay as evidence), numbers grouped with commas ("079,123,45,67"), and address parts

@@ -152,17 +152,22 @@ interface Shown {
   final: boolean;
   /** Same email and findings give the same key: Gmail shows an email several times. */
   key: string;
+  /** The email without its headers: the same message, with or without them. */
+  base: string;
 }
 
 type Phase = 'idle' | 'preparing' | 'preview' | 'sending' | 'done';
 
-/** What the user is told when the email changes under a deep check, by phase. */
+/**
+ * What the user is told when the email changes under a deep check, by phase. Gmail also shows
+ * the same email again with new details (its headers), so "changed" covers both.
+ */
 const CHANGED: Record<Phase, string> = {
   idle: '',
   preparing: 'The email changed, so the deep check was stopped. Nothing was sent.',
   preview: 'The email changed, so the prepared data was discarded. Nothing was sent.',
   sending:
-    'The email changed while the deep check ran: the data shown had been sent, its answer was dropped.',
+    'The email changed while the deep check ran: its data had been sent, its answer was dropped.',
   done: 'The email changed, so the deep check result was cleared.',
 };
 
@@ -214,6 +219,11 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     elements.send.disabled = false;
     elements.cancel.disabled = false;
     set(elements.intro, intro());
+    // Focus on a button that was just hidden (Stop, Send) would be lost: move it to the start.
+    const focused = document.activeElement;
+    if (focused && elements.section.contains(focused) && focused.closest('[hidden]')) {
+      elements.start.focus();
+    }
   }
 
   async function prepare(): Promise<void> {
@@ -372,8 +382,17 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
         return;
       }
       clearTimeout(headersWait);
-      const note = shown ? CHANGED[phase] : '';
-      shown = { email, findings, final, key };
+      // Gmail shows an email again in two steps (without headers, then with them): a note from
+      // the first step stays through the second (found in review).
+      const base = JSON.stringify({ ...email, headers: undefined });
+      const note = !shown
+        ? ''
+        : phase !== 'idle'
+          ? CHANGED[phase]
+          : shown.base === base
+            ? (elements.status.textContent ?? '')
+            : '';
+      shown = { email, findings, final, key, base };
       elements.section.hidden = false;
       reset(note);
       if (!final) headersWait = setTimeout(markFinal, deps.headersWaitMs ?? HEADERS_WAIT_MS);

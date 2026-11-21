@@ -50,6 +50,22 @@ const LINK_AT_END = new RegExp(String.raw`(?:${FULL_URL.source})$`, 'i');
 /** The text without its last word (a cut leaves a partial one). */
 const dropLastWord = (words: string): string => words.replace(/\S*$/u, '').trimEnd();
 
+/** A partial last word up to this long is dropped at a cut; a longer one is text without spaces. */
+const MAX_PARTIAL_WORD = 30;
+
+/**
+ * The end of a cut: cutting a word could leave a piece that reads as a domain ("co.ukddri…" from
+ * a 30-letter ending; found by the monkey test). A short partial word is dropped. A longer one
+ * (text without spaces, e.g. Japanese) is kept up to its first "." or "@", so its end can form no
+ * domain or address (found in review: a whole Japanese reason became "…").
+ */
+function cutEnd(cut: string): string {
+  const last = /\S*$/u.exec(cut)?.[0] ?? '';
+  if (last.length <= MAX_PARTIAL_WORD) return dropLastWord(cut);
+  const end = last.search(/[.@]/u);
+  return end < 0 ? cut : cut.slice(0, cut.length - last.length + end).trimEnd();
+}
+
 /** Model output is short; longer text is cut before the patterns run. */
 const MAX_RAW_AI_TEXT = 2_000;
 
@@ -79,9 +95,7 @@ export function cleanAiText(
   if (!keepDomains) cleaned = cleaned.replaceAll(BARE_DOMAIN, '[removed]');
   cleaned = cleaned.trim();
   if (cleaned.length <= MAX_AI_TEXT) return cleaned;
-  // The cut drops its partial last word: cutting a long word could leave a piece that reads as a
-  // domain ("co.ukddri…" from a 30-letter ending; found by the monkey test).
-  let kept = dropLastWord(cleaned.slice(0, MAX_AI_TEXT - 1));
+  let kept = cutEnd(cleaned.slice(0, MAX_AI_TEXT - 1));
   // "https:// x" is no link, but with the ellipsis right after it, "https://…" reads as one.
   while (LINK_AT_END.test(`${kept}…`)) kept = dropLastWord(kept);
   return `${kept}…`;

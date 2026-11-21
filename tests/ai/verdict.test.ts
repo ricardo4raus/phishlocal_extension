@@ -48,9 +48,9 @@ describe('parseVerdict', () => {
       }),
     );
     expect(verdict?.reasons).toHaveLength(MAX_REASONS);
-    // The cut drops the partial last word.
-    expect(verdict?.reasons[0]).toBe('Reason 0…');
-    expect(verdict?.advice).toBe('…');
+    // A short partial last word goes; a long word without dots stays, cut.
+    expect(verdict?.reasons[0]).toBe(`Reason 0 ${'x'.repeat(MAX_AI_TEXT - 10)}…`);
+    expect(verdict?.advice).toBe(`${'a'.repeat(MAX_AI_TEXT - 1)}…`);
     const words = parseVerdict(
       JSON.stringify({ risk: 'safe', reasons: ['word '.repeat(100)], advice: '' }),
     );
@@ -62,6 +62,11 @@ describe('parseVerdict', () => {
     // Found by the monkey test: the cut shortened a 30-letter ending to a valid-looking domain.
     const advice = `${'x'.repeat(280)} 0;.co.uk${'d'.repeat(30)}`;
     expect(cleanAiText(advice, { keepDomains: false })).toBe(`${'x'.repeat(280)}…`);
+    const glued = `${'dringend'.repeat(30)}&#0;.co.uk${'d'.repeat(60)}`;
+    expect(cleanAiText(glued, { keepDomains: false })).toBe(`${'dringend'.repeat(30)}&#0;…`);
+    // Found in review: text without spaces lost everything but the ellipsis.
+    const japanese = 'メール'.repeat(120);
+    expect(cleanAiText(japanese)).toBe(`${japanese.slice(0, MAX_AI_TEXT - 1)}…`);
     // Found by the monkey test: "https://" before a space is no link, but "https://…" reads as one.
     const scheme = `${'y'.repeat(280)} see https:// ${'z'.repeat(30)}`;
     expect(cleanAiText(scheme)).toBe(`${'y'.repeat(280)} see…`);

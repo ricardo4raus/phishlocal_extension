@@ -107,6 +107,7 @@ describe('greetingNames', () => {
   });
 
   it.each([
+    'Hello Dear Customer,',
     'Dear Customer,',
     'Dear valued customer,',
     'Sehr geehrte Damen und Herren,',
@@ -127,11 +128,21 @@ describe('nameVariants', () => {
     expect(nameVariants(['', 'A', '42'])).toEqual([]);
   });
 
-  it('keeps 2-letter parts out, so names in any case do not hit short words', () => {
-    expect(nameVariants(['Al Smith'])).toEqual(['Al Smith', 'Smith']);
-    expect(redact('Al Smith, AL SMITH, smith; al cliente', ['Al Smith'])).toBe(
-      '[name], [name], [name]; al cliente',
+  it('matches a full name in any case, but a single word only as written or in capitals', () => {
+    // Found in review round 2: 2-letter surnames leaked, and parts in any case hit ordinary words.
+    expect(nameVariants(['Wei Li'])).toEqual(['Wei Li', 'Wei', 'Li']);
+    expect(redact('Mr Li asked, LI too; wei li; al cliente', ['Wei Li', 'Al Ng'])).toBe(
+      'Mr [name] asked, [name] too; [name]; al cliente',
     );
+    expect(redact('Your account will be closed by the bank.', ['Will Smith', 'Bank'])).toBe(
+      'Your account will be closed by the bank.',
+    );
+  });
+
+  it('never changes a placeholder made before', () => {
+    expect(
+      redact('See https://anna-bank.example/x and Anna@bank.example', ['Anna', 'Bank', 'Link']),
+    ).toBe('See [link: anna-bank.example] and [email]@bank.example');
   });
 });
 
@@ -146,6 +157,14 @@ describe('modelNames', () => {
     expect(modelNames(many).names).toHaveLength(50);
     expect(modelNames(many).dropped).toBe(true);
     expect(modelNames(['x'.repeat(61)])).toEqual({ names: [], dropped: true });
+    // Found in review round 2: "\b" is ASCII-only, so "Renée" was split at its last "e".
+    expect(modelNames(['Renée Dupont', 'Maria e Silva', 'José y María']).names).toEqual([
+      'Renée Dupont',
+      'Maria',
+      'Silva',
+      'José',
+      'María',
+    ]);
   });
 });
 
@@ -160,6 +179,11 @@ describe('review round 1 fixes', () => {
     expect(redact('Login at secure-login.example/verify?uid=7f3a9c2e1bd4 now')).toBe(
       'Login at [link: secure-login.example] now',
     );
+    // Found in review round 2: a port, a punycode ending, an IP address or a user name in front.
+    expect(redact('a login.example:8080/v?uid=zq b')).toBe('a [link: login.example] b');
+    expect(redact('a login.xn--p1ai/v?uid=zq b')).toBe('a [link: login.xn--p1ai] b');
+    expect(redact('a 192.168.10.20/v?uid=zq b')).toBe('a [link: IP address] b');
+    expect(redact('a anna.muster:pw@host.example/x b')).toBe('a [link: host.example] b');
     expect(redact('Visit lumorabank.example today.')).toBe('Visit lumorabank.example today.');
   });
 

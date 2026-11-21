@@ -54,21 +54,23 @@ let check: DeepCheck;
 
 /** A fresh panel (new elements, so no listeners of an earlier instance) and a deep check on it. */
 function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
-  document.body.replaceChildren(
-    ...IDS.map((id) => {
-      const tag = (BUTTONS as readonly string[]).includes(id)
-        ? 'button'
-        : id === 'reasons'
-          ? 'ul'
-          : 'div';
-      const element = document.createElement(tag);
-      element.id = id;
-      // As in index.html: the data and the result can take the focus.
-      if (id === 'data') element.tabIndex = 0;
-      if (id === 'result') element.tabIndex = -1;
-      return element;
-    }),
-  );
+  const elements = IDS.map((id) => {
+    const tag = (BUTTONS as readonly string[]).includes(id)
+      ? 'button'
+      : id === 'reasons'
+        ? 'ul'
+        : 'div';
+    const element = document.createElement(tag);
+    element.id = id;
+    // As in index.html: the data and the result can take the focus.
+    if (id === 'data') element.tabIndex = 0;
+    if (id === 'result') element.tabIndex = -1;
+    return element;
+  });
+  // As in index.html, the section holds everything else.
+  const [section, ...inside] = elements;
+  section?.append(...inside);
+  document.body.replaceChildren(...(section ? [section] : []));
   return createDeepCheck(
     {
       section: get('section'),
@@ -191,15 +193,21 @@ describe('the deep check', () => {
   });
 
   it('says so when the email changes while the data is on its way', async () => {
-    // Found in review: Gmail showing the email again wiped the record without a word.
-    check.shown(email, []);
+    // Found in review: Gmail showing the email again wiped the record without a word. Gmail does
+    // it in two steps (round 2): first without headers, then with them.
+    const withHeaders: Email = { ...email, headers: { replyTo: [] } };
+    check.shown(withHeaders, []);
     await prepare();
     click('send');
-    check.shown({ ...email, headers: { replyTo: [] } }, []);
+    expect(document.activeElement).toBe(get('stop'));
+    check.shown(email, [], false);
+    check.shown(withHeaders, [], true);
     expect(runs[0]?.signal.aborted).toBe(true);
     expect(text('status')).toBe(
-      'The email changed while the deep check ran: the data shown had been sent, its answer was dropped.',
+      'The email changed while the deep check ran: its data had been sent, its answer was dropped.',
     );
+    // The focus does not stay on the hidden Stop button.
+    expect(document.activeElement).toBe(get('start'));
     await vi.advanceTimersByTimeAsync(0);
     expect(get('result').hidden).toBe(true);
     check.hidden();

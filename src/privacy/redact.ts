@@ -50,7 +50,15 @@ const ANY_ADDRESS = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]*(?:\.[\p{L}\p{N}-]*)*/gu;
  * its path can hold an ID that identifies the user too (found in review). A bare domain without
  * one stays; it names no one.
  */
-const BARE_LINK = /(?<![\p{L}\p{N}.-])(?:[\p{L}\p{N}-]+\.)+\p{L}{2,24}[/?#]\S*/gu;
+const BARE_LINK = new RegExp(
+  String.raw`(?<![\p{L}\p{N}.-])` +
+    // A user name (and password) in front goes with it: "anna:pw@host.example/x".
+    String.raw`(?:[\p{L}\p{N}._%+-]+(?::[^\s@/]*)?@)?` +
+    // A host name with a letter or punycode ending, or an IPv4 address (found in review).
+    String.raw`(?:(?:[\p{L}\p{N}-]+\.)+(?:\p{L}{2,24}|xn--[a-z\d-]+)|\d{1,3}(?:\.\d{1,3}){3})` +
+    String.raw`(?::\d+)?[/?#]\S*`,
+  'giu',
+);
 
 /**
  * An IBAN: country code, check digits, then 11 to 30 letters or digits, written in one piece or in
@@ -192,6 +200,16 @@ const greetingPattern = (greeting: string): string =>
     .map((word) => `[${word[0]?.toUpperCase()}${word[0]}]${word.slice(1)}`)
     .join(' ');
 
+/** The words of the greetings ("dear", "guten", "tag"): no names, except those that are names too. */
+const GREETING_WORDS = new Set(
+  GREETINGS.flatMap((greeting) => greeting.split(' ')).filter(
+    (word) => !['cara', 'caro', 'oi'].includes(word),
+  ),
+);
+
+const notName = (word: string): boolean =>
+  NOT_NAMES.has(word.toLowerCase()) || GREETING_WORDS.has(word.toLowerCase());
+
 const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
 const GREETING = new RegExp(
@@ -200,8 +218,10 @@ const GREETING = new RegExp(
 );
 
 /**
- * The names right after a greeting ("Hallo Anna Muster," gives "Anna Muster"). Titles and
- * generic words ("Dear Customer") are skipped, so the generic greeting stays as evidence.
+ * The names right after a greeting ("Hallo Anna Muster," gives "Anna Muster"). Titles, generic
+ * words ("Dear Customer") and greeting words ("Hello Dear Customer") are skipped, so they stay as
+ * evidence. A brand after a greeting ("Dear Lumora Bank Customer") is taken as a name: removing a
+ * brand costs evidence, keeping a name would cost privacy (a person's domain can hold their name).
  */
 export function greetingNames(text: string): string[] {
   const names: string[] = [];
@@ -209,7 +229,7 @@ export function greetingNames(text: string): string[] {
     const name: string[] = [];
     for (const word of words.replace(/^,/, '').trim().split(' ')) {
       const bare = word.replace(/\.$/, '');
-      if (NOT_NAMES.has(bare.toLowerCase())) {
+      if (notName(bare)) {
         if (name.length > 0) break;
         continue;
       }
@@ -232,7 +252,9 @@ const MAX_NAMES = 50;
  */
 export function modelNames(found: readonly string[]): { names: string[]; dropped: boolean } {
   const names = found
-    .flatMap((entry) => entry.split(/[,;/&]|\band\b|\bund\b|\bet\b|\by\b|\be\b/u))
+    // Conjunctions only between spaces: "\b" knows only ASCII letters, so "Renée" split at its
+    // last "e" (found in review).
+    .flatMap((entry) => entry.split(/[,;/&]|\s(?:and|und|et|y|e)\s/u))
     .map((name) => normalizeText(name).trim())
     .filter((name) => name !== '');
   const usable = names.filter((name) => name.length <= MAX_NAME).slice(0, MAX_NAMES);
@@ -240,10 +262,9 @@ export function modelNames(found: readonly string[]): { names: string[]; dropped
 }
 
 /**
- * The names to replace: each full name and its parts ("Anna Muster", "Anna", "Muster"), with a
- * letter and without titles. A full name needs 2 characters, a part 3: names are matched in any
- * case, and a 2-letter part would also remove words like "al" or "de". Longest first, so a full
- * name goes in one piece.
+ * The names to replace: each full name and its parts ("Anna Muster", "Anna", "Muster"), at least
+ * 2 characters ("Li", "Ng") with a letter, without titles. Longest first, so a full name goes in
+ * one piece.
  */
 export function nameVariants(names: readonly string[]): string[] {
   const variants = new Set<string>();
@@ -251,7 +272,7 @@ export function nameVariants(names: readonly string[]): string[] {
     const name = normalizeText(raw).trim();
     for (const part of [name, ...name.split(' ')]) {
       const bare = part.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
-      if (bare.length < (part === name ? 2 : 3) || !/\p{L}/u.test(bare)) continue;
+      if (bare.length < 2 || !/\p{L}/u.test(bare)) continue;
       if (TITLES.includes(bare.toLowerCase())) continue;
       variants.add(bare);
     }
@@ -264,7 +285,9 @@ const count = (text: string, placeholder: string): number => text.split(placehol
 /** A link in the text as its host only. */
 function linkPlaceholder(link: string): string {
   const url = parseUrl(/^www\./i.test(link) ? `https://${link}` : link);
-  return url?.hostname ? `[link: ${url.hostname}]` : '[link]';
+  if (!url?.hostname) return '[link]';
+  // An IP address would be read as a number by the next step and turn into "[number]".
+  return /^[\d.]+$|^\[/.test(url.hostname) ? '[link: IP address]' : `[link: ${url.hostname}]`;
 }
 
 /** An email address as its domain only. */
@@ -284,13 +307,14 @@ export function redactText(text: string, names: readonly string[], removed: Remo
     removed.links++;
     return linkPlaceholder(link);
   });
-  clean = clean.replaceAll(ANY_ADDRESS, (address) => {
-    removed.emails++;
-    return addressPlaceholder(address);
-  });
+  // Before the addresses: "anna:pw@host.example/x" is a link with a user name, not an address.
   clean = clean.replaceAll(BARE_LINK, (link) => {
     removed.links++;
     return linkPlaceholder(`https://${link}`);
+  });
+  clean = clean.replaceAll(ANY_ADDRESS, (address) => {
+    removed.emails++;
+    return addressPlaceholder(address);
   });
   clean = clean.replaceAll(IBAN, (iban) => {
     if ((iban.match(/\d/g)?.length ?? 0) < MIN_IBAN_DIGITS) return iban;
@@ -300,18 +324,31 @@ export function redactText(text: string, names: readonly string[], removed: Remo
   const before = count(clean, PLACEHOLDER.number);
   clean = replacePhoneNumbers(clean, PLACEHOLDER.number);
   removed.numbers += count(clean, PLACEHOLDER.number) - before;
-  if (names.length > 0) {
-    const pattern = new RegExp(
-      String.raw`(?<![\p{L}\p{N}])(?:${names.map(escapeRegex).join('|')})(?![\p{L}\p{N}])`,
-      // Any case: "ANNA MUSTER" and "anna muster" are the same name (found in review).
-      'giu',
-    );
-    clean = clean.replaceAll(pattern, () => {
-      removed.names++;
-      return PLACEHOLDER.name;
-    });
-  }
+  // A full name in any case ("ANNA MUSTER", "anna muster"); a single word only as written or in
+  // capitals, so a name part does not hit ordinary words ("Will", "Bank"; found in review).
+  const full = names.filter((name) => name.includes(' '));
+  const words = names
+    .filter((name) => !name.includes(' '))
+    .flatMap((name) => [name, name.toUpperCase()]);
+  clean = replaceNames(clean, full, 'giu', removed);
+  clean = replaceNames(clean, words, 'gu', removed);
   return clean.trim();
+}
+
+/** A placeholder made earlier, which a name must not change ("[link: bank-name.example]"). */
+const PLACEHOLDER_TOKEN = String.raw`\[(?:link(?:: [^\]]*)?|email|number|iban|name)\](?:@[\p{L}\p{N}.-]*)?`;
+
+function replaceNames(text: string, names: readonly string[], flags: string, removed: Removed) {
+  if (names.length === 0) return text;
+  const pattern = new RegExp(
+    String.raw`(${PLACEHOLDER_TOKEN})|(?<![\p{L}\p{N}])(?:${names.map(escapeRegex).join('|')})(?![\p{L}\p{N}])`,
+    flags,
+  );
+  return text.replaceAll(pattern, (match, placeholder: string | undefined) => {
+    if (placeholder) return match;
+    removed.names++;
+    return PLACEHOLDER.name;
+  });
 }
 
 /** What the user sees and, after agreeing, sends to the cloud. */

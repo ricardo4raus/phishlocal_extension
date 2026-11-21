@@ -722,3 +722,15 @@ _To fill in near the submission._
     model first;
   - the name search and the request could not be stopped; a Stop button, focus handling, the
     warning in the live status, and short cloud errors without the request URL.
+- Review round 2 checked those fixes and found that some of them had opened new gaps:
+  - splitting Nano's list on "e" and "y" used `\b`, which knows only ASCII letters, so "Renée"
+    split into "René" and the first name leaked;
+  - the 3-letter minimum for name parts let 2-letter surnames (Li, Ng) through, and matching
+    parts in any case removed ordinary words ("will", "bank") and even changed placeholders;
+    now a full name matches in any case, a single word only as written or in capitals;
+  - links without a scheme with a port, a punycode ending, an IP address or a user name in
+    front kept their path;
+  - Gmail shows an email again in two steps, and the second step wiped the round-1 note;
+  - a long reason without spaces (Japanese) became just "…".
+    All fixed with tests. The lesson of the answer reader's filter repeated itself: each fix for
+    one gap needs its own review.
