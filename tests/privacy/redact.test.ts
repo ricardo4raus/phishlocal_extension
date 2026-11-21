@@ -39,6 +39,14 @@ describe('redactText', () => {
     );
   });
 
+  it('also removes addresses with other letters, without a top-level domain or cut short', () => {
+    // Found by the monkey test: a field cut in the middle of an address kept its local part.
+    expect(redact('Von jürgen.müller@mail.example')).toBe('Von [email]@mail.example');
+    expect(redact('Write to anna.muster@gmail now')).toBe('Write to [email]@gmail now');
+    expect(redact('Cut here: zq.canary@private.')).toBe('Cut here: [email]@private.');
+    expect(redact('Follow @lumorabank')).toBe('Follow @lumorabank');
+  });
+
   it('removes IBANs, written in one piece or in groups', () => {
     expect(redact('Pay to CH93 0076 2011 6238 5295 7 today')).toBe('Pay to [iban] today');
     expect(redact('IBAN DE89370400440532013000.')).toBe('IBAN [iban].');
@@ -129,6 +137,14 @@ describe('cloudCut', () => {
     const text = `${'word '.repeat(10)}call +41 79 123 45 67`;
     const cutAt = text.indexOf('79') + 5;
     expect(cloudCut(text, cutAt)).toBe(`${'word '.repeat(10)}call`);
+  });
+
+  it('also trims a field that was cut where the email was read', () => {
+    // Found by the monkey test: a subject cut at its limit in the middle of an IBAN kept the half.
+    expect(cloudCut('Pay to CH93 0076 2011', 200, true)).toBe('Pay to CH');
+    expect(
+      cloudData(email({ subject: `Pay CH93 0076 ${'\t'.repeat(982)}2011` }), [], []),
+    ).toMatchObject({ json: expect.not.stringContaining('0076') as unknown });
   });
 
   it('keeps short text as it is, normalized', () => {

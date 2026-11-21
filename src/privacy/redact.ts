@@ -13,9 +13,9 @@
  * Raw headers never go: they hold the user's address and server IP addresses. Of the headers,
  * only the sender check results (pass/fail and signing domains) and the Reply-To domains go.
  */
-import { EMAIL_ADDRESS, FULL_URL, normalizeText, replacePhoneNumbers } from '../ai/patterns';
+import { FULL_URL, normalizeText, replacePhoneNumbers } from '../ai/patterns';
 import { PROMPT_LIMITS } from '../ai/prompt';
-import type { Email } from '../email';
+import { type Email, FIELD_LIMITS } from '../email';
 import type { Finding } from '../rules';
 import { parseUrl } from '../rules/domains';
 
@@ -36,6 +36,14 @@ export interface Removed {
 }
 
 const none = (): Removed => ({ names: 0, emails: 0, numbers: 0, ibans: 0, links: 0 });
+
+/**
+ * Anything shaped like an email address, wider than the AI answer reader's pattern: letters of
+ * any script ("jürgen.müller@…"), and no top-level domain needed, so an address cut short at the
+ * end of a field ("anna@private.") or written without one ("anna@gmail") goes too (found by the
+ * monkey test).
+ */
+const ANY_ADDRESS = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]*(?:\.[\p{L}\p{N}-]*)*/gu;
 
 /**
  * An IBAN: country code, check digits, then 11 to 30 letters or digits, written in one piece or in
@@ -235,7 +243,7 @@ export function redactText(text: string, names: readonly string[], removed: Remo
     removed.links++;
     return linkPlaceholder(link);
   });
-  clean = clean.replaceAll(EMAIL_ADDRESS, (address) => {
+  clean = clean.replaceAll(ANY_ADDRESS, (address) => {
     removed.emails++;
     return addressPlaceholder(address);
   });
@@ -271,12 +279,14 @@ export interface CloudData {
 
 /**
  * A field as far as it goes to the cloud, normalized. A cut can split a phone number, an address
- * or a name into pieces too short for the patterns, so a cut field loses its last word and any
- * digits and signs before it ("… call +41 79 12" ends at "call").
+ * or an IBAN into pieces too short for the patterns, so a cut field loses its last word and any
+ * digits and signs before it ("... call +41 79 12" ends at "call"). `cutBefore`: the field was
+ * already cut where the email was read (it reached its limit there), which the cloud's limit may
+ * not show after normalizing (found by the monkey test).
  */
-export function cloudCut(text: string, max: number): string {
+export function cloudCut(text: string, max: number, cutBefore = false): string {
   const normalized = normalizeText(text).trim();
-  if (normalized.length <= max) return normalized;
+  if (normalized.length <= max && !cutBefore) return normalized;
   return normalized
     .slice(0, max)
     .replace(/\S*$/u, '')
@@ -286,12 +296,22 @@ export function cloudCut(text: string, max: number): string {
 /** The email's text fields as far as they go to the cloud, before the names are removed. */
 function cloudFields(email: Email) {
   return {
-    name: cloudCut(email.sender.name, PROMPT_LIMITS.name),
-    subject: cloudCut(email.subject, PROMPT_LIMITS.subject),
+    name: cloudCut(
+      email.sender.name,
+      PROMPT_LIMITS.name,
+      email.sender.name.length >= FIELD_LIMITS.name,
+    ),
+    subject: cloudCut(
+      email.subject,
+      PROMPT_LIMITS.subject,
+      email.subject.length >= FIELD_LIMITS.subject,
+    ),
     linkTexts: email.links
       .slice(0, PROMPT_LIMITS.links)
-      .map((link) => cloudCut(link.text, PROMPT_LIMITS.linkText)),
-    body: cloudCut(email.bodyText, PROMPT_LIMITS.body),
+      .map((link) =>
+        cloudCut(link.text, PROMPT_LIMITS.linkText, link.text.length >= FIELD_LIMITS.linkText),
+      ),
+    body: cloudCut(email.bodyText, PROMPT_LIMITS.body, email.truncated),
   };
 }
 

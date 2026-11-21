@@ -5,6 +5,7 @@ import { buildUserPrompt } from '../../src/ai/prompt';
 import { MAX_AI_TEXT, MAX_REASONS, parseVerdict, RISKS } from '../../src/ai/verdict';
 import { type Email, isEmail } from '../../src/email';
 import { parsePastedEmail, readHtml } from '../../src/paste/parse-pasted-email';
+import { cloudData } from '../../src/privacy/redact';
 import { headersFromOriginalPage, GMAIL_SERVER } from '../../src/raw/gmail-original-page';
 import { looksLikeRawEmail, parseRawEmail, RawEmailError } from '../../src/raw/parse-raw-email';
 import { checkEmail, MAX_FINDINGS } from '../../src/rules';
@@ -244,6 +245,59 @@ describe('monkey: AI prompt', () => {
       // With a marker the email does not contain, the data block is valid JSON.
       const data = buildUserPrompt(email, [], 'en').split('\n')[3] ?? '';
       expect(() => JSON.parse(data) as unknown).not.toThrow();
+    });
+  });
+});
+
+/**
+ * Personal data planted in hostile emails for the privacy filter: a name (which "Nano" reports),
+ * an address, a phone number, an IBAN and a link with a user ID.
+ */
+const PRIVATE = [
+  'Zorbald Quint',
+  'zq.canary@private.example',
+  '+41 79 555 12 34',
+  'CH93 0076 2011 6238 5295 7',
+  'https://track.example/u?id=zqtoken',
+].join(' ');
+
+describe('monkey: privacy filter in front of the cloud', () => {
+  it('lets no planted personal data and no raw header through', async () => {
+    await forEachCase(300, (rng) => {
+      const email: Email = randomEmail(rng, rng.chance(0.8) ? PRIVATE : '');
+      if (rng.chance(0.5)) {
+        email.headers = {
+          replyTo: [{ name: 'Zorbald Quint', address: 'zq.canary@private.example' }],
+          returnPath: 'bounce-zqtoken@lists.example',
+          auth: {
+            server: 'mx.google.com',
+            spf: 'pass',
+            dkim: [],
+            dmarc: rng.pick(['pass', 'fail']),
+          },
+        };
+      }
+      const nanoLooked = rng.chance(0.7);
+      const data = timed('cloudData', () =>
+        cloudData(email, checkEmail(email), nanoLooked ? ['Zorbald Quint'] : undefined),
+      );
+      const { json } = data;
+      expect(() => JSON.parse(json) as unknown).not.toThrow();
+      // (The checking server's name may appear: rule messages name it, and it is Google's.)
+      for (const secret of ['zq.canary', 'zqtoken', 'bounce']) {
+        expect(json, secret).not.toContain(secret);
+      }
+      expect(json.replace(/\D/g, ''), 'phone number').not.toContain('41795551234');
+      expect(json.replace(/\s/g, ''), 'IBAN').not.toContain('CH930076');
+      // Names: everywhere when Nano looked; without it, at least the sender name goes.
+      expect(nanoLooked && /Zorbald|Quint/.test(json), 'name').toBe(false);
+      const parsed = JSON.parse(json) as { email: { from: { name: string } } };
+      expect(parsed.email.from.name).not.toMatch(/Zorbald|Quint/);
+      expect(data.namesChecked).toBe(nanoLooked);
+      // The same email, the same data.
+      expect(
+        cloudData(email, checkEmail(email), nanoLooked ? ['Zorbald Quint'] : undefined),
+      ).toEqual(data);
     });
   });
 });
