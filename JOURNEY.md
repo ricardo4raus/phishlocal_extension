@@ -732,5 +732,13 @@ _To fill in near the submission._
     front kept their path;
   - Gmail shows an email again in two steps, and the second step wiped the round-1 note;
   - a long reason without spaces (Japanese) became just "…".
-    All fixed with tests. The lesson of the answer reader's filter repeated itself: each fix for
-    one gap needs its own review.
+- All round-2 findings were fixed with tests. The lesson of the answer reader's filter repeated
+  itself: each fix for one gap needs its own review.
+- Review round 3 found that shielding the placeholders from the name step was itself a gap: a
+  literal "[link: " in an email shielded every name up to the next bracket, and names inside
+  hosts were lower-cased and kept. Instead of patching the shield, the order changed: names are
+  now replaced first, before any placeholder exists. Single words match in any case, except that
+  a lower-case word counts only inside a host or address, which also fixed "Anna" after "ANNA"
+  and the German capital ẞ. Also fixed: a "?" in a link's password, IPv6 links, Japanese reasons
+  cut to their first sentence, greeting words that are surnames ("Dear Mr Gentile"), and focus on
+  a disabled button.
