@@ -23,7 +23,7 @@ export interface GmailViewUi {
 
 export type EmptyReason = 'idle' | 'not-gmail' | 'unreadable';
 
-const CHECKED = 'Checked automatically. Nothing left your browser.';
+const CHECKED = 'Checked automatically on this device.';
 
 const FAILURES: Record<OriginalFailure, string> = {
   'no-account-key': "Gmail's page has changed",

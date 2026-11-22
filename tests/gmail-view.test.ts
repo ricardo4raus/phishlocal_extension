@@ -46,7 +46,7 @@ describe('Gmail view', () => {
     view.handle({ type: 'email', key: 'msg-f:1', email });
     expect(shown[0]).toEqual({
       email,
-      status: 'Checked automatically. Nothing left your browser. Loading the sender checks…',
+      status: 'Checked automatically on this device. Loading the sender checks…',
       note: 'Loading from Gmail…',
     });
     view.handle({ type: 'original', key: 'msg-f:1', html: PAGE });
@@ -70,7 +70,7 @@ describe('Gmail view', () => {
     expect(shown[1]).toEqual({
       email,
       status:
-        'Checked automatically. Nothing left your browser. Sender checks not available: Gmail did not answer in time.',
+        'Checked automatically on this device. Sender checks not available: Gmail did not answer in time.',
       note: HEADERS_HINT,
     });
     view.handle({ type: 'original', key: 'msg-f:1', html: '<p>no pre</p>' });

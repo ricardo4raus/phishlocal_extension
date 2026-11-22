@@ -80,8 +80,9 @@ Every part is its own component (see "How to build it"); the page sets the spaci
 
 1. **Top bar** (always): logo, "PhishLocal", and the model pill on the right. The pill is
    neutral (grey) in every state: a dot when ready, a spinner while loading or downloading, a
-   small "!" when the AI is not available or not loaded. Words: "On-device AI ready", "On-device
-   AI loading", "On-device AI 42%", "AI not available", "AI not loaded".
+   small "!" when the AI is missing. Words: "On-device AI ready", "On-device AI loading" (with
+   the elapsed time, which gives way on panels under 360 px), "On-device AI 42%", "AI not set
+   up" (not downloaded), "AI not available", "AI not loaded".
 2. **Model banner** (only when the model needs the user): not downloaded (text and the
    "Download now" button), downloading (progress bar with `role="progressbar"`), unavailable
    (text only). It never replaces the email below it.
@@ -93,9 +94,10 @@ Every part is its own component (see "How to build it"); the page sets the spaci
 4. **Email strip** (with an email): subject (one line, cut with "…"), then the sender: the
    address domain first and bold, the display name after it in grey, the full address on its own
    line, wrapping, never cut. Third line, the sender status: "Sender confirmed by Gmail" (DMARC
-   pass from `mx.google.com`), "Sender confirmed by your mail server" (pass from another server
-   in pasted raw source), "Sender not confirmed" (no headers, or no pass), "Checking the sender…"
-   (Gmail headers still loading). On the right an icon button "Check the open email again".
+   pass from `mx.google.com`, read from Gmail's own page), "Sender confirmed by your mail
+   server" (pass in pasted raw source, whatever server it names: pasted text is not Gmail's word),
+   "Sender not confirmed" (no headers, or no pass), "Checking the sender…" (Gmail headers still
+   loading). On the right an icon button "Check the open email again".
    Under the strip one muted line for the source status ("Checked automatically", "Pasted
    email", "Sample loaded: …") and errors.
 5. **Verdict band:** a tinted head with a round symbol, the verdict word and one status line;

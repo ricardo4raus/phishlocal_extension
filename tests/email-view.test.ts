@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import type { Email } from '../src/email';
-import { HEADERS_HINT, showEmail } from '../src/sidepanel/email-view';
+import { HEADERS_HINT, senderDomain, senderStatus, showEmail } from '../src/sidepanel/email-view';
 
 const email: Email = {
   sender: { name: 'PayPal', address: 'service@paypa1-secure.example' },
@@ -136,5 +136,41 @@ describe('showEmail', () => {
     const rlo = String.fromCodePoint(0x202e);
     showEmail({ ...email, sender: { name: `${rlo}moc.lapyap`, address: 'x@evil.example' } }, els);
     expect(els.sender.textContent).toBe('<U+202E>moc.lapyap <x@evil.example>');
+  });
+});
+
+/** Headers with every sender check passed, from `server`. */
+const pass = (server: string) => ({
+  replyTo: [],
+  auth: { server, spf: 'pass', dkim: [{ result: 'pass' }], dmarc: 'pass' },
+});
+
+describe('senderStatus', () => {
+  it("credits Gmail only for headers read from Gmail's own page", () => {
+    const gmail = { ...email, headers: pass('mx.google.com') };
+    expect(senderStatus(gmail, false, true).text).toBe('Sender confirmed by Gmail');
+    // Pasted raw source can say anything: a pasted "mx.google.com" is not Gmail's word.
+    expect(senderStatus(gmail, false, false).text).toBe('Sender confirmed by your mail server');
+    expect(senderStatus({ ...email, headers: pass('mx.other.example') }, false, true).text).toBe(
+      'Sender confirmed by your mail server',
+    );
+  });
+
+  it('is "not confirmed" without a DMARC pass, and "checking" only while Gmail headers load', () => {
+    expect(senderStatus(email).state).toBe('unconfirmed');
+    expect(senderStatus(email, true)).toMatchObject({
+      state: 'checking',
+      text: 'Checking the sender…',
+    });
+    const failed = {
+      ...email,
+      headers: { replyTo: [], auth: { server: 'mx.google.com', dkim: [], dmarc: 'fail' } },
+    };
+    expect(senderStatus(failed, true, true).state).toBe('unconfirmed');
+  });
+
+  it('shows the registrable domain of the address, or nothing', () => {
+    expect(senderDomain('x@mail.lumorabank.example')).toBe('lumorabank.example');
+    expect(senderDomain('')).toBe('');
   });
 });

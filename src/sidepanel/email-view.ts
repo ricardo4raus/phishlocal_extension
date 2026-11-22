@@ -41,6 +41,11 @@ export interface ShowEmailOptions {
   findings?: readonly Finding[];
   /** The Gmail headers are still loading: the sender status says "Checking the sender…". */
   loading?: boolean;
+  /**
+   * The headers were loaded from Gmail's page, where only Gmail's own server is trusted. Pasted
+   * raw source can carry any text, so its confirmation is credited to "your mail server".
+   */
+  fromGmail?: boolean;
 }
 
 /** Where to get the headers when the email was read without them. */
@@ -69,10 +74,11 @@ export type SenderStatus = 'confirmed' | 'unconfirmed' | 'checking';
 export function senderStatus(
   email: Email,
   loading = false,
+  fromGmail = false,
 ): { state: SenderStatus; text: string; icon: IconName } {
   const auth = email.headers?.auth;
   if (auth?.dmarc === 'pass') {
-    const by = auth.server === GMAIL_SERVER ? 'Gmail' : 'your mail server';
+    const by = fromGmail && auth.server === GMAIL_SERVER ? 'Gmail' : 'your mail server';
     return { state: 'confirmed', text: `Sender confirmed by ${by}`, icon: 'check' };
   }
   if (loading && !email.headers) {
@@ -129,14 +135,14 @@ function linkItem(link: EmailLink, severity: Severity | undefined): HTMLLIElemen
   return item;
 }
 
-function showStrip(email: Email, strip: StripElements, loading: boolean): void {
+function showStrip(email: Email, strip: StripElements, loading: boolean, fromGmail: boolean): void {
   setText(strip.subject, email.subject || '(no subject)');
   const domain = senderDomain(email.sender.address);
   setText(strip.domain, domain || email.sender.address || 'Unknown sender');
   setText(strip.name, email.sender.name ? `· ${email.sender.name}` : '');
   // The address line repeats the domain only when the address says more than it.
   setText(strip.address, domain && email.sender.address !== domain ? email.sender.address : '');
-  const status = senderStatus(email, loading);
+  const status = senderStatus(email, loading, fromGmail);
   strip.auth.dataset.state = status.state;
   strip.authIcon.dataset.icon = status.icon;
   strip.authText.textContent = status.text;
@@ -151,13 +157,14 @@ export function showEmail(
   elements: EmailElements,
   options: ShowEmailOptions = {},
 ): void {
-  const { headersNote = HEADERS_HINT, findings = [], loading = false } = options;
-  if (elements.strip) showStrip(email, elements.strip, loading);
+  const { headersNote = HEADERS_HINT, findings = [], loading = false, fromGmail = false } = options;
+  if (elements.strip) showStrip(email, elements.strip, loading, fromGmail);
   setText(elements.sender, mailbox(email.sender));
   setText(elements.subject, email.subject || '–');
 
   const { headers } = email;
-  elements.auth.textContent = headers ? authSummary(headers.auth) : headersNote;
+  // The summary holds domains from the headers (email content): direction overrides revealed.
+  setText(elements.auth, headers ? authSummary(headers.auth) : headersNote);
   elements.headerRows.hidden = !headers;
   setText(elements.replyTo, headers?.replyTo.map(mailbox).join(', ') || '–');
   setText(elements.returnPath, headers?.returnPath || '–');
@@ -173,8 +180,10 @@ export function showEmail(
     elements.links.append(item);
   }
 
-  const preview = email.bodyText.slice(0, BODY_PREVIEW_CHARS);
-  const cut = email.bodyText.length > BODY_PREVIEW_CHARS || email.truncated;
+  // Cut by code points, so the preview never ends in half a character.
+  const chars = [...email.bodyText];
+  const preview = chars.slice(0, BODY_PREVIEW_CHARS).join('');
+  const cut = chars.length > BODY_PREVIEW_CHARS || email.truncated;
   setText(elements.body, cut ? `${preview}…` : preview || '–');
   elements.details.hidden = false;
 }

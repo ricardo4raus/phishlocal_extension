@@ -84,7 +84,6 @@
     --radius-pill: 999px;
     --control-height: 40px;
     --control-height-l: 44px;
-    --focus-ring: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-focus);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -178,8 +177,8 @@
   }
 
   :where(:focus-visible) {
-    outline: none;
-    box-shadow: var(--focus-ring);
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
     border-radius: var(--radius-box);
   }
 
@@ -234,20 +233,9 @@
     min-width: 0;
   }
 
-  .row--start {
-    align-items: flex-start;
-  }
-
   .row > .grow {
     flex: 1;
     min-width: 0;
-  }
-
-  /* Items that wrap onto several lines (chips). */
-  .cluster {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2) var(--space-2);
   }
 
   /* Shown only while the settings load; out of the flow, so the panel does not jump when it goes. */
@@ -273,6 +261,21 @@
     mask-position: center;
     mask-size: contain;
     mask-repeat: no-repeat;
+  }
+
+  .icon--s {
+    inline-size: 14px;
+    block-size: 14px;
+  }
+
+  .icon--m {
+    inline-size: 20px;
+    block-size: 20px;
+  }
+
+  .icon--l {
+    inline-size: 22px;
+    block-size: 22px;
   }
 
   .icon[data-icon='shield-check'] {
@@ -323,17 +326,11 @@
   .icon[data-icon='dot'] {
     mask-image: url(./icons/dot.svg);
   }
-
-  /* ---- Spinner: a ring with one accent quarter. ---- */
-  .spinner {
-    display: inline-block;
-    flex: none;
-    inline-size: 1em;
-    block-size: 1em;
-    border: 2px solid var(--color-border-strong);
-    border-block-start-color: var(--color-accent);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
+  .icon[data-icon='dots'] {
+    mask-image: url(./icons/dots.svg);
+  }
+  .icon[data-icon='minus'] {
+    mask-image: url(./icons/minus.svg);
   }
 
   @keyframes spin {
@@ -371,17 +368,13 @@
     color: var(--color-on-accent);
   }
 
-  .logo > .icon {
-    inline-size: 18px;
-    block-size: 18px;
-  }
-
   /* The model pill: neutral in every state; the word says it, the mark repeats it. */
   .pill {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    max-inline-size: 60%;
+    max-inline-size: 70%;
+    min-width: 0;
     padding: 3px 10px;
     border-radius: var(--radius-pill);
     background: var(--color-surface-2);
@@ -392,16 +385,17 @@
     white-space: nowrap;
   }
 
+  .pill__word {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .pill__mark {
     display: inline-block;
     flex: none;
     inline-size: 8px;
     block-size: 8px;
     border-radius: 50%;
-    background: var(--color-pending);
-  }
-
-  .pill[data-state='ready'] .pill__mark {
     background: var(--color-text-2);
   }
 
@@ -418,7 +412,13 @@
   .pill[data-state='unavailable'] .pill__mark,
   .pill[data-state='failed'] .pill__mark,
   .pill[data-state='not-downloaded'] .pill__mark {
-    background: var(--color-warning);
+    inline-size: 12px;
+    block-size: 12px;
+    border-radius: 0;
+    mask-image: url(./icons/alert.svg);
+    mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
   }
 
   .pill__count {
@@ -428,6 +428,13 @@
 
   .pill__count:empty {
     display: none;
+  }
+
+  /* On a narrow panel the word keeps its place and the counter gives way. */
+  @container (width < 360px) {
+    .pill__count {
+      display: none;
+    }
   }
 
   /* ---- Cards and boxes. ---- */
@@ -454,10 +461,6 @@
     line-height: var(--leading-s);
   }
 
-  .note > .icon {
-    margin-block-start: 1px;
-  }
-
   /* ---- Banner: the model needs the user (download, unavailable). ---- */
   .banner {
     display: flex;
@@ -470,9 +473,6 @@
   }
 
   .banner__icon {
-    inline-size: 22px;
-    block-size: 22px;
-    margin-block-start: 1px;
     color: var(--color-accent);
   }
 
@@ -571,10 +571,6 @@
     border-color: transparent;
     background: transparent;
     color: var(--color-text-2);
-  }
-
-  .btn--block {
-    inline-size: 100%;
   }
 
   .btn--tall {
@@ -686,9 +682,6 @@
   }
 
   .point__icon {
-    inline-size: 20px;
-    block-size: 20px;
-    margin-block-start: 1px;
     color: var(--color-accent);
   }
 
@@ -748,11 +741,6 @@
     color: var(--color-text-2);
   }
 
-  .strip__auth > .icon {
-    inline-size: 14px;
-    block-size: 14px;
-  }
-
   .strip__auth[data-state='unconfirmed'] {
     color: var(--color-text-3);
   }
@@ -777,7 +765,6 @@
     --band-tint: var(--color-pending-tint);
     --band-border: var(--color-pending-border);
     --band-on: var(--color-on-pending);
-    --band-symbol: '…';
     background: var(--color-surface);
     border: 1px solid var(--band-border);
     border-radius: var(--radius-card);
@@ -790,7 +777,6 @@
     --band-tint: var(--color-safe-tint);
     --band-border: var(--color-safe-border);
     --band-on: var(--color-on-safe);
-    --band-symbol: '✓';
   }
 
   .band[data-risk='suspicious'] {
@@ -799,7 +785,6 @@
     --band-tint: var(--color-warning-tint);
     --band-border: var(--color-warning-border);
     --band-on: var(--color-on-warning);
-    --band-symbol: '!';
   }
 
   .band[data-risk='dangerous'] {
@@ -808,7 +793,6 @@
     --band-tint: var(--color-danger-tint);
     --band-border: var(--color-danger-border);
     --band-on: var(--color-on-danger);
-    --band-symbol: '✕';
   }
 
   .band__head {
@@ -829,19 +813,46 @@
     color: var(--band-text);
   }
 
-  /* The symbol is decoration (empty alternative text): the word says the same. */
+  /* The symbol is decoration (no alternative text): the word says the same. The circle is the
+     ::before, the icon the ::after drawn over it (a mask needs its own box). */
+  .band__word {
+    position: relative;
+  }
+
   .band__word::before {
-    content: var(--band-symbol) / '';
-    display: grid;
-    place-items: center;
+    content: '';
     flex: none;
     inline-size: 32px;
     block-size: 32px;
     border-radius: 50%;
     background: var(--band-color);
-    color: var(--band-on);
-    font-size: var(--text-l);
-    font-weight: 700;
+  }
+
+  .band__word::after {
+    content: '';
+    mask-image: url(./icons/dots.svg);
+    position: absolute;
+    inset-inline-start: 8px;
+    inset-block-start: 50%;
+    inline-size: 16px;
+    block-size: 16px;
+    transform: translateY(-50%);
+    background: var(--band-on);
+    mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+  }
+
+  .band[data-risk='safe'] .band__word::after {
+    mask-image: url(./icons/check.svg);
+  }
+
+  .band[data-risk='suspicious'] .band__word::after {
+    mask-image: url(./icons/alert.svg);
+  }
+
+  .band[data-risk='dangerous'] .band__word::after {
+    mask-image: url(./icons/cross.svg);
   }
 
   .band__body {
@@ -866,7 +877,6 @@
   }
 
   /* "The AI check failed": the user must see that only the rules checked this email. */
-  .band__line--strong,
   .band__line.ai-failed {
     color: var(--color-text);
     font-weight: 600;
@@ -911,6 +921,8 @@
     overflow-wrap: anywhere;
   }
 
+  /* The email text scrolls inside a fixed box: a 20,000-character body must not push the parts
+     below it off screen. */
   .details__value--text {
     white-space: pre-wrap;
     max-block-size: 200px;
@@ -1024,28 +1036,7 @@
     line-height: var(--leading-s);
   }
 
-  .mono {
-    font-family: var(--font-mono);
-  }
-
   .tabular {
     font-variant-numeric: tabular-nums;
-  }
-
-  .strong {
-    font-weight: 600;
-  }
-
-  /* Visually hidden, still read by screen readers. */
-  .sr-only {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
   }
 }

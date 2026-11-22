@@ -106,36 +106,51 @@ const BANNERS: Partial<Record<ModelState, Banner>> = {
   failed: {
     icon: 'alert',
     title: 'On-device AI could not load',
-    text: '',
+    text: 'Chrome could not load Gemini Nano. Emails get the basic checks only; the next check tries again.',
   },
 };
 
-/** Shows the model state in the pill and the banner. `detail` is the error text for `failed`. */
-function setModelState(state: ModelState, detail = ''): void {
+/**
+ * Shows the model state in the pill and the banner. `note` is a sentence put in front of the
+ * banner's text (e.g. why a download failed).
+ */
+function setModelState(state: ModelState, note = ''): void {
   modelState = state;
   modelPill.dataset.state = state;
   modelStatus.textContent = PILL_WORDS[state];
+  // The Download button may go away with the state: its focus moves to the banner's title.
+  const buttonHadFocus = document.activeElement === modelDownload;
   const banner = BANNERS[state];
   modelBanner.hidden = !banner;
   if (banner) {
     modelBanner.dataset.state = state;
     modelBannerIcon.dataset.icon = banner.icon;
     modelBannerTitle.textContent = banner.title;
-    modelBannerText.textContent =
-      state === 'failed'
-        ? `${detail} Emails get the basic checks only until it loads; the next check tries again.`
-        : banner.text;
+    modelBannerText.textContent = note ? `${note} ${banner.text}` : banner.text;
   }
   modelBannerActions.hidden = state !== 'not-downloaded';
-  modelProgressBar.hidden = state !== 'downloading';
+  // The bar shows only once Chrome has reported a percentage (setDownloadProgress).
+  modelProgressBar.hidden = true;
+  if (buttonHadFocus && modelBannerActions.hidden) modelBannerTitle.focus();
 }
 
-/** The download percentage in the pill and the bar. */
+/** The download percentage in the pill and the bar, once Chrome reports one. */
 function setDownloadProgress(loaded: number): void {
   const percent = Math.round(loaded * 100);
   modelProgress.textContent = `${percent}%`;
+  modelProgressBar.hidden = false;
   modelProgressBar.style.setProperty('--progress', `${percent}%`);
   modelProgressBar.setAttribute('aria-valuenow', String(percent));
+}
+
+/**
+ * Waits for the model like `ensureModelLoaded()`, and tells the pill when a load after a failed
+ * warm-up succeeded (the warm-up is the only other thing that sets the state).
+ */
+async function modelReady(language: string): Promise<boolean> {
+  const ready = await ensureModelLoaded(language);
+  if (ready && (modelState === 'failed' || modelState === 'loading')) setModelState('ready');
+  return ready;
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -289,7 +304,7 @@ const aiCheck = createAiCheck(
   {
     run: runAiCheck,
     uiLanguage: () => chrome.i18n.getUILanguage(),
-    modelReady: ensureModelLoaded,
+    modelReady,
     runTimeoutMs: settings.aiCheckTimeoutMs,
   },
 );
@@ -317,7 +332,7 @@ const deepCheck = createDeepCheck(
   {
     available: appCheckEnabled,
     uiLanguage: () => chrome.i18n.getUILanguage(),
-    modelReady: ensureModelLoaded,
+    modelReady,
     findNames,
     run: runCloudCheck,
     namesTimeoutMs: settings.namesTimeoutMs,
@@ -345,13 +360,20 @@ function setEmailStatus(text: string, isError = false): void {
   emailStatus.classList.toggle('status--error', isError);
 }
 
-/**
- * Shows an email from Gmail or the paste area with its rule findings; long texts get a note.
- * `headersNote` stands in for the sender checks while an email has no headers.
- */
-function displayEmail(email: Email, message: string, headersNote?: string, final = true): void {
+interface DisplayOptions {
+  /** Stands in for the sender checks while an email has no headers. */
+  headersNote?: string;
+  /** False while a Gmail email still waits for its headers. */
+  final?: boolean;
+  /** The email was read from Gmail's page (its sender checks come from Gmail's own server). */
+  fromGmail: boolean;
+}
+
+/** Shows an email from Gmail or the paste area with its rule findings; long texts get a note. */
+function displayEmail(email: Email, message: string, options: DisplayOptions): void {
+  const { headersNote, final = true, fromGmail } = options;
   const findings = showRuleCheck(() => checkEmail(email), findingsList);
-  showEmail(email, emailElements, { headersNote, findings, loading: !final });
+  showEmail(email, emailElements, { headersNote, findings, loading: !final, fromGmail });
   emptySection.hidden = true;
   emailSection.hidden = false;
   setEmailStatus(email.truncated ? `${message} The text is long and was cut.` : message);
@@ -368,7 +390,8 @@ function hideEmail(reason: EmptyReason = 'idle'): void {
 
 // While the panel is open, every email opened in Gmail is checked automatically.
 const gmailView = createGmailView({
-  show: displayEmail,
+  show: (email, message, headersNote, final) =>
+    displayEmail(email, message, { headersNote, final, fromGmail: true }),
   hide: hideEmail,
   setStatus: setEmailStatus,
 });
@@ -406,7 +429,7 @@ setUpPaste(
     onEmail: (email, message) => {
       gmailView.pasted();
       setPasteStatus('');
-      displayEmail(email, message);
+      displayEmail(email, message, { fromGmail: false });
     },
     onError: (message) => {
       gmailView.pasted();
@@ -418,6 +441,8 @@ setUpPaste(
       hideEmail();
       setPasteStatus('');
       setEmailStatus('');
+      // The Gmail tab may still show an email: back to it.
+      watch.scan();
     },
   },
 );
@@ -455,7 +480,6 @@ async function warmUp(): Promise<void> {
 async function downloadModel(): Promise<void> {
   modelDownload.disabled = true;
   setModelState('downloading');
-  setDownloadProgress(0);
   // A progress event can arrive after the download ended; it must not show a stale percentage.
   let done = false;
   try {
@@ -471,7 +495,8 @@ async function downloadModel(): Promise<void> {
     done = true;
     modelProgress.textContent = '';
     const message = error instanceof Error ? error.message : String(error);
-    setModelState('failed', `The download failed: ${message}.`);
+    // Back to the offer, so the user can try again.
+    setModelState('not-downloaded', `The download failed (${message}).`);
   } finally {
     modelDownload.disabled = false;
   }

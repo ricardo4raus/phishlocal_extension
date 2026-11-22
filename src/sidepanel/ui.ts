@@ -21,7 +21,9 @@ export type IconName =
   | 'download'
   | 'device'
   | 'eye-off'
-  | 'dot';
+  | 'dot'
+  | 'dots'
+  | 'minus';
 
 /** An element with a class and, optionally, text. */
 export function el<K extends keyof HTMLElementTagNameMap>(

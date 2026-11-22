@@ -13,13 +13,13 @@
     <div id="app" class="page" inert>
       <header class="topbar">
         <span class="logo" aria-hidden="true"
-          ><span class="icon" data-icon="shield-check"></span
+          ><span class="icon icon--m" data-icon="shield-check"></span
         ></span>
         <h1 class="topbar__title">PhishLocal</h1>
         <!-- Only state changes are announced; the counter next to them is not a live region. -->
         <p id="model-pill" class="pill" data-state="loading">
           <span class="pill__mark" aria-hidden="true"></span>
-          <span id="model-status" role="status">On-device AI loading</span>
+          <span id="model-status" class="pill__word" role="status">On-device AI loading</span>
           <span id="model-progress" class="pill__count"></span>
         </p>
       </header>
@@ -29,12 +29,12 @@
         <section id="model-banner" class="banner" aria-labelledby="model-banner-title" hidden>
           <span
             id="model-banner-icon"
-            class="icon banner__icon"
+            class="icon icon--l banner__icon"
             data-icon="download"
             aria-hidden="true"
           ></span>
           <div class="banner__body stack stack--tight">
-            <h2 id="model-banner-title" class="banner__title"></h2>
+            <h2 id="model-banner-title" class="banner__title" tabindex="-1"></h2>
             <p id="model-banner-text" class="banner__text"></p>
             <div
               id="model-progressbar"
@@ -69,7 +69,7 @@
             <h3 class="section-title">How your privacy is kept</h3>
             <ul class="stack">
               <li class="point">
-                <span class="icon point__icon" data-icon="device" aria-hidden="true"></span>
+                <span class="icon icon--m point__icon" data-icon="device" aria-hidden="true"></span>
                 <p>
                   <span class="point__lead">Checked on this device</span><br />
                   <span class="text-secondary"
@@ -78,14 +78,18 @@
                 </p>
               </li>
               <li class="point">
-                <span class="icon point__icon" data-icon="eye-off" aria-hidden="true"></span>
+                <span
+                  class="icon icon--m point__icon"
+                  data-icon="eye-off"
+                  aria-hidden="true"
+                ></span>
                 <p>
                   <span class="point__lead">No email is saved</span><br />
                   <span class="text-secondary">Close the panel and all reading stops.</span>
                 </p>
               </li>
               <li class="point">
-                <span class="icon point__icon" data-icon="cloud" aria-hidden="true"></span>
+                <span class="icon icon--m point__icon" data-icon="cloud" aria-hidden="true"></span>
                 <p>
                   <span class="point__lead">Cloud only if you ask</span><br />
                   <span class="text-secondary"
@@ -114,7 +118,12 @@
               </p>
               <p id="strip-address" class="strip__address"></p>
               <p id="strip-auth" class="strip__auth" data-state="unconfirmed">
-                <span id="strip-auth-icon" class="icon" data-icon="alert" aria-hidden="true"></span>
+                <span
+                  id="strip-auth-icon"
+                  class="icon icon--s"
+                  data-icon="alert"
+                  aria-hidden="true"
+                ></span>
                 <span id="strip-auth-text">Sender not confirmed</span>
               </p>
             </div>
@@ -295,7 +304,7 @@
               <textarea id="prompt" class="field__textarea" rows="6">
 Is this email suspicious? Answer in two sentences.
 
-"Your account is locked. Confirm your password within 24 hours: http://paypa1-secure.com/login"</textarea>
+"Your account is locked. Confirm your password within 24 hours: http://lumora-bank-verify.example/login"</textarea>
             </div>
             <label id="force-cloud-row" class="check" hidden>
               <input id="force-cloud" type="checkbox" />
