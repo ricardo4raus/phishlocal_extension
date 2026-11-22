@@ -84,6 +84,19 @@ are its input and its lower limit.
      notes, with our own advice. Gemini Nano rated a real Google security notice as suspicious
      even with the sender checks in its data. Phishing from a confirmed but hijacked sender
      almost always trips the rules too (requests for identity, log-in or card details, payments).
+   - **Second exception, when nothing is asked** (22 Nov 2026): no links, and the rules found no
+     pressure, threat, request for data or payment, not even as a note. Then an AI "suspicious"
+     alone is shown as notes with our own advice; an AI "dangerous" still stands. Gemini Nano
+     called a developer's error log that the user had sent to themselves suspicious, mainly
+     because Gmail adds no sender checks to such mail. The rules miss some scams without links:
+     a gift-card request in other words gets no finding at all, so if Nano only calls it
+     "suspicious", it shows as safe with Nano's points as notes. A password request or a transfer
+     under time pressure is at least a note, so the AI's verdict stands there
+     (`tests/ai-view.test.ts`, "an email without links").
+   - **Prompt** (same date): "not available" sender checks are no sign of phishing by
+     themselves; the AI judges mainly by what the email wants the reader to do (a link, data,
+     a payment, a reply with information, pressure); an empty subject or technical content alone
+     is no sign; reasons never name SPF, DKIM or DMARC.
 5. **Traffic light:** the verdict is shown as a block above the email details, with a colour, a
    symbol and a word per level (green ✓, yellow !, red ✕). Until the AI has answered, the rules'
    verdict shows, except that "no red flags" stays grey ("Checking…"): the AI may still raise it,
