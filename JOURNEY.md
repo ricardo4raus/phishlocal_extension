@@ -1069,3 +1069,6 @@ _To fill in near the submission._
   faded out of step (Chrome did not blend one of them smoothly), so it is one glow again, a bit
   stronger than the first; the dot is a shade lighter than the verdict's green, because a small
   dot looks darker than the large circle.
+- The bulb's glow still cut off while fading out, also as a single glow: Chrome did not blend a
+  `filter: drop-shadow()` whose colour fades. The halo is now its own layer behind the bulb (a
+  soft radial gradient) and only its opacity animates, which always fades smoothly.

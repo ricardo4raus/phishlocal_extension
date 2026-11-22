@@ -355,14 +355,16 @@
     }
   }
 
+  /* The bulb's halo only fades in and out: opacity always animates smoothly (a filter with a
+     fading colour did not: Chrome cut it off while it faded out). */
   @keyframes bulb-glow {
     0%,
     100% {
-      filter: drop-shadow(0 0 0 color-mix(in srgb, var(--color-tip) 0%, transparent));
+      opacity: 0;
     }
 
     50% {
-      filter: drop-shadow(0 0 5px var(--color-tip));
+      opacity: 1;
     }
   }
 
@@ -980,13 +982,37 @@
     background: var(--color-surface-2);
   }
 
-  /* The bulb glows like the ready dot: a warm halo swells and fades, the bulb keeps its colour.
-     The halo sits on a wrapper because a mask would cut a shadow on the icon itself. */
+  /* The bulb glows like the ready dot: a warm halo behind it fades in and out, the bulb keeps
+     its colour. The halo is the wrapper's own layer, because a mask would cut anything drawn
+     on the icon itself. */
   .band__bulb {
+    position: relative;
     display: flex;
     flex: none;
+    /* As tall as the bulb, not the box, so its halo is a circle around it. */
+    align-self: flex-start;
     color: var(--color-tip);
+  }
+
+  .band__bulb::before {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--color-tip) 45%, transparent) 0%,
+      color-mix(in srgb, var(--color-tip) 20%, transparent) 45%,
+      transparent 70%
+    );
+    opacity: 0;
     animation: bulb-glow 2.4s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  /* The bulb above its halo. */
+  .band__bulb > .icon {
+    position: relative;
   }
 
   .band__advice:has(> p:empty) {
