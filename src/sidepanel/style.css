@@ -889,7 +889,7 @@
     background: var(--color-surface-2);
   }
 
-  .band__advice:has(> :empty) {
+  .band__advice:has(> p:empty) {
     display: none;
   }
 
