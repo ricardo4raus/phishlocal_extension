@@ -207,8 +207,9 @@ icons (24-unit grid, 1.8–2.2 stroke).
 1. **"Show what will be sent" is closed by default.** `CLAUDE.md`, `docs/ai-check.md` (step 5,
    "the panel shows exactly that data") and `JOURNEY.md` ("Showing the exact data before sending
    covers the miss") promise that the user sees the data before consenting. With the fold, a user
-   can send without looking. Decide before implementing; if the fold stays, update those three
-   files. Either way, a warning that names may remain (after the 20 s limit or without the model)
+   can send without looking. Screen 1 ("you see exactly what is sent") and screen 5 ("you can
+   see the exact data") say the same. Decide before implementing; if the fold stays, update those
+   three files and the two screen texts. Either way, a warning that names may remain (after the 20 s limit or without the model)
    must stay visible outside the fold.
 2. **Sample emails:** hidden from users. Not decided yet: keep them in dev and judges builds for
    the demo video and for judges whose inbox has no phishing (`TIMETABLE.md`: "demo must always
@@ -224,3 +225,6 @@ icons (24-unit grid, 1.8–2.2 stroke).
    already downloaded before the panel relies on it.
 7. **The result after sending** (the sent data stays on screen as the record, `docs/ai-check.md`)
    is not in the mockup yet.
+8. **Plain words in the AI's reasons:** screen 4's first reason names SPF, DKIM and DMARC,
+   against the "plain words" principle. The reasons come from the AI, so this is a prompt
+   question for the tuning task (Wed 25 Nov), not a layout one.
