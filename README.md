@@ -67,9 +67,10 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   needs its own consent.
 - Besides loading "Show original" from Gmail, the only request PhishLocal makes on its own: when
   the side panel opens, it asks Firebase Remote Config (Google) for its settings, at most every
-  12 h after a successful answer (a failed one is tried again, also within the same opening).
+  12 h after a successful answer (a failed one is tried again at the next opening).
   It holds a Firebase installation ID that stays the same for this browser profile, an
-  installation token, the app ID, API key and project ID, and the browser language; when the
+  installation token, the app ID, the SDK version, API key and project ID, and the browser
+  language; when the
   installation is created or its token renewed (about weekly), also the SDK versions and the days
   the extension was used (Firebase's heartbeat header). Google also sees your IP address. Never
   email content.

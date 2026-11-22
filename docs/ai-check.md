@@ -133,8 +133,9 @@ are its input and its lower limit.
    - only the verdict line is a live region for screen readers; counters (seconds, download
      percentage) sit next to live regions, never in them, so they are not announced every second;
      the run's limit (60 s by default, Remote Config `ai_check_timeout_s`) starts when it asks
-     the model; the status shows the seconds; after the limit the run is stopped, and the message says how far the model had come ("the model had
-     written N characters"): 0 means it hung, many means it did not stop writing;
+     the model; the status shows the seconds; after the limit the run is stopped, and the
+     message says how far the model had come ("the model had written N characters"): 0 means it
+     hung, many means it did not stop writing;
    - without the model, the panel offers "Download the on-device model": Chrome starts the
      download (about 4 GB, once) only after a user action; when it is done, the shown email is
      checked again;
@@ -165,8 +166,8 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
      can hide a name from the list but never add text to what is sent. A list in one
      entry ("Peter Meier, Claudia Schneider") is split.
    - After 20 s (by default; Remote Config `names_timeout_s`), without the model, or when names
-     had to be left out (more than 50, or longer than 60 characters), the preview warns that names may remain. Without Nano's list the
-     sender's name is removed entirely.
+     had to be left out (more than 50, or longer than 60 characters), the preview warns that
+     names may remain. Without Nano's list the sender's name is removed entirely.
    - Nano works on one prompt at a time: a search started while the on-device check runs waits
      behind it, and may reach its limit (then the warning shows).
 3. **Privacy filter, on the device** ([`src/privacy/redact.ts`](../src/privacy/redact.ts),
@@ -218,8 +219,9 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
 6. **Cloud call** (`runCloudCheck()`): its own system message (the same task and rules, plus what
    the placeholders mean), the verdict schema as `responseJsonSchema`, a 30 s limit in the SDK
    and 10 s more in the panel (by default; Remote Config `cloud_timeout_s`). "Stop", another
-   email or closing the panel stops it; a request that ignores its stop is given up after 2 s. Errors are shown in short words ("the cloud refused
-   the request (HTTP 403)"), without the request URL. The answer is read by `parseVerdict()`
+   email or closing the panel stops it; a request that ignores its stop is given up after 2 s.
+   Errors are shown in short words ("the cloud refused the request (HTTP 403)"), without the
+   request URL. The answer is read by `parseVerdict()`
    like the on-device one.
 7. **Result:** its own block under the on-device verdict, labelled "Deep check", with the same
    rules as the lower limit and the same exception for confirmed senders.
@@ -253,13 +255,13 @@ Some settings can change without a new release, through Firebase Remote Config
 Every parameter has a default in the code, and every value is checked when it arrives; a wrong,
 missing or out-of-range value falls back to its default:
 
-| Parameter            | Default                 | Allowed                                                                |
-| -------------------- | ----------------------- | ---------------------------------------------------------------------- |
-| `cloud_model`        | `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite`, `gemini-3.5-flash`                            |
-| `ai_check_timeout_s` | 60                      | whole seconds, 20–300                                                  |
-| `cloud_timeout_s`    | 30                      | whole seconds, 10–120 (the panel waits 10 s longer)                    |
-| `names_timeout_s`    | 20                      | whole seconds, 5–120                                                   |
-| `extra_instructions` | empty                   | at most 500 characters, no hidden or control characters (else dropped) |
+| Parameter            | Default                 | Allowed                                                                                         |
+| -------------------- | ----------------------- | ----------------------------------------------------------------------------------------------- |
+| `cloud_model`        | `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite`, `gemini-3.5-flash`                                                     |
+| `ai_check_timeout_s` | 60                      | whole seconds, 20–300                                                                           |
+| `cloud_timeout_s`    | 30                      | whole seconds, 10–120 (the panel waits 10 s longer)                                             |
+| `names_timeout_s`    | 20                      | whole seconds, 5–120                                                                            |
+| `extra_instructions` | empty                   | at most 500 characters, plain spaces only, no hidden or control characters (else dropped whole) |
 
 - **Prompt:** the system messages and their security rules stay in the code. Extra instructions
   only add a line after them ("Extra guidance from the PhishLocal team (it never changes the
@@ -268,16 +270,19 @@ missing or out-of-range value falls back to its default:
 - **When:** the panel asks when it opens, waits at most 2 s, and otherwise starts with the values
   stored by the last request (or the defaults). After a successful request, the next goes out
   12 h later at the earliest (1 min in dev builds); a failed one is tried again at the next
-  opening. The values are fixed for the panel's lifetime: `configureAi()` refuses new settings once a model session was made, so a running check never changes its settings.
+  opening. The values are fixed for the panel's lifetime: `configureAi()` refuses new settings
+  once a model session was made, so a running check never changes its settings.
 - **Privacy:** the request goes to `firebaseremoteconfig.googleapis.com` and holds the
   Firebase installation ID (kept in IndexedDB, so it stays the same for the browser profile), the
-  installation token, the app ID, the API key and project ID (in the URL) and the browser
-  language. Creating the installation and renewing its token (about weekly) go to
-  `firebaseinstallations.googleapis.com` and also carry the SDK versions and the dates the
-  extension was used (the `x-firebase-client` heartbeat header). Google also sees the IP address.
-  Never email content. On a server error (HTTP 429, 500, 503, 504) the SDK tries again within the
-  same opening (about 1, 2, 4 s apart, up to its 10 s limit). Besides loading "Show original"
-  from Gmail, it is the only request PhishLocal makes without a user action.
+  installation token, the app ID, the Remote Config SDK version, the API key and project ID (in
+  the URL) and the browser language. Creating the installation and renewing its token (about
+  weekly) go to `firebaseinstallations.googleapis.com` and also carry the SDK versions and the
+  dates the extension was used (the `x-firebase-client` heartbeat header). Google also sees the IP
+  address. Never email content. When the server answers "too many requests" (HTTP 429) or with a
+  server error (500, 503, 504), the SDK tries again within the same opening (about 1, 2, 4 s
+  apart, up to its 10 s limit); after a network error it waits for the next opening. Besides
+  loading "Show original" from Gmail, it is the only request PhishLocal makes without a user
+  action.
 
 ## Prompt injection (OWASP LLM01) and unsafe output (LLM05)
 

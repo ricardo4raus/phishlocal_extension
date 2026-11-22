@@ -9,6 +9,16 @@ body {
   padding: 12px;
 }
 
+/* Shown only while the settings load; out of the flow, so the panel does not jump when it goes. */
+#panel-starting {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 main {
   display: flex;
   flex-direction: column;
