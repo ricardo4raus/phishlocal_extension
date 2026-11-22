@@ -1002,3 +1002,9 @@ _To fill in near the submission._
   minute to apply. Each step was checked from the terminal first (anonymous sign-up, then the
   function, then one tiny Gemini request), so the Chrome test worked on the first try once the
   credits were in: "Deep check: Looks safe", done in 1.2 s.
+- The AI now answers in the panel's language (English) instead of Chrome's: on a German Chrome,
+  the deep check had written German reasons into the English panel. One constant
+  (`PANEL_LANGUAGE`) feeds the on-device check, the name search and the deep check, and the
+  prompt says to answer in it also when the email is in another language. The side panel monkey
+  now picks Chrome's language at random and fails if the AI is asked in any other language than
+  English; with the old code it failed at once ("AI check in de").
