@@ -1014,8 +1014,13 @@ _To fill in near the submission._
   to redraw itself. About 250 texts moved from eight files into one dictionary per language
   (`src/i18n/`); English is the master copy, TypeScript refuses a translation with a missing
   text or a function with other parameters, and a test checks that every `data-t` key in
-  `index.html` exists and that no tier-1 or tier-2 text names SPF, DKIM or DMARC in any language.
-  German was checked in headless-Chrome renders (longer words, same layout); the other four are
-  my translations, not checked by a native speaker. The monkey test first lost a coverage state:
+  `index.html` exists and that the panel's tier-1 and tier-2 groups (titles, verdict, banners,
+  red flags, deep check, Gmail and paste status lines) name no SPF, DKIM or DMARC in any language.
+  The German layout was checked in headless-Chrome renders (longer words, same layout); none of
+  the translations has been checked by a native speaker yet. The review found English engine
+  reasons ("no answer within 60 s") inside translated failure lines, and a button style that
+  compared translated text; the reasons now go through one translation step (`localDetail()`),
+  and the side panel monkey runs eight extra cases in German. A pasted raw email that cannot be
+  read now says so in the panel's words, without the parser's English reason. The monkey test first lost a coverage state:
   the language menu read Chrome's language from the fake Chrome, which drew it from the shared
   random sequence and shifted every later move.

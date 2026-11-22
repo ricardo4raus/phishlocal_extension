@@ -32,8 +32,10 @@ explain every red flag, and work offline, with a cloud only as fallback."
   `tests/i18n.test.ts` keep the others complete); `index.html` marks its text with `data-t`.
   On-device answers in it and pt are experimental (Chrome: "output quality cannot be
   guaranteed"; supported are de, en, es, fr, ja; measured 17 Nov 2026), and the panel says so.
-  Only German was checked by a native speaker; dev-only parts (developer tools, samples) and the
-  rules' own messages (prompt, tier-3 notes in English) stay English.
+  No translation has been checked by a native speaker yet. English on purpose: dev-only parts
+  (developer tools, sample labels), the rules' own messages (the prompt and the English panel
+  use them; other languages show the dictionary's sentence per rule), and an SDK's own error
+  message in tier 3 (our engine reasons go through `localDetail()`).
 - Privacy is the core selling point: never send email content anywhere without explicit user
   consent.
 - Keep it simple. No frameworks (React etc.) unless I ask. Plain TypeScript + HTML + CSS.
