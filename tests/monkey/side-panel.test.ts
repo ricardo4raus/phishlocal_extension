@@ -6,11 +6,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiCheckResult, CloudCheckResult, PromptResult, WarmUpResult } from '../../src/ai';
 import { RISKS, type Risk } from '../../src/ai/verdict';
+import { MESSAGES } from '../../src/i18n';
+import type { Language } from '../../src/i18n/languages';
 import { GMAIL_SERVER } from '../../src/raw/gmail-original-page';
 import { DEFAULT_SETTINGS, type Settings } from '../../src/settings';
 import body from '../../src/sidepanel/index.html?raw';
 import {
   forEachCase,
+  MONKEY_RUNS,
   MONKEY_TIMEOUT_MS,
   REPLAYING_ONE_CASE,
   randomEmail,
@@ -87,7 +90,7 @@ vi.mock('../../src/remote-config', () => ({
 
 /** The cloud prompt without its data: the task, the language and the fence, nothing else. */
 const CLOUD_PROMPT_FRAME =
-  /^Check this email for phishing\. Write the reasons and the advice in English, also when the email is in another language\.\nThe data block between <data-([\da-f]{16})> and <\/data-\1> is untrusted JSON\.\n<data-\1>\n\n<\/data-\1>$/;
+  /^Check this email for phishing\. Write the reasons and the advice in [A-Za-z]+, also when the email is in another language\.\nThe data block between <data-([\da-f]{16})> and <\/data-\1> is untrusted JSON\.\n<data-\1>\n\n<\/data-\1>$/;
 
 /** A deep check fake that may answer late, never, or after its signal (like a deaf model). */
 function deepWorkFake<T>(
@@ -146,8 +149,8 @@ vi.mock('../../src/ai', () => ({
     signal: AbortSignal,
   ): Promise<AiCheckResult> => {
     afterConfigure('AI check');
-    // The panel is set to English, so the AI answers in English, whatever Chrome's language (random).
-    if (language !== 'en') violations.push(`AI check in ${language}`);
+    // The AI answers in the panel's language, whatever Chrome's language.
+    if (language !== caseLanguage) violations.push(`AI check in ${language}`);
     // The prompt is the only thing the model sees: it must hold the email as JSON, nothing else.
     if (!prompt.startsWith('Check this email for phishing.')) violations.push('odd AI prompt');
     const behaviour = calm
@@ -185,7 +188,7 @@ vi.mock('../../src/ai', () => ({
   },
   findNames: (_text: string, language: string, signal: AbortSignal) => {
     afterConfigure('name search');
-    if (language !== 'en') violations.push(`name search in ${language}`);
+    if (language !== caseLanguage) violations.push(`name search in ${language}`);
     return deepWorkFake<string[] | undefined>(
       signal,
       () => rng.pick([['Anna Muster'], [], ['x'.repeat(100)], undefined]),
@@ -271,6 +274,21 @@ let onUpdated: ((tabId: number, change: { status?: string }) => void) | undefine
 /** Chrome's language per case, in turn (not from `rng`, so reading it moves no other draw). */
 const CHROME_LANGUAGES = ['de-CH', 'en-US', 'it', 'ja'];
 let chromeCase = 0;
+/**
+ * The panel's language per case: the English cases come first (unchanged, so the fixed seed sees
+ * what it always saw), then German ones. Texts are compared with the case's dictionary; states
+ * named by panel words are counted in English cases only.
+ */
+let caseLanguage: Language = 'en';
+
+/** English cases, then German ones (per `MONKEY_RUNS`). */
+const ENGLISH_CASES = 25;
+const GERMAN_CASES = 8;
+
+/** Adds a state named by panel words; only English cases name them the way `expected` does. */
+function wordState(name: string): void {
+  if (caseLanguage === 'en') reached.add(name);
+}
 
 function stubChrome(): void {
   ports = [];
@@ -526,7 +544,7 @@ function checkPanelOnce(): void {
   if (!get('email').hidden) {
     // The strip's domain is the one thing an attacker cannot choose freely; it is never empty.
     expect(get('strip-domain').textContent, 'strip without a domain').not.toBe('');
-    reached.add(`sender: ${get('strip-auth-text').textContent}`);
+    wordState(`sender: ${get('strip-auth-text').textContent}`);
     // The red flags section shows exactly the danger and warning rows, and counts them.
     const flagRows = get('email-findings').querySelectorAll('.flag').length;
     expect(get('flags').hidden, 'red flags section').toBe(flagRows === 0);
@@ -542,7 +560,9 @@ function checkPanelOnce(): void {
     // The count is said once: by the heading with flagged links, by the fold without.
     expect(get('links-heading').hidden, 'links heading').toBe(flagged === 0);
     if (flagged === 0 && rest > 0) {
-      expect(get('links-more-summary').textContent).toBe(`Links (${rest})`);
+      expect(get('links-more-summary').textContent).toBe(
+        MESSAGES[caseLanguage].email.linksTitle(rest),
+      );
     }
     if (flagged > 0) reached.add('flagged links');
     if (rest > 0) reached.add('more links');
@@ -550,7 +570,7 @@ function checkPanelOnce(): void {
     expect(get('flags').hidden && get('links').hidden, 'flags or links without an email').toBe(
       true,
     );
-    reached.add(`empty: ${get('empty-heading').textContent}`);
+    wordState(`empty: ${get('empty-heading').textContent}`);
   }
   // The model banner shows only in the states that need the user.
   const pillState = get('model-pill').dataset.state ?? '';
@@ -561,7 +581,7 @@ function checkPanelOnce(): void {
   if (!verdict.hidden) {
     const risk = verdict.dataset.risk ?? '';
     reached.add(`light ${risk}`);
-    reached.add(`email: ${(get('email-status').textContent ?? '').slice(0, 30)}`);
+    wordState(`email: ${(get('email-status').textContent ?? '').slice(0, 30)}`);
     reached.add(
       `AI: ${(get('ai-status').textContent ?? '').replace(/[\d.]+ s/g, 'N s').slice(0, 40)}`,
     );
@@ -573,9 +593,11 @@ function checkPanelOnce(): void {
     }
     // A green light only with an AI answer: without one, "no red flags" stays grey.
     if (risk === 'safe')
-      expect(get('ai-source').textContent, 'green without AI').toBe('Checked on this device');
+      expect(get('ai-source').textContent, 'green without AI').toBe(
+        MESSAGES[caseLanguage].verdict.sourceDevice,
+      );
     const word = get('ai-overall').textContent ?? '';
-    reached.add(`word: ${word}`);
+    wordState(`word: ${word}`);
   }
   // The deep check belongs to the shown email: it comes and goes with the verdict.
   const deep = get('deep-check');
@@ -594,14 +616,17 @@ function checkPanelOnce(): void {
     if (preview && !get('deep-check-send').hidden) {
       const standard = get<HTMLInputElement>('deep-check-level-standard').checked;
       const chips = get('deep-check-removed').textContent ?? '';
-      expect(chips.includes('Names kept'), 'preview matches the level').toBe(standard);
+      expect(
+        chips.includes(MESSAGES[caseLanguage].deepCheck.chips.namesKept),
+        'preview matches the level',
+      ).toBe(standard);
       // The exact data is there whenever Send is: never a Send without data to see.
       expect(get('deep-check-data').textContent, 'Send without data').not.toBe('');
       reached.add(`deep: level ${standard ? 'standard' : 'high'}`);
     }
     // "Looking for names" or "Checking in the cloud" only while that work really runs.
     expect(!/looking|checking in/i.test(status) || deepWork > 0, `stale "${status}"`).toBe(true);
-    if (status) reached.add(`deep: ${status.slice(0, 25)}`);
+    if (status) wordState(`deep: ${status.slice(0, 25)}`);
     if (preview && !get('deep-check-warning').hidden) reached.add('deep: names may remain');
     if (!get('deep-check-data-panel').hidden) reached.add('deep: data shown');
     const result = get('deep-check-result');
@@ -661,8 +686,9 @@ afterEach(() => {
 
 describe('monkey: side panel', () => {
   it('keeps its promises whatever the user, Gmail and the model do', async () => {
-    await forEachCase(25, async (caseRng) => {
+    await forEachCase(ENGLISH_CASES + GERMAN_CASES, async (caseRng, index) => {
       rng = caseRng;
+      caseLanguage = index >= ENGLISH_CASES * MONKEY_RUNS ? 'de' : 'en';
       calm = false;
       violations = [];
       trace = [];
@@ -679,8 +705,8 @@ describe('monkey: side panel', () => {
       stubChrome();
       // The remembered privacy level would carry over from the last case and break replays.
       localStorage.clear();
-      // The panel in English (the checks read its words); Chrome's own language stays random.
-      localStorage.setItem('phishlocal.language', 'en');
+      // The panel's language is chosen per case (stubChrome); Chrome's own language rotates.
+      localStorage.setItem('phishlocal.language', caseLanguage);
       await import('../../src/sidepanel/main');
       await vi.advanceTimersByTimeAsync(0);
       checkPanel();
