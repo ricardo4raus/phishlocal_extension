@@ -108,7 +108,9 @@ are its input and its lower limit.
      the answer may name exactly those addresses;
    - when the panel opens, it loads the model (measured 19 Nov 2026: 304.8 s right after a full
      Chrome exit, 3.6–3.8 s on other days; afterwards every new session starts in 0.0–0.1 s,
-     whatever its settings);
+     whatever its settings). On 21–22 Nov, loads after a Chrome restart took 125–537 s while
+     Chrome sat idle (no CPU or GPU work), and 14.1 s on the first Chrome start after a PC
+     restart; the cause is outside the extension;
    - right before each check, the panel opens a session itself: 0.0 s while the model is loaded,
      a full load when Chrome had unloaded it (once measured: 249 s minutes after a 3.6 s load).
      So a load never runs inside the check's time limit, and the status says the check waits for
@@ -147,7 +149,8 @@ are its input and its lower limit.
 
 An optional second check by a larger model in the cloud (Gemini Developer API through Firebase
 AI Logic, model `gemini-3.5-flash-lite`, the SDK's own default for the cloud side of hybrid
-inference). Nothing is sent on its own:
+inference; tested in Chrome on 22 Nov 2026 with a real Google email: correct verdict with sound
+reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
 
 1. **Request:** the user clicks "Prepare a deep check…" under the verdict. For Italian and
    Portuguese, where Gemini Nano's answers are experimental, the panel recommends it. A Gmail

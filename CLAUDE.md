@@ -51,8 +51,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
   Firebase AI Logic. App Check uses a debug token (`VITE_APPCHECK_DEBUG_TOKEN` in `.env.local`),
   read **only in dev builds** (`npm run dev`); production builds have no App Check yet, so their
   cloud requests fail. The contest rules accept debug tokens in submissions.
-- The side panel warms up the on-device model when it opens. Model load can take seconds or,
-  in a long-running Chrome session, many minutes; a full Chrome exit fixed it. Inference on a
+- The side panel warms up the on-device model when it opens. Model load can take seconds or
+  many minutes (see the measurements below). Inference on a
   loaded model takes about 1 s for short answers; one run took 39 s, cause unknown. On-device
   needs `expectedInputs` / `expectedOutputs` with languages, otherwise Chrome warns.
 - Measured 19 Nov 2026: the first model load after a full Chrome exit took 304.8 s on the dev
@@ -60,6 +60,12 @@ explain every red flag, and work offline, with a cloud only as fallback."
   unload the model while the panel is open (a later session once took 249 s). So the panel opens
   a session right before each check (`ensureModelLoaded()` in `src/ai.ts`), outside the check's
   time limit. The load time itself is Chrome's and cannot be guaranteed by the extension.
+- Measured 21–22 Nov 2026 on the dev machine: after Chrome restarts, loads took 125–537 s, and
+  Chrome sat idle the whole time (no CPU, no GPU, no RAM growth; verbose log silent between the
+  request and the ready model). Ruled out: our code, RAM, disk, CPU, crash backoff
+  (`model_crash_count` 0, performance class 6), the empty GPU cache files, and Chrome still
+  running in the background. The first Chrome start after a PC restart loaded in 14.1 s; the next
+  Chrome restart took 125 s again. Cause unknown (outside the extension).
 - `PREFER_ON_DEVICE` falls back to the cloud silently, so the hybrid test prompt is for test
   text only. Real emails go to the on-device model (`InferenceMode.ONLY_ON_DEVICE`, decided 17 Nov
   2026), and to the cloud only through the deep check (21 Nov 2026,
@@ -235,5 +241,5 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - The repo stays public with its license until the end of judging (16 Dec 2026).
 - Never show DevTools in screenshots or the demo video: in dev builds the App Check SDK prints
   the debug token in the console.
-- Before a demo: exit Chrome completely (also from the tray), then open the side panel once so
-  the model is loaded.
+- Before a demo: restart the PC, start Chrome once, then open the side panel once so the model is
+  loaded (measured 22 Nov 2026: 14.1 s after a PC restart, minutes after a Chrome restart).

@@ -115,6 +115,11 @@ _Current state, updated as features land._
   (Chrome's GPU program cache files were empty) turned out wrong: after a full Chrome exit,
   including background processes, the model loaded in 3.8 s with the cache files still empty.
   The exact cause is unknown; the long-running Chrome session was probably in a bad state.
+  On 21–22 Nov the slow loads came back after real Chrome restarts (125–537 s). A measuring
+  script showed Chrome idle during the whole wait: no CPU, no GPU work, no memory growth, and
+  Chrome's verbose log silent. RAM, disk, crash backoff, the GPU cache and a new NVIDIA driver
+  were ruled out one by one. Only a PC restart helped (14.1 s), and only for the first Chrome
+  start. The cause lies outside the extension; the demo routine is now "restart the PC first".
 - **Reading Gmail without guessing:** Gmail's class names are generated and undocumented. A
   DevTools snippet that printed only counts and class names (no email content) measured the
   real page before any code was written. Gmail's details box (with "Reply-To") closes as soon as
@@ -156,6 +161,9 @@ _Current state, updated as features land._
 
 - Gemini Nano in Chrome: the first prompt after a cold start can take minutes; warm prompts take
   about 1 s. On-device prompts need `expectedInputs` / `expectedOutputs` with languages.
+- A slow step is not always heavy work: sampling CPU, GPU and memory every 5 s showed that a
+  minutes-long model load was Chrome waiting, not loading. That ruled out every hardware theory
+  at once.
 - Vite copies every `VITE_*` variable into the built JavaScript. Anything in `.env.local` that
   the code uses is public in the extension, so secrets (e.g. an App Check debug token) must
   never ship in a release build.
@@ -770,3 +778,24 @@ _To fill in near the submission._
   only an address's domain goes through the host filter ("Dear Email User" broke "[email]"),
   and raw hosts are always normalized. The remaining edge cases (a name inside a longer
   punycode label, the Turkish dotted İ) are documented limits.
+
+### Sun 22 Nov 2026
+
+**Session with Claude Code:**
+
+- First real deep check in Chrome (dev build, App Check debug token): a Google "you shared data
+  with debattr.com" email. The preview showed both addresses as `[email]@domain` and the links as
+  hosts only; the cloud (`gemini-3.5-flash-lite`) answered in 1.9 s with "No signs of phishing"
+  and sound reasons in German. The SDK's default model stays.
+- The first try showed no button: `npm run check` had overwritten `dist` with a production build,
+  which has no App Check, so the panel correctly offered no deep check. `npm run dev` fixed it.
+- The on-device model loaded in 383–537 s. Measured instead of guessed:
+  - Chrome had not exited the first time (a process from 19 Nov was still running);
+  - after a real exit: still minutes, with Chrome idle the whole time (CPU about 0, GPU 0 %,
+    10 GB RAM free); disk reads the 4 GB weights in 0.7 s;
+  - Chrome's `Local State`: `model_crash_count` 0, performance class 6 (highest), RTX 5070 Ti;
+  - fresh GPU cache files stayed empty and did not speed up the next load;
+  - Chrome's verbose log: nothing between the request and the ready model;
+  - NVIDIA driver update plus PC restart: 14.1 s; the next Chrome restart: 125 s again.
+- Decision: stop debugging before the feature freeze. The demo routine is now "restart the PC,
+  start Chrome, open the panel once"; CLAUDE.md and `docs/ai-check.md` hold the measurements.
