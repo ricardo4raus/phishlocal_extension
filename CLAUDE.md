@@ -35,8 +35,12 @@ explain every red flag, and work offline, with a cloud only as fallback."
 
 1. **On-device by default**: Gemini Nano checks the email in Chrome. Nothing leaves the device.
 2. **Privacy filter in front of the cloud**: a cloud "deep check" happens only with explicit
-   consent. Before sending, the on-device step removes personal data (names, email addresses,
-   phone numbers, IBANs) and shows the user exactly what will be sent.
+   consent. Before sending, the on-device step removes personal data and shows the user exactly
+   what will be sent. A privacy level, chosen in the panel (decided 22 Nov 2026), sets how much:
+   "Standard" (default) removes email addresses, phone and other long numbers, IBANs and link
+   paths; "High" also removes the names of people (Gemini Nano and greetings). Standard keeps
+   names because removing them also hit brands, and the cloud can then tell a mass email from one
+   written for the recipient.
 3. **Explains every red flag** instead of only "dangerous": e.g. "link text says paypal.com but
    goes to paypa1-secure.com", "creates time pressure".
 4. **Multilingual**: en, de, fr, es on-device. Other languages (e.g. Italian) go to the cloud,
@@ -73,8 +77,9 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - `PREFER_ON_DEVICE` falls back to the cloud silently, so the hybrid test prompt is for test
   text only. Real emails go to the on-device model (`InferenceMode.ONLY_ON_DEVICE`, decided 17 Nov
   2026), and to the cloud only through the deep check (21 Nov 2026,
-  `src/sidepanel/deep-check-view.ts`): on request, Nano finds names on the device (`findNames()`),
-  `cloudData()` in `src/privacy/redact.ts` builds the cleaned data, the panel shows exactly that
+  `src/sidepanel/deep-check-view.ts`): on request (and at privacy level High only), Nano finds
+  names on the device (`findNames()`), `cloudData()` in `src/privacy/redact.ts` builds the cleaned
+  data, the panel shows exactly that
   JSON, and only "Send to the cloud" sends it (`runCloudCheck()`), once per consent. Never send
   anything else from an email to the cloud, and never raw headers. Details: `docs/ai-check.md`.
 - AI check (`src/ai/`, `runAiCheck()` in `src/ai.ts`, `src/sidepanel/ai-view.ts`): every shown

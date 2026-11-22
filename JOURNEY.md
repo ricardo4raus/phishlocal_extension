@@ -870,3 +870,13 @@ _To fill in near the submission._
   up to ten domains of their own, named like a person. Now only the visible, confirmed sender
   domain counts, with tests for a second signer named "Anna" and for "Anna" next to
   "Anna Muster".
+- Measured before changing the name search (Chrome console, four made-up texts, 20 runs per
+  variant): the current prompt listed no brand as a person and missed no one, with Chrome's
+  default sampling or greedy. A prompt with separate "people" and "organizations" lists did
+  worse (a brand as a person in 10 of 20 runs) and was dropped. The name search now uses greedy
+  sampling, so the same email gives the same list. The "32 names" in the Chrome screenshot were
+  occurrences: one wrong entry, "Google", appears about 30 times in that email.
+- Ricardo's decision: a privacy level for the deep check. "Standard" (the default) keeps names
+  and removes addresses, numbers, IBANs and link paths; "High" also removes names. Removing names
+  costs evidence (brands, and whether an email was written for the recipient or for everyone),
+  and the user now chooses. Standard needs no name search, so its preview comes at once.

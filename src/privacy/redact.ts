@@ -472,6 +472,16 @@ function replaceNames(
 }
 
 /** What the user sees and, after agreeing, sends to the cloud. */
+/**
+ * How much the deep check removes. "standard" (the default): addresses, numbers, IBANs and link
+ * paths. "high": also the names of people, found by Gemini Nano and after greetings.
+ */
+export type PrivacyLevel = 'standard' | 'high';
+
+export const PRIVACY_LEVELS: readonly PrivacyLevel[] = ['standard', 'high'];
+
+export const DEFAULT_PRIVACY_LEVEL: PrivacyLevel = 'standard';
+
 export interface CloudData {
   /** The data block, exactly as it is shown and sent. */
   json: string;
@@ -572,19 +582,27 @@ function withoutConfirmedBrand(names: readonly string[], email: Email): string[]
  * The cloud data for one email. `foundNames`: the names Gemini Nano found in
  * {@link nameSearchText}, or `undefined` if it could not look; then the sender's name is removed
  * entirely, since it may be a person's.
+ *
+ * `level`: "high" also removes names (from greetings and Nano's list); "standard" keeps every
+ * name, so the cloud sees whether the email was written for this person or for everyone ("Dear
+ * customer"). Addresses, numbers, IBANs and link paths are removed at both levels.
  */
 export function cloudData(
   email: Email,
   findings: readonly Finding[],
   foundNames: readonly string[] | undefined,
+  level: PrivacyLevel = 'high',
 ): CloudData {
   const removed = none();
   const fields = cloudFields(email);
-  const fromModel = modelNames(foundNames ?? []);
-  const names = nameVariants([
-    ...greetingNames(nameSearchText(email)),
-    ...withoutConfirmedBrand(fromModel.names, email),
-  ]);
+  const high = level === 'high';
+  const fromModel = modelNames(high ? (foundNames ?? []) : []);
+  const names = high
+    ? nameVariants([
+        ...greetingNames(nameSearchText(email)),
+        ...withoutConfirmedBrand(fromModel.names, email),
+      ])
+    : [];
   const clean = (text: string): string => redactText(text, names, removed);
   // Hosts and domains go through the name and number filter too: "secure.anna-muster.example" is
   // a host, and a name in it is still a name (found in review round 5).
@@ -597,7 +615,7 @@ export function cloudData(
   };
   const auth = email.headers?.auth;
   let senderName = clean(fields.name);
-  if (!foundNames && senderName !== '') {
+  if (high && !foundNames && senderName !== '') {
     removed.names++;
     senderName = PLACEHOLDER.name;
   }
@@ -643,6 +661,7 @@ export function cloudData(
   return {
     json: JSON.stringify(data, null, 2),
     removed,
-    namesChecked: foundNames !== undefined && !fromModel.dropped,
+    // At "standard" no name is meant to be removed, so none can remain by mistake.
+    namesChecked: !high || (foundNames !== undefined && !fromModel.dropped),
   };
 }

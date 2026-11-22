@@ -264,6 +264,18 @@ h2 {
   font-size: 14px;
 }
 
+/* The select may be wider than the panel's text: let it wrap under its label. */
+.deep-check-level {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.deep-check-level select {
+  max-width: 100%;
+}
+
 .deep-check-preview {
   display: flex;
   flex-direction: column;

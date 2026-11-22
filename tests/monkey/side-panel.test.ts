@@ -362,6 +362,13 @@ const MOVES: Record<string, () => void> = {
     trace.push(`click #${id}`);
     get(id).click();
   },
+  level: () => {
+    const select = get<HTMLSelectElement>('deep-check-level');
+    if (select.closest('[hidden]') || select.disabled) return;
+    select.value = rng.pick(['standard', 'high']);
+    trace.push(`choose privacy level ${select.value}`);
+    select.dispatchEvent(new Event('change'));
+  },
   deep: () => {
     const id = rng.pick([
       'deep-check-start',
@@ -567,6 +574,8 @@ describe('monkey: side panel', () => {
       vi.resetModules();
       loadPanel();
       stubChrome();
+      // The remembered privacy level would carry over from the last case and break replays.
+      localStorage.clear();
       await import('../../src/sidepanel/main');
       await vi.advanceTimersByTimeAsync(0);
       checkPanel();

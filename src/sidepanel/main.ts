@@ -154,6 +154,9 @@ const emailElements = {
 };
 const findingsList = byId<HTMLUListElement>('email-findings');
 
+/** Where the deep check's privacy level is remembered in this browser. */
+const PRIVACY_LEVEL_KEY = 'phishlocal.deepCheck.privacyLevel';
+
 /** The AI check's answer language; the warm-up loads the model for exactly this one. */
 const checkLanguage = answerLanguage(chrome.i18n.getUILanguage());
 
@@ -180,6 +183,7 @@ const deepCheck = createDeepCheck(
     section: byId<HTMLElement>('deep-check'),
     intro: byId<HTMLElement>('deep-check-intro'),
     start: byId<HTMLButtonElement>('deep-check-start'),
+    level: byId<HTMLSelectElement>('deep-check-level'),
     stop: byId<HTMLButtonElement>('deep-check-stop'),
     preview: byId<HTMLElement>('deep-check-preview'),
     removed: byId<HTMLElement>('deep-check-removed'),
@@ -201,6 +205,21 @@ const deepCheck = createDeepCheck(
     run: runCloudCheck,
     namesTimeoutMs: settings.namesTimeoutMs,
     cloudTimeoutMs: settings.cloudTimeoutMs,
+    // A convenience only: without storage (private window, blocked site data) the default applies.
+    savedLevel: () => {
+      try {
+        return localStorage.getItem(PRIVACY_LEVEL_KEY) ?? undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    saveLevel: (level) => {
+      try {
+        localStorage.setItem(PRIVACY_LEVEL_KEY, level);
+      } catch {
+        // Not remembered; the panel still works.
+      }
+    },
   },
 );
 
