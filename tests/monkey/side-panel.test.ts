@@ -271,6 +271,11 @@ function stubChrome(): void {
     i18n: { getUILanguage: () => rng.pick(['de-CH', 'en-US', 'it', 'ja']) },
     tabs: {
       query: async () => [{ id: 7, windowId: 1 }],
+      // "How it works" opens the README in a tab; the panel only ever opens that one URL.
+      create: async ({ url }: { url: string }) => {
+        if (!url.startsWith('https://github.com/')) violations.push(`opened tab ${url}`);
+        return { id: 8 };
+      },
       connect: () => {
         if (!calm && rng.chance(0.1)) throw new Error('Cannot access a chrome:// URL');
         let onMessage: ((message: unknown) => void) | undefined;
@@ -356,7 +361,9 @@ const MOVES: Record<string, () => void> = {
       'paste-use',
       'paste-use',
       'paste-clear',
+      'paste-open',
       'sample-load',
+      'how-it-works',
       'run',
     ]);
     trace.push(`click #${id}`);
@@ -445,7 +452,17 @@ function listedRuleRisk(): Risk {
 const STATUS_IDS = [
   'model-status',
   'model-progress',
+  'model-banner-title',
+  'model-banner-text',
+  'empty-heading',
+  'empty-text',
+  'strip-subject',
+  'strip-domain',
+  'strip-name',
+  'strip-address',
+  'strip-auth-text',
   'email-status',
+  'paste-status',
   'ai-overall',
   'ai-status',
   'ai-reasons',
@@ -472,9 +489,27 @@ function checkPanelOnce(): void {
       'img, iframe, frame, script, object, embed, link, style, a, form, svg, math, template',
     ),
   ).toHaveLength(0);
-  // The verdict and the email details come and go together.
+  // The verdict and the email details come and go together, and so do the email section and
+  // the empty state (one of the two is always on screen).
   const verdict = get('verdict');
   expect(verdict.hidden, 'verdict and details shown together').toBe(get('email-details').hidden);
+  expect(get('email').hidden, 'email section and details differ').toBe(get('email-details').hidden);
+  expect(get('empty').hidden, 'empty state and email section both shown or both hidden').toBe(
+    !get('email').hidden,
+  );
+  if (!get('email').hidden) {
+    // The strip's domain is the one thing an attacker cannot choose freely; it is never empty.
+    expect(get('strip-domain').textContent, 'strip without a domain').not.toBe('');
+    reached.add(`sender: ${get('strip-auth-text').textContent}`);
+  } else {
+    reached.add(`empty: ${get('empty-heading').textContent}`);
+  }
+  // The model banner shows only in the states that need the user.
+  const pillState = get('model-pill').dataset.state ?? '';
+  reached.add(`model: ${pillState}`);
+  expect(get('model-banner').hidden, `banner for state ${pillState}`).toBe(
+    !['not-downloaded', 'downloading', 'unavailable', 'failed'].includes(pillState),
+  );
   if (!verdict.hidden) {
     const risk = verdict.dataset.risk ?? '';
     reached.add(`light ${risk}`);
@@ -598,6 +633,23 @@ describe('monkey: side panel', () => {
       get('read-email').click();
       await vi.advanceTimersByTimeAsync(1_000_000);
       checkPanel();
+      // One Gmail email with confirmed sender checks, so that state is seen in every case and
+      // not only when the random messages happen to line up (tab switch: a fresh port).
+      onActivated?.({ tabId: 7, windowId: 1 });
+      await vi.advanceTimersByTimeAsync(0);
+      const port = ports.at(-1);
+      port?.receive({ type: 'email', key: 'msg-f:calm', email: randomEmail(rng) });
+      port?.receive({
+        type: 'original',
+        key: 'msg-f:calm',
+        html: `<pre>Authentication-Results: ${GMAIL_SERVER}; spf=pass; dkim=pass header.d=b.example; dmarc=pass
+From: a@b.example
+Subject: s
+
+x</pre>`,
+      });
+      await vi.advanceTimersByTimeAsync(1_000_000);
+      checkPanel();
       // One deep check while everything answers, so a whole run (prepare, consent, answer) is seen
       // in every case where it is offered, not only when the random clicks happen to line up.
       const start = get<HTMLButtonElement>('deep-check-start');
@@ -655,6 +707,17 @@ describe('monkey: side panel', () => {
           'deep: Sent: the data shown',
           'deep: The deep check failed',
           'deep light',
+          'sender: Sender confirmed by Gmail',
+          'sender: Sender not confirmed',
+          'sender: Checking the sender…',
+          'empty: Open an email in Gmail',
+          'empty: Open Gmail in this tab',
+          'empty: Could not read this email',
+          'model: ready',
+          'model: not-downloaded',
+          'model: unavailable',
+          'model: failed',
+          'model: downloading',
         ];
     const states = [...reached].join('\n');
     for (const state of expected) expect(states, 'state never reached').toContain(state);

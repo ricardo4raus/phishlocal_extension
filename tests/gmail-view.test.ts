@@ -36,7 +36,7 @@ beforeEach(() => {
       calls.push('show');
       shown.push({ email: shownEmail, status, note });
     },
-    hide: () => calls.push('hide'),
+    hide: (reason) => calls.push(`hide: ${reason}`),
     setStatus: (text, isError) => calls.push(`status${isError ? ' error' : ''}: ${text}`),
   });
 });
@@ -84,7 +84,7 @@ describe('Gmail view', () => {
     view.disconnected();
     expect(calls).toEqual([
       'show',
-      'hide',
+      'hide: idle',
       'status: Open an email in Gmail: while this panel is open, PhishLocal checks it automatically, on this device.',
       expect.stringMatching(/^status: Open Gmail in this tab/),
     ]);
@@ -107,7 +107,7 @@ describe('Gmail view', () => {
     view.handle({ type: 'unreadable' });
     expect(calls).toEqual([
       'show',
-      'hide',
+      'hide: unreadable',
       'status error: Could not read this email. Gmail may have changed its page.',
     ]);
   });

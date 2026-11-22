@@ -62,11 +62,13 @@ describe('showEmail', () => {
       { text: 'Help', href: 'https://www.google.com/url?q=https://evil.example/' },
       { text: '<b>x</b>', href: 'not a link' },
     ];
-    showEmail({ ...email, links }, els, undefined, [
-      { rule: 'redirect-link', severity: 'info', message: 'x', evidence: [], links: [1] },
-      { rule: 'lookalike-domain', severity: 'danger', message: 'x', evidence: [], links: [1] },
-      { rule: 'urgency', severity: 'warning', message: 'x', evidence: [] },
-    ]);
+    showEmail({ ...email, links }, els, {
+      findings: [
+        { rule: 'redirect-link', severity: 'info', message: 'x', evidence: [], links: [1] },
+        { rule: 'lookalike-domain', severity: 'danger', message: 'x', evidence: [], links: [1] },
+        { rule: 'urgency', severity: 'warning', message: 'x', evidence: [] },
+      ],
+    });
     const items = [...els.links.children] as HTMLElement[];
     expect(items.map((item) => item.className)).toEqual(['link', 'link danger', 'link']);
     expect(items[1]?.firstElementChild?.textContent).toBe(
