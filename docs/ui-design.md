@@ -145,9 +145,9 @@ without sideways scrolling.
   - **High** – "Removes:" Everything from Standard; **Names of people** (bold).
   - Default Standard, remembered in the browser. Changing the level rebuilds the data at once;
     at High that starts the name search.
-- **While preparing** (High only): one line "Looking for names on this device… 0:07", a Stop
-  button; the chips, the fold and Send are not shown. Standard needs no search: its data shows at
-  once.
+- **While preparing** (High only): the status line "Waiting for the on-device AI…" and then
+  "Looking for names on this device…", the elapsed time next to it and a Stop button; the chips,
+  the fold and Send are not shown. Standard needs no search: its data shows at once.
 - **Preview:** chips "1 name", "2 email addresses", "1 number", "1 link path" (or "No personal
   data found"), the line "Never sent: your address, the raw headers, server IP addresses.", when
   names could not be checked the warning "Some names may still be in the text: read it before
@@ -156,10 +156,15 @@ without sideways scrolling.
   highlighting (a highlight built from the text could mark an attacker's own "[name]" as removed).
 - Buttons: **"Send to the cloud"** (filled, cloud icon), **"Cancel"** (outlined), full width.
   Below: "Sent once, for this check only, to Gemini through Firebase AI Logic."
-- **Sending:** "Checking in the cloud… 0:03" and Stop; Send and Cancel are gone; the data stays.
-- **Result:** a second band "Deep check: …" with the cloud's reasons and advice, the footer
-  "Checked in the cloud · Done in 1.9 s", and the status "Sent once: the data above." The data
-  fold stays as the record. The button "Deep check in the cloud…" is available again.
+- **Sending:** "Checking in the cloud…" with the elapsed time and Stop; Send and Cancel are
+  gone; the data stays.
+- **Result:** a second band under the card, "Deep check: …" with the cloud's reasons and advice,
+  the footer "Checked in the cloud · Done in 1.9 s", and the status "Sent once, for this check
+  only." How the cloud and the basic checks were combined goes to a "Deep check" row in Email
+  details. The card stays open with the data as the record; "Back to the result" closes it and
+  keeps the result, and the button "Deep check in the cloud…" is available again.
+- **Failure:** "The deep check did not work (short reason). The result above still applies." The
+  card stays open with the data, so the same consent can be sent again.
 
 ## Wording
 
@@ -184,7 +189,7 @@ Tier-1 texts. The same thing has the same name everywhere.
 | Privacy levels              | Standard / High; "Names of people"                                                                                 |
 | Data fold                   | Show what will be sent                                                                                             |
 | Cloud send                  | Send to the cloud / Cancel / Stop                                                                                  |
-| After sending               | Sent once: the data above.                                                                                         |
+| After sending               | Sent once, for this check only.                                                                                    |
 | Paste                       | Paste an email (empty card), Check another email (fold), Use pasted email, Clear                                   |
 | Refresh                     | Check the open email again                                                                                         |
 | Privacy points (empty card) | Checked on this device / No email is saved / Cloud only if you ask                                                 |
