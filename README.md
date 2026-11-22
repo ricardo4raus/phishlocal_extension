@@ -46,6 +46,10 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   `InferenceMode.PREFER_ON_DEVICE`. Gemini Nano answers on the device; the cloud (Gemini
   Developer API) is the fallback. The panel loads the on-device model when it opens and shows
   where each prompt ran.
+- **Settings without a new release:** Firebase Remote Config sets the cloud model (from an
+  allow-list), the time limits and extra guidance for the AI, all checked on arrival and with
+  defaults in the code. The prompt's security rules stay in the code. Details:
+  [`docs/ai-check.md`](docs/ai-check.md#settings-from-remote-config).
 
 ## Privacy
 
@@ -59,7 +63,17 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   tracking pixels or run scripts.
 - The cloud deep check runs only when you ask for it and agree to the data shown: personal data
   is removed on the device first, raw headers are never sent, and you see exactly the email data
-  that goes (besides PhishLocal's fixed instructions). Each email needs its own consent.
+  that goes (besides PhishLocal's own instructions, which hold no personal data). Each email
+  needs its own consent.
+- Besides loading "Show original" from Gmail, the only request PhishLocal makes on its own: when
+  the side panel opens, it asks Firebase Remote Config (Google) for its settings, at most every
+  12 h after a successful answer (a failed one is tried again at the next opening).
+  It holds a Firebase installation ID that stays the same for this browser profile, an
+  installation token, the app ID, the SDK version, API key and project ID, and the browser
+  language; when the
+  installation is created or its token renewed (about weekly), also the SDK versions and the days
+  the extension was used (Firebase's heartbeat header). Google also sees your IP address. Never
+  email content.
 - Permissions: the side panel, and Gmail only (`https://mail.google.com/*`). The `scripting`
   permission is used once after an install or update, to start PhishLocal's Gmail script in
   Gmail tabs that were already open, so you don't have to reload Gmail.
@@ -84,6 +98,16 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
    (App Check > Apps > Manage debug tokens) and set `VITE_APPCHECK_DEBUG_TOKEN`. It is a secret.
    Only development builds (`npm run dev`) use it; release builds leave it out, so their cloud
    requests fail until App Check is set up for them.
+
+   **Judges build:** `npm run build:judges` writes a release build to `dist-judges/` with a
+   second, separate debug token (`VITE_APPCHECK_JUDGES_TOKEN` in `.env.judges.local`), so judges
+   can use the deep check without any setup. That token is revoked after judging. A browser
+   extension has no real App Check attestation (reCAPTCHA would load remote scripts), so a
+   public release would need a small token server; until then, the normal build has no cloud.
+   The token passes App Check for the whole Firebase project, so share the judges build only
+   privately (Devpost links and uploaded files are public) and cap the Gemini API quota while
+   judging runs.
+
 4. **Enable Gemini Nano:** open `chrome://flags/#prompt-api-for-gemini-nano`, set it to "Enabled
    Multilingual", and restart Chrome. If the model is not on the device yet, the side panel shows
    "Download the on-device model" (about 4 GB, once).
@@ -92,8 +116,9 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 6. **Load the extension:** open `chrome://extensions`, turn on developer mode, click "Load
    unpacked" and choose `dist/`.
 
-**Model load is slow?** If the model takes minutes to load, exit Chrome completely (also from the
-system tray) and start it again.
+**Model load is slow?** On the dev machine, loads after a Chrome restart sometimes took minutes
+while Chrome sat idle; a PC restart helped. See
+[`docs/model-load-debugging.md`](docs/model-load-debugging.md).
 
 ## Development
 

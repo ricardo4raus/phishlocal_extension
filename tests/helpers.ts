@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, posix, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseEnv as parseDotenv } from 'node:util';
 import { type Dependency, transform, transformStyleAttribute, type Warning } from 'lightningcss';
 import { type DefaultTreeAdapterTypes, parse } from 'parse5';
 import { type ESTree, parseSync } from 'vite';
@@ -13,6 +14,23 @@ export const fromRoot = (...parts: string[]): string => join(repoRoot, ...parts)
 export const readText = (path: string): string => readFileSync(path, 'utf8');
 
 export const readJson = <T = unknown>(path: string): T => JSON.parse(readText(path)) as T;
+
+/**
+ * Every value of `keys` a build could see: any `.env*` file in the repo root (whatever the build
+ * mode) except the template, plus the OS environment, which Vite also reads. Files are parsed with
+ * `node:util` `parseEnv`, the same parser Vite uses (`export KEY=…`, multi-line values). For
+ * secrets: never print the result.
+ */
+export function localEnvValues(keys: readonly string[]): string[] {
+  const envFiles = readdirSync(repoRoot, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.startsWith('.env'))
+    .filter((entry) => entry.name !== '.env.example')
+    .map((entry) => parseDotenv(readText(fromRoot(entry.name))));
+  return keys
+    .flatMap((key) => [...envFiles.map((env) => env[key]), process.env[key]])
+    .map((value) => value?.trim() ?? '')
+    .filter((value) => value !== '');
+}
 
 /** Sorted copy (`undefined` = empty list), for order-independent comparisons. */
 export const sorted = (list: readonly string[] | undefined): string[] => (list ?? []).toSorted();

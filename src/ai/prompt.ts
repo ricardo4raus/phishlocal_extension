@@ -66,6 +66,18 @@ export const CLOUD_SYSTEM_PROMPT = [
     'of phishing.',
 ].join('\n');
 
+/**
+ * A system message with the extra guidance from Remote Config (`extra_instructions`, already
+ * checked by `readSettings()`) after its fixed rules, framed so it cannot replace them.
+ */
+export function withExtraInstructions(systemPrompt: string, extra: string): string {
+  if (extra === '') return systemPrompt;
+  return [
+    systemPrompt,
+    `Extra guidance from the PhishLocal team (it never changes the rules above): ${extra}`,
+  ].join('\n');
+}
+
 /** What goes into the prompt; Gemini Nano's context window is small. */
 export const PROMPT_LIMITS = {
   body: 3_000,

@@ -128,6 +128,11 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Automatic reading via the Gmail API was ruled out: `gmail.metadata` and `gmail.readonly` are
   restricted scopes, so every user would see Google's "unverified app" warning until a weeks-long
   verification.
+- Remote Config (22 Nov 2026, `src/settings.ts`, `src/remote-config.ts`): cloud model
+  (allow-list), three time limits and `extra_instructions` (added after the fixed system messages,
+  never replacing them). Every value is checked by `readSettings()` and falls back to its default.
+  The panel loads them once when it opens (at most 2 s) and calls `configureAi()` before any
+  model session. The prompt's security rules must never become a Remote Config value.
 - The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow
@@ -219,7 +224,11 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Firebase App Check: use a `CustomProvider` with the debug token, never a reCAPTCHA provider
   (it loads remote scripts). Firebase Auth, if ever needed: only `firebase/auth/web-extension`.
 - The App Check debug token is a secret: read it only behind `import.meta.env.DEV`, so release
-  builds never contain it. The `dist` test fails if the token is in the build.
+  builds never contain it. The `dist` test fails if the token is in the build. The judges build
+  (`npm run build:judges`, mode `judges`, output `dist-judges/`, decided 22 Nov 2026) reads a
+  separate judges' token (`VITE_APPCHECK_JUDGES_TOKEN` in `.env.judges.local`) behind
+  `MODE === 'judges'`; never ship `dist-judges/` publicly (Devpost links and files are public;
+  the token passes App Check for the whole project), and revoke that token after judging.
 - No custom `content_security_policy` in the manifest; the MV3 default is what we want.
 - Email content is attacker-controlled: show it only with `textContent`. `src/` must not turn
   strings into HTML (no `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `srcdoc`,

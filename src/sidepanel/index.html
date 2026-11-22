@@ -7,7 +7,10 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <main id="app">
+    <!-- Until the settings are loaded, the panel is inert: no click or paste goes to a part that
+         is not set up yet. This line, outside it, tells screen readers why. -->
+    <p id="panel-starting" role="status">Starting…</p>
+    <main id="app" inert>
       <h1>PhishLocal</h1>
       <!-- Only state changes are announced; the counters next to them are not live regions. -->
       <p class="model-status">

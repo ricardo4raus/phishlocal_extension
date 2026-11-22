@@ -22,16 +22,10 @@ import type { Finding } from '../rules';
 import { HEADERS_WAIT_MS, judge, STOP_GRACE_MS } from './ai-view';
 
 /**
- * How long Gemini Nano may look for names before the data is built without its list. It starts
- * after the model is loaded: a load can take minutes and is not the search's fault.
+ * How much longer than the cloud request's own limit the panel waits for it: the request's limit
+ * fires first, and this one also bounds a request that does not keep it.
  */
-export const NAMES_TIMEOUT_MS = 20_000;
-
-/**
- * How long the panel waits for the cloud. The request has its own limit of 30 s
- * (`CLOUD_TIMEOUT_MS`); this one also bounds a request that does not keep it.
- */
-export const CLOUD_LIMIT_MS = 40_000;
+export const CLOUD_LIMIT_EXTRA_MS = 10_000;
 
 /** The reason a run is stopped when it reaches its time limit. */
 const TIME_LIMIT = 'time limit';
@@ -66,7 +60,13 @@ export interface DeepCheckDeps {
   findNames: (text: string, language: string, signal: AbortSignal) => Promise<string[] | undefined>;
   /** Sends one prompt to the cloud. Called only after the user agreed to the data in it. */
   run: (prompt: string, signal: AbortSignal) => Promise<AiCheckResult>;
-  namesTimeoutMs?: number;
+  /**
+   * How long Gemini Nano may look for names before the data is built without its list (settings'
+   * `namesTimeoutMs`). It starts after the model is loaded: a load is not the search's fault.
+   */
+  namesTimeoutMs: number;
+  /** The cloud request's own time limit (settings' `cloudTimeoutMs`). */
+  cloudTimeoutMs: number;
   headersWaitMs?: number;
 }
 
@@ -172,7 +172,8 @@ const CHANGED: Record<Phase, string> = {
 };
 
 export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps): DeepCheck {
-  const namesTimeoutMs = deps.namesTimeoutMs ?? NAMES_TIMEOUT_MS;
+  const { namesTimeoutMs } = deps;
+  const cloudLimitMs = deps.cloudTimeoutMs + CLOUD_LIMIT_EXTRA_MS;
   let shown: Shown | undefined;
   let phase: Phase = 'idle';
   /** The data shown for consent; only this is ever sent. */
@@ -188,7 +189,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
 
   function intro(): string {
     if (!deps.available) {
-      return 'Not available in this build: the cloud needs App Check, which only the development build has for now.';
+      return 'Not available in this build: the cloud needs App Check, which only the development build and the judges build have.';
     }
     if (shown && !shown.final) return 'Waiting for the sender checks of this email…';
     const lead = EXPERIMENTAL_LANGUAGES.has(language())
@@ -332,7 +333,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     const answer = await bounded(
       () => deps.run(buildCloudPrompt(data.json, answerIn), controller.signal),
       controller,
-      CLOUD_LIMIT_MS,
+      cloudLimitMs,
       (error): AiCheckResult =>
         controller.signal.aborted
           ? { ok: false, reason: 'stopped' }
@@ -346,7 +347,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     stop = undefined;
     const result: AiCheckResult =
       controller.signal.reason === TIME_LIMIT && !answer.ok
-        ? { ok: false, reason: 'failed', detail: `no answer within ${CLOUD_LIMIT_MS / 1000} s` }
+        ? { ok: false, reason: 'failed', detail: `no answer within ${cloudLimitMs / 1000} s` }
         : answer;
     showResult(result, findings, email);
   }

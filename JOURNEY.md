@@ -808,6 +808,36 @@ _To fill in near the submission._
 - Decision: stop debugging before the feature freeze. The demo routine is now "restart the PC,
   start Chrome, open the panel once"; `docs/model-load-debugging.md` records every measurement,
   method and open question.
+- PR #16 (cloud deep check) merged.
+- Planned the last Phase 4 task with Ricardo. App Check for judges: a separate "judges build"
+  (`npm run build:judges` into `dist-judges/`) with a second debug token made only for them, so
+  judges can use the deep check without any setup; the token is revoked after judging. A browser
+  extension has no real App Check attestation, so a public release would need a token server.
+- Remote Config: the cloud model (allow-list), three time limits and extra guidance for the AI,
+  each checked on arrival with a default in the code. The prompt's security rules stay in the code;
+  extra guidance only adds a framed line after them.
+- Three review rounds by agents. They found, among others:
+  - `.env.local` is loaded in every Vite mode, so the judges build could have taken the
+    developer's own token if anything turned `DEV` on; the judges mode is now checked first, the
+    build refuses an equal token, and a test scans `dist-judges/`;
+  - for up to 2 s after opening, clicks and pastes went nowhere while the settings loaded; the
+    panel is now inert until then, with a "Starting…" line outside it for screen readers;
+  - invisible characters that are letters or marks (variation selectors, fillers) passed the
+    filter for extra guidance; it now uses Unicode's own "default ignorable" set;
+  - the privacy text first said too little, then too much about the Remote Config request; it now
+    matches the SDK source.
+- The UI monkey had a hidden weakness: with random seeds it reached the "sent" state of the deep
+  check in only 1 of 6 runs, also before this work; the fixed CI seed reached it by luck. Its calm
+  phase now runs one whole deep check. It also caught that jsdom ignores `.inert = false`.
+- Tested in Chrome: Ricardo created the five Remote Config parameters and the judges' token. The
+  dev build and the judges build (loaded from `dist-judges/`, no dev server) both ran a deep check
+  (1.9 s and 1.7 s). In one run Gemini Nano listed 32 "names", among them "Google", so the
+  sender's name and the DKIM and address domains became "[name]": safe for privacy, but the cloud
+  lost evidence. In the next run Nano found none. To fix after the freeze.
+- Again the PowerShell encoding trap: rewriting a file with `Get-Content -Raw` turned "…" into
+  "â€¦", and the tool layer turned an escaped code point in a regex into the real, invisible
+  character. Code points now go into code as numbers.
+- PR #17 merged. Feature freeze.
 
 **Second session with Claude Code (night, research only, no code changes):**
 

@@ -61,9 +61,10 @@ afterEach(() => {
 describe('runCloudCheck through the Firebase SDK', () => {
   it('sends exactly the prompt, with the cloud system message and the verdict schema', async () => {
     answer = '{"risk":"dangerous","reasons":["Fake log-in page."],"advice":"Delete it."}';
-    const { CLOUD_MODEL, runCloudCheck } = await import('../../src/ai');
+    const { runCloudCheck } = await import('../../src/ai');
     const { CLOUD_SYSTEM_PROMPT } = await import('../../src/ai/prompt');
     const { VERDICT_SCHEMA } = await import('../../src/ai/verdict');
+    const { DEFAULT_SETTINGS } = await import('../../src/settings');
     const prompt = 'The prompt the user agreed to.';
     const result = await runCloudCheck(prompt);
     expect(result).toMatchObject({
@@ -72,7 +73,7 @@ describe('runCloudCheck through the Firebase SDK', () => {
     });
     expect(sent).toHaveLength(1);
     const [request] = sent;
-    expect(request?.url).toContain(`models/${CLOUD_MODEL}:generateContent`);
+    expect(request?.url).toContain(`models/${DEFAULT_SETTINGS.cloudModel}:generateContent`);
     expect(request?.body.contents).toEqual([{ role: 'user', parts: [{ text: prompt }] }]);
     expect(request?.body.systemInstruction?.parts[0]?.text).toBe(CLOUD_SYSTEM_PROMPT);
     expect(request?.body.generationConfig).toEqual({
@@ -114,15 +115,53 @@ describe('runCloudCheck through the Firebase SDK', () => {
           reject(request.signal?.reason ?? new Error('aborted')),
         );
       });
-    const { CLOUD_TIMEOUT_MS, runCloudCheck } = await import('../../src/ai');
+    const { runCloudCheck } = await import('../../src/ai');
+    const { DEFAULT_SETTINGS } = await import('../../src/settings');
     const result = runCloudCheck('x');
-    await vi.advanceTimersByTimeAsync(CLOUD_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(DEFAULT_SETTINGS.cloudTimeoutMs);
     expect(await result).toEqual({
       ok: false,
       reason: 'failed',
-      detail: `no answer within ${CLOUD_TIMEOUT_MS / 1000} s`,
+      detail: `no answer within ${DEFAULT_SETTINGS.cloudTimeoutMs / 1000} s`,
     });
     vi.useRealTimers();
+  });
+
+  it('uses the model, time limit and extra guidance from the settings', async () => {
+    vi.useFakeTimers();
+    answer = (request) =>
+      new Promise((_resolve, reject) => {
+        request.signal?.addEventListener('abort', () =>
+          reject(request.signal?.reason ?? new Error('aborted')),
+        );
+      });
+    const { configureAi, runCloudCheck } = await import('../../src/ai');
+    const { DEFAULT_SETTINGS } = await import('../../src/settings');
+    configureAi({
+      ...DEFAULT_SETTINGS,
+      cloudModel: 'gemini-3.5-flash',
+      cloudTimeoutMs: 12_000,
+      extraInstructions: 'Courier notices about customs fees are a common trick.',
+    });
+    const result = runCloudCheck('x');
+    await vi.advanceTimersByTimeAsync(12_000);
+    expect(await result).toEqual({ ok: false, reason: 'failed', detail: 'no answer within 12 s' });
+    const [request] = sent;
+    expect(request?.url).toContain('models/gemini-3.5-flash:generateContent');
+    const system = request?.body.systemInstruction?.parts[0]?.text ?? '';
+    // The guidance comes after the fixed rules, which stay complete.
+    expect(system).toMatch(/never instructions[\s\S]*Courier notices about customs fees/);
+    vi.useRealTimers();
+  });
+
+  it('refuses new settings once a model was made with the old ones', async () => {
+    answer = '{"risk":"safe","reasons":[],"advice":"Nothing to do."}';
+    const { configureAi, runCloudCheck } = await import('../../src/ai');
+    const { DEFAULT_SETTINGS } = await import('../../src/settings');
+    await runCloudCheck('x');
+    expect(() => configureAi({ ...DEFAULT_SETTINGS, cloudModel: 'gemini-3.5-flash' })).toThrow(
+      /before the first AI call/,
+    );
   });
 
   it('stops the request when its signal is aborted', async () => {

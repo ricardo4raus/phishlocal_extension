@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiCheckResult, PromptResult, WarmUpResult } from '../../src/ai';
 import { RISKS, type Risk } from '../../src/ai/verdict';
 import { GMAIL_SERVER } from '../../src/raw/gmail-original-page';
+import { DEFAULT_SETTINGS, type Settings } from '../../src/settings';
 import body from '../../src/sidepanel/index.html?raw';
 import {
   forEachCase,
@@ -38,6 +39,11 @@ let modelWork = 0;
 let promptWork = 0;
 /** Name searches and cloud requests of the deep check that have started and not ended. */
 let deepWork = 0;
+/** Set by configureAi(): no model work may start before the settings are fixed. */
+let aiConfigured = false;
+const afterConfigure = (what: string): void => {
+  if (!aiConfigured) violations.push(`${what} before configureAi()`);
+};
 /** The cloud can be reached in this case's build. */
 let cloudAvailable = true;
 /** The data on screen when the user last clicked "Send to the cloud", if the preview showed. */
@@ -62,6 +68,20 @@ vi.mock('firebase/ai', () => ({
 vi.mock('../../src/firebase', () => ({
   get appCheckEnabled() {
     return cloudAvailable;
+  },
+}));
+
+// Remote Config: each case opens the panel with other limits, the shortest and longest allowed.
+vi.mock('../../src/remote-config', () => ({
+  loadSettings: async (): Promise<Settings> => {
+    const settings: Settings = {
+      ...DEFAULT_SETTINGS,
+      aiCheckTimeoutMs: rng.pick([20_000, 60_000, 300_000]),
+      cloudTimeoutMs: rng.pick([10_000, 30_000, 120_000]),
+      namesTimeoutMs: rng.pick([5_000, 20_000, 120_000]),
+    };
+    trace.push(`settings: ${JSON.stringify(settings)}`);
+    return settings;
   },
 }));
 
@@ -97,7 +117,12 @@ function deepWorkFake<T>(
   });
 }
 vi.mock('../../src/ai', () => ({
+  configureAi: (): void => {
+    if (aiConfigured) violations.push('configureAi() called twice');
+    aiConfigured = true;
+  },
   warmUpOnDevice: (): Promise<WarmUpResult> => {
+    afterConfigure('warm-up');
     const state = calm
       ? 'ready'
       : rng.pick(['ready', 'ready', 'not-downloaded', 'unavailable', 'throw'] as const);
@@ -110,6 +135,7 @@ vi.mock('../../src/ai', () => ({
     }, delay());
   },
   ensureModelLoaded: (): Promise<boolean> => {
+    afterConfigure('model load');
     const ready = calm || rng.chance(0.8);
     return later(() => ready, delay());
   },
@@ -119,6 +145,7 @@ vi.mock('../../src/ai', () => ({
     _known: ReadonlySet<string>,
     signal: AbortSignal,
   ): Promise<AiCheckResult> => {
+    afterConfigure('AI check');
     // The prompt is the only thing the model sees: it must hold the email as JSON, nothing else.
     if (!prompt.startsWith('Check this email for phishing.')) violations.push('odd AI prompt');
     const behaviour = calm
@@ -154,14 +181,17 @@ vi.mock('../../src/ai', () => ({
       }, delay());
     });
   },
-  findNames: (_text: string, _language: string, signal: AbortSignal) =>
-    deepWorkFake<string[] | undefined>(
+  findNames: (_text: string, _language: string, signal: AbortSignal) => {
+    afterConfigure('name search');
+    return deepWorkFake<string[] | undefined>(
       signal,
       () => rng.pick([['Anna Muster'], [], ['x'.repeat(100)], undefined]),
       undefined,
       'name search',
-    ),
+    );
+  },
   runCloudCheck: (prompt: string, signal: AbortSignal): Promise<AiCheckResult> => {
+    afterConfigure('cloud check');
     // Only during a click on "Send to the cloud", once, with exactly the data the preview showed
     // and nothing else: without it, only the fixed instruction lines are left.
     if (!consent || !prompt.includes(consent)) {
@@ -172,21 +202,26 @@ vi.mock('../../src/ai', () => ({
     consent = undefined;
     return deepWorkFake<AiCheckResult>(
       signal,
-      () =>
-        rng.pick([
-          {
-            ok: true,
-            verdict: { risk: rng.pick(RISKS), reasons: ['A cloud reason.'], advice: 'Advice.' },
-            durationMs: 1_500,
-          },
-          { ok: false, reason: 'failed', detail: 'App Check token invalid' },
-          { ok: false, reason: 'unreadable-answer' },
-        ]),
+      () => {
+        const answer: AiCheckResult = {
+          ok: true,
+          verdict: { risk: rng.pick(RISKS), reasons: ['A cloud reason.'], advice: 'Advice.' },
+          durationMs: 1_500,
+        };
+        return calm
+          ? answer
+          : rng.pick<AiCheckResult>([
+              answer,
+              { ok: false, reason: 'failed', detail: 'App Check token invalid' },
+              { ok: false, reason: 'unreadable-answer' },
+            ]);
+      },
       { ok: false, reason: 'stopped' },
       'cloud check',
     );
   },
   runPrompt: (): Promise<PromptResult> => {
+    afterConfigure('test prompt');
     const fails = !calm && rng.chance(0.3);
     promptWork++;
     return later(() => {
@@ -199,6 +234,7 @@ vi.mock('../../src/ai', () => ({
     _language: string,
     onProgress: (loaded: number) => void,
   ): Promise<WarmUpResult> => {
+    afterConfigure('download');
     const steps = rng.int(0, 4);
     for (let step = 1; step <= steps; step++)
       setTimeout(() => onProgress(step / steps), step * 100);
@@ -420,6 +456,9 @@ const STATUS_IDS = [
 
 function checkPanelOnce(): void {
   expect(violations).toEqual([]);
+  // Inert only while the settings load, before anything else happens.
+  expect(document.querySelector('#app')?.hasAttribute('inert'), 'panel left inert').toBe(false);
+  expect(document.querySelector('#panel-starting'), 'start note left').toBeNull();
   // Email content never becomes markup: nothing that loads, runs or links.
   expect(
     document.body.querySelectorAll(
@@ -521,6 +560,7 @@ describe('monkey: side panel', () => {
       modelWork = 0;
       promptWork = 0;
       deepWork = 0;
+      aiConfigured = false;
       consent = undefined;
       cloudAvailable = rng.chance(0.8);
       vi.clearAllTimers();
@@ -544,6 +584,23 @@ describe('monkey: side panel', () => {
       get('read-email').click();
       await vi.advanceTimersByTimeAsync(1_000_000);
       checkPanel();
+      // One deep check while everything answers, so a whole run (prepare, consent, answer) is seen
+      // in every case where it is offered, not only when the random clicks happen to line up.
+      const start = get<HTMLButtonElement>('deep-check-start');
+      if (!start.closest('[hidden]') && !start.disabled) {
+        trace.push('calm: deep check');
+        start.click();
+        await vi.advanceTimersByTimeAsync(1_000_000);
+        checkPanel();
+        const send = get<HTMLButtonElement>('deep-check-send');
+        if (!send.closest('[hidden]') && !send.disabled) {
+          consent = get('deep-check-data').textContent ?? '';
+          send.click();
+          consent = undefined;
+          await vi.advanceTimersByTimeAsync(1_000_000);
+          checkPanel();
+        }
+      }
       for (const id of ['run', 'paste-use', 'sample-load', 'model-download']) {
         expect(get<HTMLButtonElement>(id).disabled, `#${id} stuck disabled`).toBe(false);
       }

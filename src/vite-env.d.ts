@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID: string;
   /** Development only. A secret: used in dev builds, never in `npm run build`. */
   readonly VITE_APPCHECK_DEBUG_TOKEN?: string;
+  /** Judges build only (`npm run build:judges`). A secret: never in `npm run build`. */
+  readonly VITE_APPCHECK_JUDGES_TOKEN?: string;
 }
 
 interface ImportMeta {

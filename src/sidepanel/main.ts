@@ -1,5 +1,6 @@
 import { InferenceSource } from 'firebase/ai';
 import {
+  configureAi,
   downloadOnDeviceModel,
   ensureModelLoaded,
   findNames,
@@ -12,6 +13,7 @@ import {
 import { answerLanguage } from '../ai/prompt';
 import { appCheckEnabled } from '../firebase';
 import type { Email } from '../email';
+import { loadSettings } from '../remote-config';
 import { checkEmail } from '../rules';
 import { createAiCheck } from './ai-view';
 import { createDeepCheck } from './deep-check-view';
@@ -28,6 +30,16 @@ function byId<T extends HTMLElement>(id: string): T {
 }
 
 const modelStatus = byId<HTMLElement>('model-status');
+
+// The settings from Remote Config (at most 2 s; otherwise the stored or default values), fixed
+// for this panel before the first model session is made and before any button works. Until then
+// the panel is inert (set in index.html), so no click or paste is lost to a listener that is not
+// there yet; a status line outside it says "Starting…".
+const settings = await loadSettings();
+configureAi(settings);
+byId<HTMLElement>('app').removeAttribute('inert');
+byId<HTMLElement>('panel-starting').remove();
+
 const modelProgress = byId<HTMLElement>('model-progress');
 const modelDownload = byId<HTMLButtonElement>('model-download');
 const promptInput = byId<HTMLTextAreaElement>('prompt');
@@ -158,6 +170,7 @@ const aiCheck = createAiCheck(
     run: runAiCheck,
     uiLanguage: () => chrome.i18n.getUILanguage(),
     modelReady: ensureModelLoaded,
+    runTimeoutMs: settings.aiCheckTimeoutMs,
   },
 );
 
@@ -186,6 +199,8 @@ const deepCheck = createDeepCheck(
     modelReady: ensureModelLoaded,
     findNames,
     run: runCloudCheck,
+    namesTimeoutMs: settings.namesTimeoutMs,
+    cloudTimeoutMs: settings.cloudTimeoutMs,
   },
 );
 

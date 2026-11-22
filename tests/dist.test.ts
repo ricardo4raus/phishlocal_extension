@@ -6,9 +6,8 @@
  * shipped extension. `npm run check` and CI run build before test, so dist is fresh there.
  * To run only the fast source tests locally: `npx vitest run tests/manifest.test.ts tests/source-structure.test.ts`.
  */
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { basename, extname, join, posix } from 'node:path';
-import { parseEnv as parseDotenv } from 'node:util';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   type Manifest,
@@ -18,6 +17,7 @@ import {
   fromRoot,
   htmlResources,
   isNonLocalUrl,
+  localEnvValues,
   normalizeInside,
   readJson,
   readText,
@@ -36,25 +36,9 @@ const distManifestPath = join(distDir, 'manifest.json');
  */
 const BUILD_INPUTS = ['manifest.json', 'vite.config.ts', 'tsconfig.json', 'package-lock.json'];
 
-const DEBUG_TOKEN_KEY = 'VITE_APPCHECK_DEBUG_TOKEN';
-
-/**
- * Every debug token value a build could see: any `.env*` file in the repo root (whatever the
- * build mode) except the template, plus the OS environment, which Vite also reads. Files are
- * parsed with `node:util` `parseEnv`, the same parser Vite uses (`export KEY=…`, multi-line values).
- */
-function localDebugTokens(): string[] {
-  const envFiles = readdirSync(fromRoot(), { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.startsWith('.env'))
-    .filter((entry) => entry.name !== '.env.example')
-    .map((entry) => fromRoot(entry.name));
-  return [
-    ...envFiles.map((file) => parseDotenv(readText(file))[DEBUG_TOKEN_KEY]),
-    process.env[DEBUG_TOKEN_KEY],
-  ]
-    .map((value) => value?.trim() ?? '')
-    .filter((value) => value !== '');
-}
+/** Every debug token a build could see: the developer's (dev builds) and the judges' (judges build). */
+const localDebugTokens = (): string[] =>
+  localEnvValues(['VITE_APPCHECK_DEBUG_TOKEN', 'VITE_APPCHECK_JUDGES_TOKEN']);
 
 let manifest: Manifest;
 let sourceManifest: Manifest;
@@ -226,9 +210,10 @@ describe('dist/ build output', () => {
     expect(problems).toEqual([]);
   });
 
-  it('does not contain the App Check debug token', () => {
-    // Vite copies every VITE_* value the code reads into the bundle. The debug token is a secret,
-    // so the source reads it only in dev builds. This checks a production build really drops it.
+  it('does not contain an App Check debug token', () => {
+    // Vite copies every VITE_* value the code reads into the bundle. The debug tokens are
+    // secrets, so the source reads them only in dev builds and in the judges build (which goes to
+    // dist-judges/). This checks a normal production build really drops both.
     // Without a local token (e.g. in CI) there is nothing to look for.
     const tokens = localDebugTokens();
 
@@ -239,7 +224,7 @@ describe('dist/ build output', () => {
         return tokens.some((token) => text.includes(token));
       })
       .map((file) => toPosixRelative(distDir, file));
-    expect(leaks, 'read the token only behind `import.meta.env.DEV`').toEqual([]);
+    expect(leaks, 'read the tokens only behind `DEV` / `MODE === "judges"`').toEqual([]);
   });
 
   it('contains no .env files', () => {

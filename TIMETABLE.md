@@ -55,7 +55,10 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
       (names, emails, phone numbers, IBANs) removed ON-DEVICE first; user sees what is sent;
       unsupported on-device languages (e.g. Italian) go to the cloud the same way. Never send raw
       headers (they hold the user's address and server IP addresses), only the rule findings
-- [ ] Sun 22.11. – Remote Config for prompt & thresholds; App Check working → FEATURE FREEZE
+- [x] Sun 22.11. – Remote Config for prompt & thresholds; App Check working → FEATURE FREEZE
+      (App Check for judges: a separate judges build with its own debug token; a public release
+      would need a token server. Remote Config: cloud model, time limits, extra guidance; the
+      prompt's security rules stay in the code. Both tested in Chrome on 22.11.)
 
 ## Phase 5 · Polish & test
 

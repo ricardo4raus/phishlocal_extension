@@ -6,9 +6,28 @@ import {
   type LanguageModelExpected,
   type LanguageModelPromptOptions,
 } from 'firebase/ai';
-import { CLOUD_SYSTEM_PROMPT, SYSTEM_PROMPT } from './ai/prompt';
+import { CLOUD_SYSTEM_PROMPT, SYSTEM_PROMPT, withExtraInstructions } from './ai/prompt';
 import { type AiVerdict, parseVerdict, VERDICT_SCHEMA } from './ai/verdict';
 import { ai } from './firebase';
+import { DEFAULT_SETTINGS, type Settings } from './settings';
+
+let settings: Readonly<Settings> = DEFAULT_SETTINGS;
+let settingsUsed = false;
+
+/**
+ * Sets the settings from Remote Config. Only before the first AI call: sessions and models keep
+ * the settings they were made with, and all of them must match.
+ */
+export function configureAi(next: Readonly<Settings>): void {
+  if (settingsUsed) throw new Error('configureAi() must run before the first AI call.');
+  settings = { ...next };
+}
+
+/** The settings, fixed from now on. */
+function currentSettings(): Readonly<Settings> {
+  settingsUsed = true;
+  return settings;
+}
 
 /** Languages Gemini Nano handles on-device. Chrome warns if a session is created without them. */
 const ON_DEVICE_LANGUAGES = ['en', 'de', 'fr', 'es'];
@@ -47,7 +66,17 @@ function checkSessionOptions(language: string): LanguageModelCreateOptions {
   return {
     expectedInputs: [{ type: 'text', languages: inputs }],
     expectedOutputs: [{ type: 'text', languages: [language] }],
-    initialPrompts: [{ role: 'system', content: [{ type: 'text', value: SYSTEM_PROMPT }] }],
+    initialPrompts: [
+      {
+        role: 'system',
+        content: [
+          {
+            type: 'text',
+            value: withExtraInstructions(SYSTEM_PROMPT, currentSettings().extraInstructions),
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -267,20 +296,24 @@ export async function findNames(
   }
 }
 
+let cloudCheckModel: ReturnType<typeof getGenerativeModel> | undefined;
+
 /**
- * The cloud model of the deep check (Gemini Developer API through Firebase AI Logic). Flash-Lite
- * is the SDK's own default for the cloud side of hybrid inference.
+ * The cloud model of the deep check (Gemini Developer API through Firebase AI Logic), made on
+ * first use with the settings' model (default Flash-Lite, the SDK's own default for the cloud
+ * side of hybrid inference).
  */
-export const CLOUD_MODEL = 'gemini-3.5-flash-lite';
-
-/** A cloud check that has not answered after this long is stopped. */
-export const CLOUD_TIMEOUT_MS = 30_000;
-
-const cloudCheckModel = getGenerativeModel(ai, {
-  model: CLOUD_MODEL,
-  systemInstruction: CLOUD_SYSTEM_PROMPT,
-  generationConfig: { responseMimeType: 'application/json', responseJsonSchema: VERDICT_SCHEMA },
-});
+function deepCheckModel(): ReturnType<typeof getGenerativeModel> {
+  cloudCheckModel ??= getGenerativeModel(ai, {
+    model: currentSettings().cloudModel,
+    systemInstruction: withExtraInstructions(
+      CLOUD_SYSTEM_PROMPT,
+      currentSettings().extraInstructions,
+    ),
+    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: VERDICT_SCHEMA },
+  });
+  return cloudCheckModel;
+}
 
 /**
  * The cloud deep check: sends `prompt` (built from the data the user saw and agreed to) to the
@@ -290,8 +323,8 @@ const cloudCheckModel = getGenerativeModel(ai, {
 export async function runCloudCheck(prompt: string, signal?: AbortSignal): Promise<AiCheckResult> {
   const start = performance.now();
   try {
-    const { response } = await cloudCheckModel.generateContent(prompt, {
-      timeout: CLOUD_TIMEOUT_MS,
+    const { response } = await deepCheckModel().generateContent(prompt, {
+      timeout: currentSettings().cloudTimeoutMs,
       ...(signal ? { signal } : {}),
     });
     if (signal?.aborted) return { ok: false, reason: 'stopped' };
@@ -307,11 +340,13 @@ export async function runCloudCheck(prompt: string, signal?: AbortSignal): Promi
 
 /**
  * A short reason for a failed cloud request. The SDK's messages are long and name the request URL
- * with the project ID ("Error fetching from https://…: [403 ] …").
+ * with the project ID ("Error fetching from https://...: [403 ] ...").
  */
 export function cloudError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  if (/timeout|timed out/i.test(message)) return `no answer within ${CLOUD_TIMEOUT_MS / 1000} s`;
+  if (/timeout|timed out/i.test(message)) {
+    return `no answer within ${currentSettings().cloudTimeoutMs / 1000} s`;
+  }
   const status = /\[(\d{3})\b/.exec(message)?.[1];
   if (status) return `the cloud refused the request (HTTP ${status})`;
   return navigator.onLine ? 'the cloud request failed' : 'no connection to the cloud';
