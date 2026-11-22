@@ -168,6 +168,11 @@ _Current state, updated as features land._
   and its monkey still found two leaks at 100 times the cases. Both came from text that had been
   cut before the filter saw it: an address cut to "anna@private." no longer looked like an
   address, and a subject cut at its limit ended in half an IBAN that no pattern recognizes.
+- **A public build with a cloud:** App Check protects the Gemini quota, but its attestation
+  providers are for websites (reCAPTCHA, which loads remote scripts) and mobile apps, so a
+  browser extension cannot prove it is the real one. Debug tokens worked for development and
+  judging but cannot ship. The answer is a small token server: it cannot verify the extension
+  either, so it limits instead (anonymous sign-in, tokens per user and day, a cap for everyone).
 
 ## What we learned
 
@@ -322,6 +327,9 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
 - A progress bar needs a source: a percentage the code cannot measure would stop at 90 % for
   minutes and cost the trust a privacy tool lives on. Elapsed time is honest when the end is
   unknown.
+- Firebase SDKs call each other: Auth asks App Check for a token on every request, so an App
+  Check provider that needs an Auth sign-in loops on the same Firebase app. A second app for the
+  sign-in, without App Check, breaks the loop.
 
 ## Accomplishments we're proud of
 
@@ -970,3 +978,11 @@ _To fill in near the submission._
   colour), the loading spinner is grey, the advice bulb is gold and glows the same way, and
   without flagged links the fold itself is titled "Links (3)". A glow on a masked icon needs a
   wrapper: the mask cuts the icon's own shadow.
+- Decided to ship a fully working public build after all: the deep check now gets its App Check
+  token from a token server (`functions/`, a callable Cloud Function in Zurich) instead of a
+  debug token. The extension signs in anonymously only after the click on Send, on a second
+  Firebase app (Auth on the main app would ask App Check, which would ask the server: a loop),
+  and gets a token for 30 minutes. The function counts tokens in Firestore, 10 per user and 500
+  for everyone per day; at the limit the panel says so and sends nothing. The email never passes
+  through the server. Deploy with one command (`npm run deploy:functions`); the Firebase console
+  steps (Blaze plan, anonymous sign-in, Firestore, a signing role) are in the README.

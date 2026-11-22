@@ -69,6 +69,11 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   also names), raw headers are never sent, and you see what was removed and, under "Show what
   will be sent", exactly the email data that goes (besides PhishLocal's own instructions, which
   hold no personal data). Each email needs its own consent.
+- To reach the cloud, the deep check needs an access token. After your click on "Send to the
+  cloud", PhishLocal signs in anonymously with Firebase Authentication (an ID without name or
+  email, kept in this browser profile) and asks PhishLocal's token server for a token that lasts
+  30 minutes. That request carries the anonymous ID, never email content. The server counts the
+  tokens per ID and per day (10) and for all users together (500), so nobody can run up costs.
 - Besides loading "Show original" from Gmail, the only request PhishLocal makes on its own: when
   the side panel opens, it asks Firebase Remote Config (Google) for its settings, at most every
   12 h after a successful answer (a failed one is tried again at the next opening).
@@ -94,23 +99,32 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 
    ```sh
    npm ci
+   npm ci --prefix functions
    ```
 
 2. **Configure Firebase:** copy [`.env.example`](.env.example) to `.env.local` and fill in the
    `VITE_FIREBASE_*` values of your Firebase web app. `.env.local` is git-ignored.
-3. **Optional, for the cloud path (deep check, test prompt):** create an App Check debug token in the Firebase console
-   (App Check > Apps > Manage debug tokens) and set `VITE_APPCHECK_DEBUG_TOKEN`. It is a secret.
-   Only development builds (`npm run dev`) use it; release builds leave it out, so their cloud
-   requests fail until App Check is set up for them.
+3. **For the cloud path (deep check), once per Firebase project:** set up the token server
+   ([`functions/`](functions/)). A browser extension has no App Check attestation of its own
+   (reCAPTCHA would load remote scripts), so a small Cloud Function signs the App Check tokens.
+   1. Firebase console: switch the project to the **Blaze** plan (Cloud Functions need it) and set
+      a budget alert (e.g. 5 €).
+   2. **Authentication** > Get started > Sign-in method: enable **Anonymous**.
+   3. **Firestore Database** > Create database: production mode, location `europe-west6`
+      (Zurich). It holds only the daily counters.
+   4. Google Cloud console > IAM: give the **Default compute service account**
+      (`<project number>-compute@developer.gserviceaccount.com`) the role **Service Account Token
+      Creator**, and enable the **IAM Service Account Credentials API**. The function signs the
+      tokens with this account.
+   5. Run `npm run firebase:login` once, then `npm run deploy:functions`. The script reads the
+      project and app ID from `.env.local` and deploys the function and the Firestore rules.
 
-   **Judges build:** `npm run build:judges` writes a release build to `dist-judges/` with a
-   second, separate debug token (`VITE_APPCHECK_JUDGES_TOKEN` in `.env.judges.local`), so judges
-   can use the deep check without any setup. That token is revoked after judging. A browser
-   extension has no real App Check attestation (reCAPTCHA would load remote scripts), so a
-   public release would need a small token server; until then, the normal build has no cloud.
-   The token passes App Check for the whole Firebase project, so share the judges build only
-   privately (Devpost links and uploaded files are public) and cap the Gemini API quota while
-   judging runs.
+   **Debug tokens (development and judging):** with `VITE_APPCHECK_DEBUG_TOKEN` (from App Check >
+   Apps > Manage debug tokens) in `.env.local`, `npm run dev` skips the token server. It is a
+   secret; release builds leave it out. `npm run build:judges` writes a build to `dist-judges/`
+   with a second, separate debug token (`VITE_APPCHECK_JUDGES_TOKEN` in `.env.judges.local`),
+   revoked after judging. That token passes App Check for the whole Firebase project, so share
+   the judges build only privately (Devpost links and uploaded files are public).
 
 4. **Enable Gemini Nano:** open `chrome://flags/#prompt-api-for-gemini-nano`, set it to "Enabled
    Multilingual", and restart Chrome. If the model is not on the device yet, the side panel shows
@@ -169,6 +183,8 @@ A failure names its seed and case; set `MONKEY_SEED` and `MONKEY_CASE` to replay
 | `src/raw/`             | Raw email and header parsing      |
 | `src/rules/`           | Rule checks                       |
 | `src/firebase.ts`      | Firebase and App Check            |
+| `src/token-server.ts`  | Token server client               |
+| `functions/`           | Token server (Cloud Function)     |
 | `tests/`               | Vitest tests                      |
 | `docs/`                | Documentation                     |
 

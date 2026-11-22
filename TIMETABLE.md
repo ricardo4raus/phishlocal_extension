@@ -67,6 +67,10 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
       (done Sun 22.11., PRs #22 to #27: spec, shell, verdict band, red flags and links, deep
       check consent card, wrap-up; each reviewed by an agent and checked with headless-Chrome
       screenshots and the monkeys at 100× cases)
+- [ ] Mon 23.11. – Token server for a public build with the deep check (decided 22.11., after
+      the feature freeze): Cloud Function that signs App Check tokens for anonymous Firebase Auth
+      users, daily limits in Firestore. Code in PR; open: Firebase console setup, deploy, test in
+      Chrome. Fallback if not stable by Fri 27.11.: the judges build.
 - [ ] Tue 24.11. – Collect test emails (phishing samples + normal emails; private only, no company data)
 - [ ] Wed 25.11. – Test and tune prompt/thresholds; note results
 - [ ] Thu 26.11. – Fix bugs; test in a fresh Chrome profile and the cloud-only path
