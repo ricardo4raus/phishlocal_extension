@@ -12,13 +12,13 @@ export const de: Messages = {
     downloadNow: 'Jetzt herunterladen',
     emptyHeading: 'Öffne eine E-Mail in Gmail',
     emptyText:
-      'PhishLocal prüft sie hier, automatisch, solange dieses Fenster offen ist. Die E-Mail verlässt deinen Browser nie.',
+      'PhishLocal prüft sie hier, automatisch, solange diese Seitenleiste offen ist. Die E-Mail verlässt deinen Browser nie.',
     pasteOpen: 'E-Mail einfügen',
     privacyTitle: 'So bleiben deine Daten privat',
     pointDeviceLead: 'Auf diesem Gerät geprüft',
     pointDeviceText: 'Grundprüfungen plus Gemini Nano, die KI in Chrome. Funktioniert offline.',
     pointSavedLead: 'Keine E-Mail wird gespeichert',
-    pointSavedText: 'Schließe das Fenster, und alles Lesen hört auf.',
+    pointSavedText: 'Schließe die Seitenleiste, und alles Lesen hört auf.',
     pointCloudLead: 'Cloud nur, wenn du es willst',
     pointCloudText: 'Persönliche Daten werden zuerst entfernt, und du siehst, was gesendet wird.',
     languages: 'Sprachen: en · de · fr · es · it · pt',
@@ -82,7 +82,7 @@ export const de: Messages = {
     settings: 'Einstellungen',
     language: 'Sprache',
     languageHint:
-      'Legt die Sprache des Fensters und der Antworten der KI fest. Das Fenster startet neu, um zu wechseln.',
+      'Legt die Sprache der Seitenleiste und der Antworten der KI fest. Die Seitenleiste startet neu, um zu wechseln.',
   },
 
   automatic: (name) => `Automatisch (${name})`,
@@ -127,11 +127,11 @@ export const de: Messages = {
   empty: {
     idle: {
       heading: 'Öffne eine E-Mail in Gmail',
-      text: 'PhishLocal prüft sie hier, automatisch, solange dieses Fenster offen ist. Die E-Mail verlässt deinen Browser nie.',
+      text: 'PhishLocal prüft sie hier, automatisch, solange diese Seitenleiste offen ist. Die E-Mail verlässt deinen Browser nie.',
     },
     'not-gmail': {
       heading: 'Öffne Gmail in diesem Tab',
-      text: 'PhishLocal prüft die E-Mails, die du in Gmail öffnest, automatisch, solange dieses Fenster offen ist. War Gmail schon offen, bevor PhishLocal installiert oder aktualisiert wurde, lade den Gmail-Tab neu. Du kannst auch eine E-Mail aus einem beliebigen Mailprogramm einfügen.',
+      text: 'PhishLocal prüft die E-Mails, die du in Gmail öffnest, automatisch, solange diese Seitenleiste offen ist. War Gmail schon offen, bevor PhishLocal installiert oder aktualisiert wurde, lade den Gmail-Tab neu. Du kannst auch eine E-Mail aus einem beliebigen Mailprogramm einfügen.',
     },
     unreadable: {
       heading: 'Diese E-Mail konnte nicht gelesen werden',
@@ -152,7 +152,7 @@ export const de: Messages = {
       timeout: 'Gmail hat nicht rechtzeitig geantwortet',
       unreadable: 'Gmails Seite konnte nicht gelesen werden',
     },
-    idle: 'Öffne eine E-Mail in Gmail: Solange dieses Fenster offen ist, prüft PhishLocal sie automatisch, auf diesem Gerät.',
+    idle: 'Öffne eine E-Mail in Gmail: Solange diese Seitenleiste offen ist, prüft PhishLocal sie automatisch, auf diesem Gerät.',
     notGmail:
       'Öffne Gmail in diesem Tab, um E-Mails automatisch zu prüfen. War Gmail schon offen, bevor PhishLocal installiert oder aktualisiert wurde, lade den Gmail-Tab neu.',
     unreadable:
