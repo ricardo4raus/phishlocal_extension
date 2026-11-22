@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// Firestore holds only the token server's daily counters (functions/src/index.ts), written by the
+// server through the Admin SDK, which these rules do not restrict. Clients get no access at all.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
