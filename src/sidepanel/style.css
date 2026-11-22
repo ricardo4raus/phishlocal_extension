@@ -48,6 +48,8 @@
     --color-safe-tint: #eaf6ee;
     --color-safe-border: #bfe3cb;
     --color-on-safe: #ffffff;
+    /* The advice bulb: a symbol, 4.4:1 on surface-2. */
+    --color-tip: #a16207;
     /* Pending (grey): white on fill 4.8, fill on surface 4.8. */
     --color-pending: #6b737d;
     --color-pending-text: #4a525c;
@@ -120,6 +122,8 @@
       --color-safe-tint: #17321f;
       --color-safe-border: #2a5236;
       --color-on-safe: #111418;
+      /* The advice bulb: 9.1:1 on surface-2. */
+      --color-tip: #f5c542;
       --color-pending: #8a939d;
       --color-pending-text: #b0b8c1;
       --color-pending-tint: #232930;
@@ -343,6 +347,17 @@
   @keyframes spin {
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  @keyframes bulb-glow {
+    0%,
+    100% {
+      filter: drop-shadow(0 0 0 color-mix(in srgb, var(--color-tip) 0%, transparent));
+    }
+
+    50% {
+      filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-tip) 80%, transparent));
     }
   }
 
@@ -922,6 +937,15 @@
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-box);
     background: var(--color-surface-2);
+  }
+
+  /* The bulb glows like the ready dot: a warm halo swells and fades, the bulb keeps its colour.
+     The halo sits on a wrapper because a mask would cut a shadow on the icon itself. */
+  .band__bulb {
+    display: flex;
+    flex: none;
+    color: var(--color-tip);
+    animation: bulb-glow 2.4s ease-in-out infinite;
   }
 
   .band__advice:has(> p:empty) {

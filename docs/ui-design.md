@@ -103,7 +103,8 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    Under the strip one muted line for the source status ("Checked automatically", "Pasted
    email", "Sample loaded: …") and errors.
 5. **Verdict band:** a tinted head with a round symbol, the verdict word and one status line;
-   then the reasons (up to five, as the AI gives them), the "What to do" box, and the footer
+   then the reasons (up to five, as the AI gives them), the "What to do" box (a gold bulb that
+   glows like the ready dot), and the footer
    "Checked on this device · Done in 1.4 s". While the AI check runs, the footer shows the
    elapsed time and the Stop button instead.
 6. **Red flags** (heading "Red flags (3)", the count as text): one list in one card, one row per
@@ -269,12 +270,13 @@ one.
 | warning-text   | `#7A4A00` | `#FFD58A` | badge text                            |
 | warning-tint   | `#FFF4DE` | `#3A2E14` | badge                                 |
 | warning-border | `#EBCB8B` | `#5A4720` | cards                                 |
-| safe           | `#1E7A3C` | `#4CC27A` | symbols                               |
+| safe           | `#1E7A3C` | `#4CC27A` | symbols, ready dot                    |
 | safe-text      | `#155C2C` | `#8FD6A5` | verdict word                          |
 | safe-tint      | `#EAF6EE` | `#17321F` | verdict band                          |
 | safe-border    | `#BFE3CB` | `#2A5236` | verdict card                          |
 | pending        | `#6B737D` | `#8A939D` | "Checking…" and "unchecked" symbol    |
 | pending-tint   | `#F0F2F5` | `#232930` | "Checking…" band, loading pill, chips |
+| tip            | `#A16207` | `#F5C542` | advice bulb                           |
 
 Every pair is measured before use (text 4.5:1, symbols and meaningful borders 3:1); the
 measurements live as comments in `style.css`.
