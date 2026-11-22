@@ -51,7 +51,7 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 
 ## Phase 4 · Hybrid & Firebase (main selling point)
 
-- [ ] Sat 21.11. – Cloud "deep check": only with explicit user consent; personal data
+- [x] Sat 21.11. – Cloud "deep check": only with explicit user consent; personal data
       (names, emails, phone numbers, IBANs) removed ON-DEVICE first; user sees what is sent;
       unsupported on-device languages (e.g. Italian) go to the cloud the same way. Never send raw
       headers (they hold the user's address and server IP addresses), only the rule findings

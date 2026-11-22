@@ -51,8 +51,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
   Firebase AI Logic. App Check uses a debug token (`VITE_APPCHECK_DEBUG_TOKEN` in `.env.local`),
   read **only in dev builds** (`npm run dev`); production builds have no App Check yet, so their
   cloud requests fail. The contest rules accept debug tokens in submissions.
-- The side panel warms up the on-device model when it opens. Model load can take seconds or,
-  in a long-running Chrome session, many minutes; a full Chrome exit fixed it. Inference on a
+- The side panel warms up the on-device model when it opens. Model load can take seconds or
+  many minutes (see the measurements below). Inference on a
   loaded model takes about 1 s for short answers; one run took 39 s, cause unknown. On-device
   needs `expectedInputs` / `expectedOutputs` with languages, otherwise Chrome warns.
 - Measured 19 Nov 2026: the first model load after a full Chrome exit took 304.8 s on the dev
@@ -60,10 +60,20 @@ explain every red flag, and work offline, with a cloud only as fallback."
   unload the model while the panel is open (a later session once took 249 s). So the panel opens
   a session right before each check (`ensureModelLoaded()` in `src/ai.ts`), outside the check's
   time limit. The load time itself is Chrome's and cannot be guaranteed by the extension.
-- `PREFER_ON_DEVICE` falls back to the cloud silently; consent before cloud is the 21 Nov task.
-  Real emails go only to the on-device model (`InferenceMode.ONLY_ON_DEVICE`, decided 17 Nov
-  2026); never to the cloud until the consent step exists. The hybrid test prompt is for test
-  text only.
+- Measured 21–22 Nov 2026 on the dev machine: after Chrome restarts, loads took 125–537 s, and
+  Chrome sat idle the whole time (no CPU, no GPU, no RAM growth; verbose log silent between the
+  request and the ready model). Ruled out: our code, RAM, disk, CPU, crash backoff
+  (`model_crash_count` 0, performance class 6), the empty GPU cache files, and Chrome still
+  running in the background. The first Chrome start after a PC restart loaded in 14.1 s; the next
+  Chrome restart took 125 s again. Cause unknown (outside the extension). Full record, with the
+  measuring methods: `docs/model-load-debugging.md`.
+- `PREFER_ON_DEVICE` falls back to the cloud silently, so the hybrid test prompt is for test
+  text only. Real emails go to the on-device model (`InferenceMode.ONLY_ON_DEVICE`, decided 17 Nov
+  2026), and to the cloud only through the deep check (21 Nov 2026,
+  `src/sidepanel/deep-check-view.ts`): on request, Nano finds names on the device (`findNames()`),
+  `cloudData()` in `src/privacy/redact.ts` builds the cleaned data, the panel shows exactly that
+  JSON, and only "Send to the cloud" sends it (`runCloudCheck()`), once per consent. Never send
+  anything else from an email to the cloud, and never raw headers. Details: `docs/ai-check.md`.
 - AI check (`src/ai/`, `runAiCheck()` in `src/ai.ts`, `src/sidepanel/ai-view.ts`): every shown
   email goes on-device to Gemini Nano with a fixed system message (as `initialPrompts`, because
   the SDK does not pass `systemInstruction` on-device) and a JSON data block between random
@@ -177,8 +187,9 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - `tests/` holds structure tests for the source, the manifest and the `dist` build output
   (e.g. no remote code). When adding a manifest permission, host permission or content-script
   match, update the allow-list in `tests/manifest.test.ts` on purpose.
-- Monkey tests (`tests/monkey/`, added 19 Nov 2026): random hostile input for the parsers, rules
-  and AI answer reader, and random event orders for the AI check and the whole side panel
+- Monkey tests (`tests/monkey/`, added 19 Nov 2026): random hostile input for the parsers, rules,
+  AI answer reader and the privacy filter (planted personal data must not reach the cloud data),
+  and random event orders for the AI check and the whole side panel
   (`main.ts` with fake Chrome and model). CI runs a fixed seed. Before a PR that touches parsing,
   the AI check or the panel, also run them with a random seed and 100 times the cases
   (`MONKEY_SEED=random`, `MONKEY_RUNS=100`; command in the README). A failure names
@@ -231,5 +242,5 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - The repo stays public with its license until the end of judging (16 Dec 2026).
 - Never show DevTools in screenshots or the demo video: in dev builds the App Check SDK prints
   the debug token in the console.
-- Before a demo: exit Chrome completely (also from the tray), then open the side panel once so
-  the model is loaded.
+- Before a demo: restart the PC, start Chrome once, then open the side panel once so the model is
+  loaded (measured 22 Nov 2026: 14.1 s after a PC restart, minutes after a Chrome restart).

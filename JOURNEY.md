@@ -63,6 +63,9 @@ _Current state, updated as features land._
 - The verdict is a traffic light at the top (green, yellow, red, each with a symbol and a word);
   it stays grey until the AI has answered, unless the rules already found a warning. Each link
   shows its real domain in bold and a shortened URL, and links behind a red flag are marked.
+- On request, a deep check in the cloud (Gemini through Firebase AI Logic): Gemini Nano finds
+  names on the device, a privacy filter replaces names, addresses, numbers, IBANs and full links,
+  and the panel shows exactly the data that will be sent. Only "Send to the cloud" sends it.
 
 ## How we built it
 
@@ -112,6 +115,11 @@ _Current state, updated as features land._
   (Chrome's GPU program cache files were empty) turned out wrong: after a full Chrome exit,
   including background processes, the model loaded in 3.8 s with the cache files still empty.
   The exact cause is unknown; the long-running Chrome session was probably in a bad state.
+  On 21–22 Nov the slow loads came back after real Chrome restarts (125–537 s). A measuring
+  script showed Chrome idle during the whole wait: no CPU, no GPU work, no memory growth, and
+  Chrome's verbose log silent. RAM, disk, crash backoff, the GPU cache and a new NVIDIA driver
+  were ruled out one by one. Only a PC restart helped (14.1 s), and only for the first Chrome
+  start. The cause lies outside the extension; the demo routine is now "restart the PC first".
 - **Reading Gmail without guessing:** Gmail's class names are generated and undocumented. A
   DevTools snippet that printed only counts and class names (no email content) measured the
   real page before any code was written. Gmail's details box (with "Reply-To") closes as soon as
@@ -144,11 +152,18 @@ _Current state, updated as features land._
   several times. All four came from combinations nobody writes by hand: a phone number split by a
   tab, a link glued to a digit, two low surrogates in a row, rules failing on the second showing
   of the same email.
+- **Cleaning data that is already cut:** the privacy filter worked on every hand-written case,
+  and its monkey still found two leaks at 100 times the cases. Both came from text that had been
+  cut before the filter saw it: an address cut to "anna@private." no longer looked like an
+  address, and a subject cut at its limit ended in half an IBAN that no pattern recognizes.
 
 ## What we learned
 
 - Gemini Nano in Chrome: the first prompt after a cold start can take minutes; warm prompts take
   about 1 s. On-device prompts need `expectedInputs` / `expectedOutputs` with languages.
+- A slow step is not always heavy work: sampling CPU, GPU and memory every 5 s showed that a
+  minutes-long model load was Chrome waiting, not loading. That ruled out every hardware theory
+  at once.
 - Vite copies every `VITE_*` variable into the built JavaScript. Anything in `.env.local` that
   the code uses is public in the extension, so secrets (e.g. an App Check debug token) must
   never ship in a release build.
@@ -271,6 +286,12 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   seed in the failure message replays them.
 - Run a filter on the text as the user will see it: cleaning that joins whitespace after the
   filter has run can rebuild what the filter removed.
+- Let a small model point, not write: Gemini Nano only lists the names it sees, and our code
+  removes only strings that are really in the text. A prompt injection can then make it miss a
+  name, but never add anything to what leaves the device. Showing the exact data before sending
+  covers the miss.
+- A filter in front of the network should assume its input was already cut somewhere: patterns
+  that need a whole address or IBAN miss the half that a field limit leaves behind.
 
 ## Accomplishments we're proud of
 
@@ -650,3 +671,132 @@ _To fill in near the submission._
   followed by a space-grouped amount ("bis 19.11.2026 4 500 000.00 CHF"); keeping it would
   reopen the leak, so it is a documented limit. The monkey's own phone check got a test of its
   own, after the review showed it also hid one planted number.
+
+### Fri 20 Nov 2026
+
+- PR #14 (result UI) and PR #15 (monkey tests) merged after a last check on `main` (853 tests).
+
+### Sat 21 Nov 2026
+
+**Session with Claude Code:**
+
+- Planned the cloud deep check, and Ricardo approved the plan:
+  - consent every time;
+  - names found by Gemini Nano plus greetings;
+  - sender check results sent, raw headers never;
+  - the SDK's default cloud model.
+- The privacy filter (`src/privacy/redact.ts`) runs on the device:
+  - links become their host;
+  - addresses keep only their domain;
+  - IBANs and long numbers become placeholders, dates stay;
+  - names become "[name]".
+    The answer reader's link, address and phone patterns moved to a shared module for it.
+- Gemini Nano finds the names (`findNames()`, `ONLY_ON_DEVICE` with the guard against the SDK's
+  silent cloud call). It only points; the code removes only strings that are in the text.
+- The cloud call (`runCloudCheck()`) has:
+  - its own system message;
+  - the verdict schema as `responseJsonSchema`;
+  - a time limit and a stop signal.
+    Tests run it through the SDK's browser build with `fetch` faked, and check that the request
+    holds exactly the prompt.
+- Side panel:
+  - "Prepare a deep check…" shows the exact JSON and what was removed;
+  - only "Send to the cloud" sends it, once;
+  - another email stops it, and late answers are dropped;
+  - work that ignores its stop signal is given up after 2 s.
+    A mutation test (the panel sending by itself) failed both the view tests and the UI monkey,
+    which now checks that no cloud request goes without a click on Send with the data on screen.
+- A privacy monkey plants a name, an address, a phone number, an IBAN, a user-ID link and hostile
+  headers in random emails. At 100 times the cases it found two leaks, both fixed with
+  regression tests:
+  - an address cut short at the end of a field;
+  - half an IBAN at the end of a subject that was already cut where the email was read.
+- Random 100× runs of all monkeys found three older gaps in the AI answer reader (already on
+  `main`), all fixed with regression tests:
+  - an accent behind an invisible mark did not join its letter, so the sender's address passed
+    and then showed as "examplé";
+  - the cut at 300 characters turned the end of a long word into a valid-looking domain;
+  - "https://" before a space became "https://…" after the cut.
+- Two review agents checked the branch (privacy and security; logic and UI). No way to send
+  without consent, but real gaps, all fixed with tests:
+  - the invisible-character rule's message quoted the email's words, so a name split by a
+    zero-width space went to the cloud; such messages now go as a fixed text;
+  - names were matched case-sensitively ("ANNA MUSTER" stayed);
+  - a flood or a list from Nano dropped names silently; lists are split, and the preview warns;
+  - links without a scheme kept their path ("login.example/verify?uid=…");
+  - Gmail showing the email again (with its headers) wiped a running request's record without a
+    word; the deep check now waits for the headers, and the panel says what happened;
+  - a model load of minutes ran inside the name search's 20 s limit; the panel now waits for the
+    model first;
+  - the name search and the request could not be stopped; a Stop button, focus handling, the
+    warning in the live status, and short cloud errors without the request URL.
+- Review round 2 checked those fixes and found that some of them had opened new gaps:
+  - splitting Nano's list on "e" and "y" used `\b`, which knows only ASCII letters, so "Renée"
+    split into "René" and the first name leaked;
+  - the 3-letter minimum for name parts let 2-letter surnames (Li, Ng) through, and matching
+    parts in any case removed ordinary words ("will", "bank") and even changed placeholders;
+    now a full name matches in any case, a single word only as written or in capitals;
+  - links without a scheme with a port, a punycode ending, an IP address or a user name in
+    front kept their path;
+  - Gmail shows an email again in two steps, and the second step wiped the round-1 note;
+  - a long reason without spaces (Japanese) became just "…".
+- All round-2 findings were fixed with tests. The lesson of the answer reader's filter repeated
+  itself: each fix for one gap needs its own review.
+- Review round 3 found that shielding the placeholders from the name step was itself a gap: a
+  literal "[link: " in an email shielded every name up to the next bracket, and names inside
+  hosts were lower-cased and kept. Instead of patching the shield, the order changed: names are
+  now replaced first, before any placeholder exists. Single words match in any case, except that
+  a lower-case word counts only inside a host or address, which also fixed "Anna" after "ANNA"
+  and the German capital ẞ. Also fixed: a "?" in a link's password, IPv6 links, Japanese reasons
+  cut to their first sentence, greeting words that are surnames ("Dear Mr Gentile"), and focus on
+  a disabled button.
+- Review round 4 found that names-first opened two leaks: a "[name]" in the middle of an address
+  or a host broke those patterns, so "hans.[name]@private.example" sent the first name and a
+  link whose host held a name kept its path and user ID. The fix keeps the order but lets each
+  name stand as one letter that normalized text cannot hold (a mathematical bold "N", which NFKC
+  folds away) until the end, so the address and link patterns still see whole words. A
+  mutation check (writing "[name]" at once again) fails the new test. The random monkeys found
+  one more: a body cut at its limit by a source that did not mark it as cut ended in half an
+  IBAN; a body at its limit now always counts as cut.
+- Random runs also found an older gap in the AI answer reader: "+49 30/12/34 56789" holds a
+  date-shaped group, and the rest alone is too short to look like a phone number. A "+" never
+  starts a date, so such a match is now removed.
+- PR #16 opened. Review round 5 found one more leak: link targets, address domains and DKIM
+  domains skipped the name filter ("secure.anna-muster.example" went out as is). They now go
+  through it, as written instead of punycode. It also found that the "+" rule removed deadlines
+  after a time zone ("UTC+1 19.11.2026"), and that hosts read from the text kept percent-encoded
+  paths or punctuation. All fixed with tests.
+- Review round 6 found that running hosts through the whole filter turned "www.bank.example" into
+  a link placeholder, that a host read only as written could show a false target
+  ("lumorabank.example%2Eevil.example"), and that the time-zone exception let "GMT+49 30/12/34
+  56789" through. Hosts now get their own filter (names and numbers only), a host is taken as
+  written only when a browser reads the same host, and after a time zone only a time may stand
+  next to the date.
+- Review round 7 found that a trailing dot ("müller.example.") made the browser's host differ,
+  so its punycode went out unfiltered; hosts now compare without it, names are also matched as
+  punycode labels, digits next to a name in a host no longer hide it ("anna1985.example"),
+  only an address's domain goes through the host filter ("Dear Email User" broke "[email]"),
+  and raw hosts are always normalized. The remaining edge cases (a name inside a longer
+  punycode label, the Turkish dotted İ) are documented limits.
+
+### Sun 22 Nov 2026
+
+**Session with Claude Code:**
+
+- First real deep check in Chrome (dev build, App Check debug token): a Google "you shared data
+  with debattr.com" email. The preview showed both addresses as `[email]@domain` and the links as
+  hosts only; the cloud (`gemini-3.5-flash-lite`) answered in 1.9 s with "No signs of phishing"
+  and sound reasons in German. The SDK's default model stays.
+- The first try showed no button: `npm run check` had overwritten `dist` with a production build,
+  which has no App Check, so the panel correctly offered no deep check. `npm run dev` fixed it.
+- The on-device model loaded in 383–537 s. Measured instead of guessed:
+  - Chrome had not exited the first time (a process from 19 Nov was still running);
+  - after a real exit: still minutes, with Chrome idle the whole time (CPU about 0, GPU 0 %,
+    10 GB RAM free); disk reads the 4 GB weights in 0.7 s;
+  - Chrome's `Local State`: `model_crash_count` 0, performance class 6 (highest), RTX 5070 Ti;
+  - fresh GPU cache files stayed empty and did not speed up the next load;
+  - Chrome's verbose log: nothing between the request and the ready model;
+  - NVIDIA driver update plus PC restart: 14.1 s; the next Chrome restart: 125 s again.
+- Decision: stop debugging before the feature freeze. The demo routine is now "restart the PC,
+  start Chrome, open the panel once"; `docs/model-load-debugging.md` records every measurement,
+  method and open question.

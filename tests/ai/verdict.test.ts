@@ -48,8 +48,38 @@ describe('parseVerdict', () => {
       }),
     );
     expect(verdict?.reasons).toHaveLength(MAX_REASONS);
-    expect(verdict?.reasons[0]?.length).toBe(MAX_AI_TEXT);
-    expect(verdict?.advice.length).toBe(MAX_AI_TEXT);
+    // A short partial last word goes; a long word without dots stays, cut.
+    expect(verdict?.reasons[0]).toBe(`Reason 0 ${'x'.repeat(MAX_AI_TEXT - 10)}…`);
+    expect(verdict?.advice).toBe(`${'a'.repeat(MAX_AI_TEXT - 1)}…`);
+    const words = parseVerdict(
+      JSON.stringify({ risk: 'safe', reasons: ['word '.repeat(100)], advice: '' }),
+    );
+    expect(words?.reasons[0]?.length).toBeLessThanOrEqual(MAX_AI_TEXT);
+    expect(words?.reasons[0]).toMatch(/^(?:word )*word…$/);
+  });
+
+  it('never leaves a domain or a loose accent that a cut or an invisible mark made', () => {
+    // Found by the monkey test: the cut shortened a 30-letter ending to a valid-looking domain.
+    const advice = `${'x'.repeat(280)} 0;.co.uk${'d'.repeat(30)}`;
+    expect(cleanAiText(advice, { keepDomains: false })).toBe(`${'x'.repeat(280)}…`);
+    const glued = `${'dringend'.repeat(30)}&#0;.co.uk${'d'.repeat(60)}`;
+    expect(cleanAiText(glued, { keepDomains: false })).toBe(`${'dringend'.repeat(30)}&#0;…`);
+    // Found in review: text without spaces lost everything but the ellipsis.
+    const japanese = 'メール'.repeat(120);
+    expect(cleanAiText(japanese)).toBe(`${japanese.slice(0, MAX_AI_TEXT - 1)}…`);
+    // Review round 3: sentences end in "。" (read as "."); all whole sentences stay.
+    const sentence = `${'メール'.repeat(9)}。`;
+    const kept = cleanAiText(sentence.repeat(20));
+    expect(kept).toBe(`${sentence.replace('。', '.').repeat(10)}…`);
+    // Found by the monkey test: "https://" before a space is no link, but "https://…" reads as one.
+    const scheme = `${'y'.repeat(280)} see https:// ${'z'.repeat(30)}`;
+    expect(cleanAiText(scheme)).toBe(`${'y'.repeat(280)} see…`);
+    // Found by the monkey test: an accent behind a direction mark stayed loose, so the known
+    // address passed and then showed as "examplé".
+    const known = new Set(['news@lumorabank.example']);
+    const marked = `From news@lumorabank.example${String.fromCodePoint(0x200f, 0x0301)} today`;
+    // Joined, "lumorabank.examplé" is no longer the known address, so it is removed.
+    expect(cleanAiText(marked, { knownAddresses: known })).toBe('From [removed]é today');
   });
 
   it('removes links, addresses and phone numbers an injection could plant', () => {
@@ -146,6 +176,13 @@ describe('cleanAiText', () => {
     // Found in review round 5: a date between the groups split the number into short pieces.
     expect(cleanAiText('Call 079 19.11.2026 123 4567')).toBe('Call [removed]');
     expect(cleanAiText('Call 07912 19.11.2026 34567')).toBe('Call [removed]');
+    // Found by the monkey test: a date-shaped group, and the rest too short on its own.
+    expect(cleanAiText('Call +49 30/12/34 56789 now')).toBe('Call [removed] now');
+    // Review round 5: after a time zone, the "+" is an offset and the date a deadline.
+    const deadline = 'Pay by UTC+1 19.11.2026 14:00 or GMT+01 19/11/2026 9h';
+    expect(cleanAiText(deadline)).toBe(deadline);
+    // Review round 6: but not a phone number glued to a time zone.
+    expect(cleanAiText('Call GMT+49 30/12/34 56789 now')).toBe('Call GMT[removed] now');
   });
 
   it('checks dates in other scripts by value too', () => {

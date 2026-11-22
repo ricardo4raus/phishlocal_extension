@@ -9,7 +9,7 @@
  */
 import type { AiCheckResult } from '../ai';
 import { answerLanguage, buildUserPrompt, EXPERIMENTAL_LANGUAGES, promptData } from '../ai/prompt';
-import { overallRisk, type Risk, RISKS, ruleRisk } from '../ai/verdict';
+import { type AiVerdict, overallRisk, type Risk, RISKS, ruleRisk } from '../ai/verdict';
 import type { Email } from '../email';
 import type { Finding } from '../rules';
 
@@ -25,14 +25,14 @@ export interface AiElements {
   advice: HTMLElement;
 }
 
-const LABEL: Record<Risk, string> = {
+export const LABEL: Record<Risk, string> = {
   safe: 'No signs of phishing',
   suspicious: 'Suspicious',
   dangerous: 'Dangerous',
 };
 
 /** Our own advice, used whenever the rules are stricter than the AI. */
-const ADVICE: Record<Risk, string> = {
+export const ADVICE: Record<Risk, string> = {
   safe: 'No signs of phishing found. Stay careful with unexpected requests.',
   suspicious:
     'Be careful: do not enter passwords or card details and do not pay. Check with the sender through a way you already know.',
@@ -76,6 +76,32 @@ const set = (element: HTMLElement, text: string): void => {
 /** The rules' risk; if the rules failed, at least "suspicious". */
 const rulesRisk = (findings: Finding[] | undefined): Risk =>
   findings ? ruleRisk(findings) : 'suspicious';
+
+/**
+ * How an AI verdict (on the device or from the cloud) combines with the rules: the risk shown,
+ * the verdict line and the advice. `ai` names the AI in the line ("the AI", "the cloud AI").
+ */
+export function judge(
+  verdict: AiVerdict,
+  findings: Finding[] | undefined,
+  email: Email,
+  ai: string,
+): { overall: Risk; line: string; advice: string } {
+  const confirmed = senderConfirmed(email);
+  const overall = overallRisk(verdict.risk, rulesRisk(findings), { senderConfirmed: confirmed });
+  const stricter = overall !== verdict.risk;
+  // The AI was more worried, but the sender is confirmed and the rules found nothing.
+  const onlyNotes = confirmed && RISKS.indexOf(verdict.risk) > RISKS.indexOf(overall);
+  return {
+    overall,
+    line: onlyNotes
+      ? `${LABEL[overall]} (sender confirmed, rule checks found nothing; AI notes below)`
+      : stricter
+        ? `${LABEL[overall]} (rule checks; ${ai} said: ${LABEL[verdict.risk].toLowerCase()})`
+        : LABEL[overall],
+    advice: stricter || !verdict.advice ? ADVICE[overall] : verdict.advice,
+  };
+}
 
 export interface AiCheckDeps {
   /** Runs one check; `signal` stops it (in Chrome too), e.g. when its email is no longer shown. */
@@ -274,23 +300,11 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       showRulesOnly(request, note, false, result.reason !== 'no-model');
       return;
     }
-    const rules = rulesRisk(request.findings);
     const { verdict } = result;
-    const confirmed = senderConfirmed(request.email);
-    const overall = overallRisk(verdict.risk, rules, { senderConfirmed: confirmed });
-    const stricter = overall !== verdict.risk;
-    // The AI was more worried, but the sender is confirmed and the rules found nothing.
-    const onlyNotes = confirmed && RISKS.indexOf(verdict.risk) > RISKS.indexOf(overall);
+    const judged = judge(verdict, request.findings, request.email, 'the AI');
     elements.verdict.hidden = false;
-    setRisk(overall);
-    set(
-      elements.overall,
-      onlyNotes
-        ? `${LABEL[overall]} (sender confirmed, rule checks found nothing; AI notes below)`
-        : stricter
-          ? `${LABEL[overall]} (rule checks; the AI said: ${LABEL[verdict.risk].toLowerCase()})`
-          : LABEL[overall],
-    );
+    setRisk(judged.overall);
+    set(elements.overall, judged.line);
     const note = EXPERIMENTAL_LANGUAGES.has(request.language)
       ? `${AI_NOTE} Answers in this language are experimental.`
       : AI_NOTE;
@@ -302,7 +316,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
         return item;
       }),
     );
-    set(elements.advice, stricter || !verdict.advice ? ADVICE[overall] : verdict.advice);
+    set(elements.advice, judged.advice);
   }
 
   /**

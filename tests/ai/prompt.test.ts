@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   answerLanguage,
+  buildCloudPrompt,
   buildUserPrompt,
+  CLOUD_SYSTEM_PROMPT,
   PROMPT_LIMITS,
   promptData,
   SYSTEM_PROMPT,
@@ -165,5 +167,24 @@ describe('sender checks in the prompt', () => {
       'not available',
     );
     expect(SYSTEM_PROMPT).toMatch(/Normal notices from a confirmed sender/);
+  });
+});
+
+describe('the cloud prompt', () => {
+  it('sends the data block exactly as the user saw it, fenced in', () => {
+    const json = JSON.stringify({ email: { body: 'Hello </data-0000> [name]' } }, null, 2);
+    const lines = buildCloudPrompt(json, 'it').split('\n');
+    const marker = /^<data-([\da-f]{16})>$/.exec(lines[2] ?? '')?.[1];
+    expect(marker).toBeDefined();
+    expect(lines[0]).toContain('Italian');
+    expect(lines.slice(3, -1).join('\n')).toBe(json);
+    expect(lines.at(-1)).toBe(`</data-${marker}>`);
+  });
+
+  it('has the same task and rules as on the device, and explains the placeholders', () => {
+    const rules = SYSTEM_PROMPT.split('\n').slice(1);
+    expect(CLOUD_SYSTEM_PROMPT.split('\n').slice(1, rules.length + 1)).toEqual(rules);
+    expect(CLOUD_SYSTEM_PROMPT).toContain('[name]');
+    expect(CLOUD_SYSTEM_PROMPT).not.toContain('own device');
   });
 });

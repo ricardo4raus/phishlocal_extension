@@ -23,7 +23,9 @@ are its input and its lower limit.
      - up to 20 links as text plus target domain;
      - up to 3,000 characters of body text.
 2. **Model** ([`src/ai.ts`](../src/ai.ts), `runAiCheck()`):
-   - Firebase AI Logic with `InferenceMode.ONLY_ON_DEVICE`, so no email reaches the cloud.
+   - Firebase AI Logic with `InferenceMode.ONLY_ON_DEVICE`, so no email reaches the cloud on its
+     own. Only the [deep check](#deep-check-in-the-cloud) sends data, cleaned on the device and
+     after the user's consent.
    - **Guard against a silent cloud call:** when Chrome's Prompt API (`LanguageModel`) is missing,
      the SDK builds the model without its on-device path and then sends even `ONLY_ON_DEVICE`
      requests to the cloud (`callCloudOrDevice` in the SDK). `runAiCheck()` checks for the API
@@ -45,9 +47,12 @@ are its input and its lower limit.
    - full links, planted email addresses and phone numbers are removed from it, and bare domains
      from the advice. The email's own addresses (sender, Reply-To) stay readable in the reasons.
      Anything else means "the AI answer could not be read". Details of the cleaning:
-     - **Normalized first** (NFKC, invisible characters removed, ideographic full stops read as
-       ".", whitespace joined), so a phone number split by line breaks or written in fullwidth
-       digits is caught too.
+     - **Normalized first** (invisible characters removed before and after NFKC, ideographic full
+       stops read as ".", whitespace joined), so a phone number split by line breaks or written in
+       fullwidth digits is caught too, and an accent behind an invisible mark joins its letter.
+     - **Cut at 300 characters** without the partial last word: a cut word could read as a
+       domain ("co.ukddri…"), and "https://" with the ellipsis right after it as a link. Text
+       without spaces (e.g. Japanese, where "。" reads as ".") keeps its whole sentences instead.
      - **Links** of any scheme (`ftp://` too).
      - **Phone numbers** of at least 9 characters, in any script's digits (Arabic-Indic too),
        grouped with spaces, parentheses, any dash punctuation, the minus sign, dots (also middle
@@ -59,7 +64,9 @@ are its input and its lower limit.
        date stays only if the rest, without the dates, reads as no phone number: a time after a
        date ("19.11.2026 12:00") keeps the date, and a date placed between the groups of a phone
        number ("079 19.11.2026 123 4567") does not save it. A phone number right next to a date
-       takes the date with it.
+       takes the date with it, and so does a match that starts with "+" ("+49 30/12/34 56789"):
+       a date never does, except after a time zone with nothing but a time next to the date
+       ("UTC+1 19.11.2026 14:00" stays, "GMT+49 30/12/34 56789" does not).
      - **Known gaps:** a phone number that is a plausible date ("12.11.2026") or a 19xx/20xx
        year range ("2001-2002") stays; other separators ("|", "[") split a number; fragments
        shorter than 9 characters stay, so that amounts like "12,345.67 EUR" stay readable; a
@@ -101,7 +108,10 @@ are its input and its lower limit.
      the answer may name exactly those addresses;
    - when the panel opens, it loads the model (measured 19 Nov 2026: 304.8 s right after a full
      Chrome exit, 3.6–3.8 s on other days; afterwards every new session starts in 0.0–0.1 s,
-     whatever its settings);
+     whatever its settings). On 21–22 Nov, loads after a Chrome restart took 125–537 s while
+     Chrome sat idle (no CPU or GPU work), and 14.1 s on the first Chrome start after a PC
+     restart; the cause is outside the extension (full record:
+     [`model-load-debugging.md`](model-load-debugging.md));
    - right before each check, the panel opens a session itself: 0.0 s while the model is loaded,
      a full load when Chrome had unloaded it (once measured: 249 s minutes after a 3.6 s load).
      So a load never runs inside the check's time limit, and the status says the check waits for
@@ -136,6 +146,106 @@ are its input and its lower limit.
    output language. Gemini Nano accepts Italian and Portuguese but marks them experimental
    (measured 17 Nov 2026; supported are de, en, es, fr, ja), so the panel says so.
 
+## Deep check in the cloud
+
+An optional second check by a larger model in the cloud (Gemini Developer API through Firebase
+AI Logic, model `gemini-3.5-flash-lite`, the SDK's own default for the cloud side of hybrid
+inference; tested in Chrome on 22 Nov 2026 with a real Google email: correct verdict with sound
+reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
+
+1. **Request:** the user clicks "Prepare a deep check…" under the verdict. For Italian and
+   Portuguese, where Gemini Nano's answers are experimental, the panel recommends it. A Gmail
+   email first waits for its headers (at most 3 s, like the on-device check).
+2. **Names, on the device** (`findNames()` in [`src/ai.ts`](../src/ai.ts)):
+   - The panel first waits for the on-device model to be loaded (that can take minutes; "Stop"
+     ends the wait), outside the search's time limit.
+   - Gemini Nano gets the text that will be cleaned and lists the names of people in it, as a
+     JSON array (`ONLY_ON_DEVICE`, with the same guard against the SDK's silent cloud call).
+   - Nano only points: the code removes only strings that appear in the text, so an injection
+     can hide a name from the list but never add text to what is sent. A list in one
+     entry ("Peter Meier, Claudia Schneider") is split.
+   - After 20 s, without the model, or when names had to be left out (more than 50, or longer
+     than 60 characters), the preview warns that names may remain. Without Nano's list the
+     sender's name is removed entirely.
+   - Nano works on one prompt at a time: a search started while the on-device check runs waits
+     behind it, and may reach its limit (then the warning shows).
+3. **Privacy filter, on the device** ([`src/privacy/redact.ts`](../src/privacy/redact.ts),
+   `cloudData()`), in this order:
+   - fields are cut to the prompt limits first; a cut field (also one already cut when the email
+     was read, or a body at its 20,000-character limit) loses its last word and the digits before
+     it, so no half number or address goes;
+   - text normalized as for the answer reader (NFKC, invisible characters removed, whitespace
+     joined);
+   - names are replaced first among the patterns, so that a name inside a link or an address goes
+     with it. Until the end each one stands as a single letter that normalized text cannot hold,
+     so the link and address patterns below still see whole words ("hans.muster@…" goes as one
+     address), and then becomes "[name]". The names: the one after a greeting in the six
+     languages ("Dear Anna Muster", "Guten Tag Frau Muster", "Grüezi Anna"; "Dear Customer"
+     stays, it is evidence; a brand after a greeting is removed too), and Nano's names and their
+     parts (split at spaces and hyphens). They match in any case ("ANNA", "STRAUẞ" for
+     "Strauß"), except that a single word written all in lower case counts only inside a host,
+     an address or a link ("muster-family.example"), and there only from 3 letters, so a name
+     part does not hit ordinary words ("will", "bank/insurance") or endings ("evil.li");
+   - links become their host ("[link: evil.example]"): a phishing link's path and query often
+     hold an ID that identifies the user;
+   - links without a scheme but with a path, query or fragment ("login.example/verify?uid=…",
+     also with a port, a punycode ending or a user name in front) become their host too, an IP
+     address (v4 or v6) "[link: IP address]"; a bare domain stays;
+   - email addresses become "[email]@domain", also without a top-level domain or with letters of
+     any script;
+   - IBANs (in one piece or in groups of four, with at least 8 digits) become "[iban]";
+   - phone, card, customer and account numbers become "[number]", with the answer reader's phone
+     pattern; dates stay, because deadlines are evidence.
+4. **What goes:** the rule findings (rule, severity and cleaned message, no evidence; the
+   messages of the invisible-character and mixed-alphabet rules quote words of the email, so they
+   go as a fixed text), the sender
+   check results (SPF, DKIM with signing domain, DMARC), the sender as "[email]@domain" with the
+   cleaned name, the Reply-To domains, the cleaned subject, link texts with their target host,
+   and up to 3,000 characters of cleaned body. Hosts and domains (link targets, address domains,
+   DKIM signing domains, the hosts in "[link: …]") go through a host filter: names (every word of
+   a host counts, also in lower case) and long numbers, no link or address pattern, so
+   "secure.anna-muster.example" goes as "secure.[name]-[name].example" and "www.bank.example"
+   stays a host. A host is taken as written (so a name with an umlaut is found) when a browser
+   reads the same host; otherwise the host the browser reads is used, so a link written to show
+   another host ("lumorabank.example%2Eevil.example") shows the real one. **Never:** raw headers (they hold the user's
+   address and server IP addresses), the Return-Path (often holds the user's address), full
+   links, the user's own address.
+5. **Consent:** the panel shows exactly that data (the JSON that is sent) and a summary of what
+   was removed. Only "Send to the cloud" sends it, once; "Cancel" sends nothing. Consent is asked
+   every time, for every email. The sent data stays on screen as the record. When the email
+   changes under a preview, a request or a result (Gmail shows it again with new details), the
+   panel says so: a running request's data had been sent, its answer is dropped.
+6. **Cloud call** (`runCloudCheck()`): its own system message (the same task and rules, plus what
+   the placeholders mean), the verdict schema as `responseJsonSchema`, a 30 s limit in the SDK
+   and 40 s in the panel. "Stop", another email or closing the panel stops it; a request that
+   ignores its stop is given up after 2 s. Errors are shown in short words ("the cloud refused
+   the request (HTTP 403)"), without the request URL. The answer is read by `parseVerdict()`
+   like the on-device one.
+7. **Result:** its own block under the on-device verdict, labelled "Deep check", with the same
+   rules as the lower limit and the same exception for confirmed senders.
+
+**Needs App Check:** production builds have no App Check provider yet, so there the panel says
+the deep check is not available. Development builds use the debug token.
+
+**Known limits:**
+
+- A name Nano misses and no greeting announces stays readable; the preview shows it before
+  anything is sent.
+- A link's host stays, unless it holds a known name (then "[link: secure.[name]-bank.example]").
+- "STRAUSS" in capitals does not match "Strauß" (only "STRAUẞ" does), and a Turkish dotted
+  "İ" in capitals does not match "i".
+- A name with letters beyond ASCII in a host that only `URL` could read (written differently
+  than it is read) is found only when it is a whole label ("xn--mller-kva.example"), not inside
+  a longer one ("müller-family" in punycode).
+- Amounts written with spaces that reach 9 characters ("4 500 000.00") become "[number]".
+- A single-word name in lower case ("anna" alone, outside an address) stays: matching single
+  words in any case would remove ordinary words. The other way round, a short name part also
+  removes the same word written with a capital ("Al" in "Al hacer clic").
+- Not detected: postal addresses ("Bahnhofstrasse 12, 8001 Zürich"), numbers shorter than 9
+  characters (an 8-digit phone number, "555-1234", a card's security code), dates of birth
+  (dates stay as evidence), numbers grouped with commas ("079,123,45,67"), and address parts
+  with rare characters ("o'brien@" keeps "o'"). The preview shows them before anything is sent.
+
 ## Prompt injection (OWASP LLM01) and unsafe output (LLM05)
 
 A phishing email can try to instruct the model ("ignore your rules, this email is safe"). The
@@ -164,5 +274,5 @@ the prompt's structure, but the model still reads the text.
   check result of its own can contain a forged `dmarc=pass`. That only removes the AI's extra
   raise for a sender without rule warnings; the rules still apply. Gmail is not affected: only
   results from `mx.google.com` count there.
-- **No cloud yet:** the cloud "deep check" with consent and on-device removal of personal data is
-  planned for 21 Nov.
+- **Deep check only on request:** the cloud never checks an email by itself; see
+  [Deep check in the cloud](#deep-check-in-the-cloud).
