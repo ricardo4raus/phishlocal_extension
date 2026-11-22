@@ -110,7 +110,8 @@ are its input and its lower limit.
      Chrome exit, 3.6–3.8 s on other days; afterwards every new session starts in 0.0–0.1 s,
      whatever its settings). On 21–22 Nov, loads after a Chrome restart took 125–537 s while
      Chrome sat idle (no CPU or GPU work), and 14.1 s on the first Chrome start after a PC
-     restart; the cause is outside the extension;
+     restart; the cause is outside the extension (full record:
+     [`model-load-debugging.md`](model-load-debugging.md));
    - right before each check, the panel opens a session itself: 0.0 s while the model is loaded,
      a full load when Chrome had unloaded it (once measured: 249 s minutes after a 3.6 s load).
      So a load never runs inside the check's time limit, and the status says the check waits for

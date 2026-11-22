@@ -65,7 +65,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
   request and the ready model). Ruled out: our code, RAM, disk, CPU, crash backoff
   (`model_crash_count` 0, performance class 6), the empty GPU cache files, and Chrome still
   running in the background. The first Chrome start after a PC restart loaded in 14.1 s; the next
-  Chrome restart took 125 s again. Cause unknown (outside the extension).
+  Chrome restart took 125 s again. Cause unknown (outside the extension). Full record, with the
+  measuring methods: `docs/model-load-debugging.md`.
 - `PREFER_ON_DEVICE` falls back to the cloud silently, so the hybrid test prompt is for test
   text only. Real emails go to the on-device model (`InferenceMode.ONLY_ON_DEVICE`, decided 17 Nov
   2026), and to the cloud only through the deep check (21 Nov 2026,

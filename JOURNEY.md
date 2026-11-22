@@ -798,4 +798,5 @@ _To fill in near the submission._
   - Chrome's verbose log: nothing between the request and the ready model;
   - NVIDIA driver update plus PC restart: 14.1 s; the next Chrome restart: 125 s again.
 - Decision: stop debugging before the feature freeze. The demo routine is now "restart the PC,
-  start Chrome, open the panel once"; CLAUDE.md and `docs/ai-check.md` hold the measurements.
+  start Chrome, open the panel once"; `docs/model-load-debugging.md` records every measurement,
+  method and open question.
