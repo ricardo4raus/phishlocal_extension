@@ -1081,11 +1081,12 @@
   }
 
   .flag__value {
-    font-family: var(--font-mono);
     overflow-wrap: anywhere;
   }
 
+  /* The real target: monospace and bold, so a domain reads letter by letter. */
   .flag__value--strong {
+    font-family: var(--font-mono);
     font-weight: 700;
     color: var(--color-danger-text);
   }
