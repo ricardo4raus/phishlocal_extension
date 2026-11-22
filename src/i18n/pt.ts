@@ -7,8 +7,8 @@ const plural = (count: number, one: string, many: string): string =>
 export const pt: Messages = {
   html: {
     starting: 'A iniciar…',
-    modelLoading: 'IA no dispositivo a carregar',
-    downloadLabel: 'Transferência da IA no dispositivo',
+    modelLoading: 'A carregar a IA local',
+    downloadLabel: 'Transferência da IA local',
     downloadNow: 'Transferir agora',
     emptyHeading: 'Abra um e-mail no Gmail',
     emptyText:
@@ -97,9 +97,9 @@ export const pt: Messages = {
   },
 
   pill: {
-    loading: 'IA no dispositivo a carregar',
-    ready: 'IA no dispositivo pronta',
-    downloading: 'IA no dispositivo',
+    loading: 'A carregar a IA local',
+    ready: 'IA local pronta',
+    downloading: 'IA local',
     'not-downloaded': 'IA não instalada',
     unavailable: 'IA não disponível',
     failed: 'IA não carregada',
@@ -107,19 +107,19 @@ export const pt: Messages = {
 
   banner: {
     'not-downloaded': {
-      title: 'Instalar a IA no dispositivo',
+      title: 'Instalar a IA local',
       text: 'O Chrome transfere o Gemini Nano uma única vez, cerca de 4 GB. Depois, os e-mails são verificados neste dispositivo, também offline. Até lá recebem apenas as verificações básicas.',
     },
     downloading: {
-      title: 'A instalar a IA no dispositivo',
+      title: 'A instalar a IA local',
       text: 'O Chrome está a transferir o Gemini Nano. As verificações básicas já funcionam enquanto espera, e pode continuar a usar o Gmail.',
     },
     unavailable: {
-      title: 'A IA no dispositivo não está disponível neste computador',
+      title: 'A IA local não está disponível neste computador',
       text: 'O Chrome não consegue executar o Gemini Nano aqui. Os e-mails recebem apenas as verificações básicas; a verificação aprofundada na nuvem continua a funcionar onde é oferecida.',
     },
     failed: {
-      title: 'Não foi possível carregar a IA no dispositivo',
+      title: 'Não foi possível carregar a IA local',
       text: 'O Chrome não conseguiu carregar o Gemini Nano. Os e-mails recebem apenas as verificações básicas; a próxima verificação tenta de novo.',
     },
     downloadFailed: (reason) => `A transferência falhou (${reason}).`,
@@ -313,11 +313,11 @@ export const pt: Messages = {
     waitingHeaders: 'À espera das verificações do remetente…',
     running: (secondTry) => `Verificação da IA em curso${secondTry ? ' (segunda tentativa)' : ''}…`,
     loading: (secondTry) =>
-      `IA no dispositivo a carregar${secondTry ? ' (segunda tentativa)' : ''}… O primeiro carregamento após reiniciar o Chrome pode demorar alguns minutos; o resultado aparece aqui sozinho.`,
+      `A carregar a IA local${secondTry ? ' (segunda tentativa)' : ''}… O primeiro carregamento após reiniciar o Chrome pode demorar alguns minutos; o resultado aparece aqui sozinho.`,
     waitingPrevious: 'À espera da verificação do e-mail anterior…',
-    note: 'IA no dispositivo (Gemini Nano). A IA pode errar.',
+    note: 'IA local (Gemini Nano). A IA pode errar.',
     experimental: 'As respostas neste idioma são experimentais.',
-    noModel: 'A IA no dispositivo não está pronta, por isso só correram as verificações básicas.',
+    noModel: 'A IA local não está pronta, por isso só correram as verificações básicas.',
     stopped: 'A verificação da IA foi parada. As verificações básicas continuam a valer.',
     failed: (secondTry, detail) =>
       `A verificação da IA falhou${secondTry ? ' após uma segunda tentativa' : ''} (${detail}). As verificações básicas continuam a valer.`,
@@ -342,8 +342,8 @@ export const pt: Messages = {
     notAvailable: 'Não disponível nesta versão.',
     waitingHeaders: 'À espera das verificações do remetente…',
     recommendedExperimental: (language) =>
-      `Recomendado: as respostas no dispositivo em ${language} são experimentais.`,
-    recommendedUnchecked: 'Recomendado: a IA no dispositivo não verificou este e-mail.',
+      `Recomendado: as respostas da IA local em ${language} são experimentais.`,
+    recommendedUnchecked: 'Recomendado: a IA local não verificou este e-mail.',
     chips: {
       names: (count) => plural(count, 'nome', 'nomes'),
       emails: (count) => plural(count, 'endereço de e-mail', 'endereços de e-mail'),
@@ -363,7 +363,7 @@ export const pt: Messages = {
         'O e-mail mudou durante a verificação aprofundada: os dados dele já tinham sido enviados, a resposta foi descartada.',
       done: 'O e-mail mudou, por isso o resultado da verificação aprofundada foi apagado.',
     },
-    waitingModel: 'À espera da IA no dispositivo…',
+    waitingModel: 'À espera da IA local…',
     lookingForNames: 'A procurar nomes neste dispositivo…',
     prepareFailed:
       'A verificação aprofundada não conseguiu preparar os dados. Não foi enviado nada.',

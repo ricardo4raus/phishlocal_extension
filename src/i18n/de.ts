@@ -7,8 +7,8 @@ const plural = (count: number, one: string, many: string): string =>
 export const de: Messages = {
   html: {
     starting: 'Wird gestartet…',
-    modelLoading: 'KI auf dem Gerät lädt',
-    downloadLabel: 'Download der KI auf dem Gerät',
+    modelLoading: 'Lokale KI wird geladen',
+    downloadLabel: 'Download der lokalen KI',
     downloadNow: 'Jetzt herunterladen',
     emptyHeading: 'Öffne eine E-Mail in Gmail',
     emptyText:
@@ -96,9 +96,9 @@ export const de: Messages = {
   },
 
   pill: {
-    loading: 'KI auf dem Gerät lädt',
-    ready: 'KI auf dem Gerät bereit',
-    downloading: 'KI auf dem Gerät',
+    loading: 'Lokale KI wird geladen',
+    ready: 'Lokale KI bereit',
+    downloading: 'Lokale KI',
     'not-downloaded': 'KI nicht eingerichtet',
     unavailable: 'KI nicht verfügbar',
     failed: 'KI nicht geladen',
@@ -106,19 +106,19 @@ export const de: Messages = {
 
   banner: {
     'not-downloaded': {
-      title: 'KI auf dem Gerät einrichten',
+      title: 'Lokale KI einrichten',
       text: 'Chrome lädt Gemini Nano einmal herunter, etwa 4 GB. Danach werden E-Mails auf diesem Gerät geprüft, auch offline. Bis dahin erhalten sie nur die Grundprüfungen.',
     },
     downloading: {
-      title: 'KI auf dem Gerät wird eingerichtet',
+      title: 'Lokale KI wird eingerichtet',
       text: 'Chrome lädt Gemini Nano herunter. Die Grundprüfungen funktionieren schon, während du wartest, und du kannst Gmail weiter nutzen.',
     },
     unavailable: {
-      title: 'KI auf dem Gerät ist auf diesem Computer nicht verfügbar',
+      title: 'Lokale KI ist auf diesem Computer nicht verfügbar',
       text: 'Chrome kann Gemini Nano hier nicht ausführen. E-Mails erhalten nur die Grundprüfungen; die Tiefenprüfung in der Cloud funktioniert weiterhin, wo sie angeboten wird.',
     },
     failed: {
-      title: 'KI auf dem Gerät konnte nicht laden',
+      title: 'Lokale KI konnte nicht geladen werden',
       text: 'Chrome konnte Gemini Nano nicht laden. E-Mails erhalten nur die Grundprüfungen; die nächste Prüfung versucht es erneut.',
     },
     downloadFailed: (reason) => `Der Download ist fehlgeschlagen (${reason}).`,
@@ -320,11 +320,11 @@ export const de: Messages = {
     waitingHeaders: 'Warte auf die Absenderprüfungen…',
     running: (secondTry) => `KI-Prüfung läuft${secondTry ? ' (zweiter Versuch)' : ''}…`,
     loading: (secondTry) =>
-      `KI auf dem Gerät lädt${secondTry ? ' (zweiter Versuch)' : ''}… Das erste Laden nach einem Neustart von Chrome kann einige Minuten dauern; das Ergebnis erscheint hier von selbst.`,
+      `Lokale KI wird geladen${secondTry ? ' (zweiter Versuch)' : ''}… Das erste Laden nach einem Neustart von Chrome kann einige Minuten dauern; das Ergebnis erscheint hier von selbst.`,
     waitingPrevious: 'Warte auf die Prüfung der vorherigen E-Mail…',
-    note: 'KI auf dem Gerät (Gemini Nano). KI kann sich irren.',
+    note: 'Lokale KI (Gemini Nano). KI kann sich irren.',
     experimental: 'Antworten in dieser Sprache sind experimentell.',
-    noModel: 'Die KI auf dem Gerät ist nicht bereit, also liefen nur die Grundprüfungen.',
+    noModel: 'Die lokale KI ist nicht bereit, also liefen nur die Grundprüfungen.',
     stopped: 'Die KI-Prüfung wurde gestoppt. Die Grundprüfungen gelten weiterhin.',
     failed: (secondTry, detail) =>
       `Die KI-Prüfung ist fehlgeschlagen${secondTry ? ' (auch im zweiten Versuch)' : ''} (${detail}). Die Grundprüfungen gelten weiterhin.`,
@@ -349,8 +349,8 @@ export const de: Messages = {
     notAvailable: 'In dieser Version nicht verfügbar.',
     waitingHeaders: 'Warte auf die Absenderprüfungen…',
     recommendedExperimental: (language) =>
-      `Empfohlen: Antworten auf dem Gerät in ${language} sind experimentell.`,
-    recommendedUnchecked: 'Empfohlen: Die KI auf dem Gerät hat diese E-Mail nicht geprüft.',
+      `Empfohlen: Antworten der lokalen KI auf ${language} sind experimentell.`,
+    recommendedUnchecked: 'Empfohlen: Die lokale KI hat diese E-Mail nicht geprüft.',
     chips: {
       names: (count) => plural(count, 'Name', 'Namen'),
       emails: (count) => plural(count, 'E-Mail-Adresse', 'E-Mail-Adressen'),
@@ -370,7 +370,7 @@ export const de: Messages = {
         'Die E-Mail hat sich während der Tiefenprüfung geändert: ihre Daten waren gesendet, die Antwort wurde verworfen.',
       done: 'Die E-Mail hat sich geändert, also wurde das Ergebnis der Tiefenprüfung entfernt.',
     },
-    waitingModel: 'Warte auf die KI auf dem Gerät…',
+    waitingModel: 'Warte auf die lokale KI…',
     lookingForNames: 'Suche Namen auf diesem Gerät…',
     prepareFailed: 'Die Tiefenprüfung konnte ihre Daten nicht vorbereiten. Nichts wurde gesendet.',
     stopped:

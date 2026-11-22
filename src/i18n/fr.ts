@@ -7,8 +7,8 @@ const plural = (count: number, one: string, many: string): string =>
 export const fr: Messages = {
   html: {
     starting: 'Démarrage…',
-    modelLoading: 'IA sur l’appareil en chargement',
-    downloadLabel: 'Téléchargement de l’IA sur l’appareil',
+    modelLoading: 'Chargement de l’IA locale',
+    downloadLabel: 'Téléchargement de l’IA locale',
     downloadNow: 'Télécharger maintenant',
     emptyHeading: 'Ouvrez un e-mail dans Gmail',
     emptyText:
@@ -98,9 +98,9 @@ export const fr: Messages = {
   },
 
   pill: {
-    loading: 'IA sur l’appareil en chargement',
-    ready: 'IA sur l’appareil prête',
-    downloading: 'IA sur l’appareil',
+    loading: 'Chargement de l’IA locale',
+    ready: 'IA locale prête',
+    downloading: 'IA locale',
     'not-downloaded': 'IA non installée',
     unavailable: 'IA non disponible',
     failed: 'IA non chargée',
@@ -108,19 +108,19 @@ export const fr: Messages = {
 
   banner: {
     'not-downloaded': {
-      title: 'Installer l’IA sur l’appareil',
+      title: 'Installer l’IA locale',
       text: 'Chrome télécharge Gemini Nano une seule fois, environ 4 Go. Ensuite, les e-mails sont vérifiés sur cet appareil, même hors ligne. D’ici là, ils ne reçoivent que les vérifications de base.',
     },
     downloading: {
-      title: 'Installation de l’IA sur l’appareil',
+      title: 'Installation de l’IA locale',
       text: 'Chrome télécharge Gemini Nano. Les vérifications de base fonctionnent déjà pendant l’attente, et vous pouvez continuer à utiliser Gmail.',
     },
     unavailable: {
-      title: 'L’IA sur l’appareil n’est pas disponible sur cet ordinateur',
+      title: 'L’IA locale n’est pas disponible sur cet ordinateur',
       text: 'Chrome ne peut pas exécuter Gemini Nano ici. Les e-mails ne reçoivent que les vérifications de base ; l’analyse approfondie dans le cloud fonctionne toujours là où elle est proposée.',
     },
     failed: {
-      title: 'L’IA sur l’appareil n’a pas pu se charger',
+      title: 'L’IA locale n’a pas pu se charger',
       text: 'Chrome n’a pas pu charger Gemini Nano. Les e-mails ne reçoivent que les vérifications de base ; la prochaine vérification réessaie.',
     },
     downloadFailed: (reason) => `Le téléchargement a échoué (${reason}).`,
@@ -317,11 +317,11 @@ export const fr: Messages = {
     running: (secondTry) =>
       `Vérification par l’IA en cours${secondTry ? ' (deuxième essai)' : ''}…`,
     loading: (secondTry) =>
-      `IA sur l’appareil en chargement${secondTry ? ' (deuxième essai)' : ''}… Le premier chargement après un redémarrage de Chrome peut prendre quelques minutes ; le résultat s’affichera ici de lui-même.`,
+      `Chargement de l’IA locale${secondTry ? ' (deuxième essai)' : ''}… Le premier chargement après un redémarrage de Chrome peut prendre quelques minutes ; le résultat s’affichera ici de lui-même.`,
     waitingPrevious: 'En attente de la vérification de l’e-mail précédent…',
-    note: 'IA sur l’appareil (Gemini Nano). L’IA peut se tromper.',
+    note: 'IA locale (Gemini Nano). L’IA peut se tromper.',
     experimental: 'Les réponses dans cette langue sont expérimentales.',
-    noModel: 'L’IA sur l’appareil n’est pas prête : seules les vérifications de base ont tourné.',
+    noModel: 'L’IA locale n’est pas prête : seules les vérifications de base ont tourné.',
     stopped: 'La vérification par l’IA a été arrêtée. Les vérifications de base restent valables.',
     failed: (secondTry, detail) =>
       `La vérification par l’IA a échoué${secondTry ? ' après un deuxième essai' : ''} (${detail}). Les vérifications de base restent valables.`,
@@ -346,8 +346,8 @@ export const fr: Messages = {
     notAvailable: 'Non disponible dans cette version.',
     waitingHeaders: 'En attente des vérifications de l’expéditeur…',
     recommendedExperimental: (language) =>
-      `Recommandé : les réponses sur l’appareil en ${language} sont expérimentales.`,
-    recommendedUnchecked: 'Recommandé : l’IA sur l’appareil n’a pas vérifié cet e-mail.',
+      `Recommandé : les réponses de l’IA locale en ${language} sont expérimentales.`,
+    recommendedUnchecked: 'Recommandé : l’IA locale n’a pas vérifié cet e-mail.',
     chips: {
       names: (count) => plural(count, 'nom', 'noms'),
       emails: (count) => plural(count, 'adresse e-mail', 'adresses e-mail'),
@@ -367,7 +367,7 @@ export const fr: Messages = {
         'L’e-mail a changé pendant l’analyse approfondie : ses données avaient été envoyées, la réponse a été ignorée.',
       done: 'L’e-mail a changé, le résultat de l’analyse approfondie a donc été effacé.',
     },
-    waitingModel: 'En attente de l’IA sur l’appareil…',
+    waitingModel: 'En attente de l’IA locale…',
     lookingForNames: 'Recherche de noms sur cet appareil…',
     prepareFailed: 'L’analyse approfondie n’a pas pu préparer ses données. Rien n’a été envoyé.',
     stopped:

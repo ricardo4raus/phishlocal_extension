@@ -7,8 +7,8 @@ const plural = (count: number, one: string, many: string): string =>
 export const it: Messages = {
   html: {
     starting: 'Avvio…',
-    modelLoading: 'IA sul dispositivo in caricamento',
-    downloadLabel: 'Download dell’IA sul dispositivo',
+    modelLoading: 'Caricamento dell’IA locale',
+    downloadLabel: 'Download dell’IA locale',
     downloadNow: 'Scarica ora',
     emptyHeading: 'Apri un’email in Gmail',
     emptyText:
@@ -98,9 +98,9 @@ export const it: Messages = {
   },
 
   pill: {
-    loading: 'IA sul dispositivo in caricamento',
-    ready: 'IA sul dispositivo pronta',
-    downloading: 'IA sul dispositivo',
+    loading: 'Caricamento dell’IA locale',
+    ready: 'IA locale pronta',
+    downloading: 'IA locale',
     'not-downloaded': 'IA non installata',
     unavailable: 'IA non disponibile',
     failed: 'IA non caricata',
@@ -108,19 +108,19 @@ export const it: Messages = {
 
   banner: {
     'not-downloaded': {
-      title: 'Installa l’IA sul dispositivo',
+      title: 'Installa l’IA locale',
       text: 'Chrome scarica Gemini Nano una sola volta, circa 4 GB. Dopo, le email vengono controllate su questo dispositivo, anche offline. Fino ad allora ricevono solo i controlli di base.',
     },
     downloading: {
-      title: 'Installazione dell’IA sul dispositivo',
+      title: 'Installazione dell’IA locale',
       text: 'Chrome sta scaricando Gemini Nano. I controlli di base funzionano già mentre aspetti, e puoi continuare a usare Gmail.',
     },
     unavailable: {
-      title: 'L’IA sul dispositivo non è disponibile su questo computer',
+      title: 'L’IA locale non è disponibile su questo computer',
       text: 'Chrome non può eseguire Gemini Nano qui. Le email ricevono solo i controlli di base; il controllo approfondito nel cloud funziona ancora dove è offerto.',
     },
     failed: {
-      title: 'Non è stato possibile caricare l’IA sul dispositivo',
+      title: 'Non è stato possibile caricare l’IA locale',
       text: 'Chrome non è riuscito a caricare Gemini Nano. Le email ricevono solo i controlli di base; il prossimo controllo riprova.',
     },
     downloadFailed: (reason) => `Il download non è riuscito (${reason}).`,
@@ -314,12 +314,11 @@ export const it: Messages = {
     waitingHeaders: 'In attesa delle verifiche del mittente…',
     running: (secondTry) => `Controllo dell’IA in corso${secondTry ? ' (secondo tentativo)' : ''}…`,
     loading: (secondTry) =>
-      `IA sul dispositivo in caricamento${secondTry ? ' (secondo tentativo)' : ''}… Il primo caricamento dopo il riavvio di Chrome può richiedere alcuni minuti; il risultato comparirà qui da solo.`,
+      `Caricamento dell’IA locale${secondTry ? ' (secondo tentativo)' : ''}… Il primo caricamento dopo il riavvio di Chrome può richiedere alcuni minuti; il risultato comparirà qui da solo.`,
     waitingPrevious: 'In attesa del controllo dell’email precedente…',
-    note: 'IA sul dispositivo (Gemini Nano). L’IA può sbagliare.',
+    note: 'IA locale (Gemini Nano). L’IA può sbagliare.',
     experimental: 'Le risposte in questa lingua sono sperimentali.',
-    noModel:
-      'L’IA sul dispositivo non è pronta, quindi sono stati eseguiti solo i controlli di base.',
+    noModel: 'L’IA locale non è pronta, quindi sono stati eseguiti solo i controlli di base.',
     stopped: 'Il controllo dell’IA è stato fermato. I controlli di base restano validi.',
     failed: (secondTry, detail) =>
       `Il controllo dell’IA non è riuscito${secondTry ? ' dopo un secondo tentativo' : ''} (${detail}). I controlli di base restano validi.`,
@@ -344,8 +343,8 @@ export const it: Messages = {
     notAvailable: 'Non disponibile in questa versione.',
     waitingHeaders: 'In attesa delle verifiche del mittente…',
     recommendedExperimental: (language) =>
-      `Consigliato: le risposte sul dispositivo in ${language} sono sperimentali.`,
-    recommendedUnchecked: 'Consigliato: l’IA sul dispositivo non ha controllato questa email.',
+      `Consigliato: le risposte dell’IA locale in ${language} sono sperimentali.`,
+    recommendedUnchecked: 'Consigliato: l’IA locale non ha controllato questa email.',
     chips: {
       names: (count) => plural(count, 'nome', 'nomi'),
       emails: (count) => plural(count, 'indirizzo email', 'indirizzi email'),
@@ -365,7 +364,7 @@ export const it: Messages = {
         'L’email è cambiata durante il controllo approfondito: i suoi dati erano stati inviati, la risposta è stata scartata.',
       done: 'L’email è cambiata, quindi il risultato del controllo approfondito è stato cancellato.',
     },
-    waitingModel: 'In attesa dell’IA sul dispositivo…',
+    waitingModel: 'In attesa dell’IA locale…',
     lookingForNames: 'Ricerca di nomi su questo dispositivo…',
     prepareFailed:
       'Il controllo approfondito non è riuscito a preparare i dati. Non è stato inviato nulla.',
