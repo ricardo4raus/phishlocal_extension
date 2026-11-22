@@ -300,6 +300,9 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   covers the miss.
 - A filter in front of the network should assume its input was already cut somewhere: patterns
   that need a whole address or IBAN miss the half that a field limit leaves behind.
+- A progress bar needs a source: a percentage the code cannot measure would stop at 90 % for
+  minutes and cost the trust a privacy tool lives on. Elapsed time is honest when the end is
+  unknown.
 
 ## Accomplishments we're proud of
 
@@ -880,3 +883,22 @@ _To fill in near the submission._
   and removes addresses, numbers, IBANs and link paths; "High" also removes names. Removing names
   costs evidence (brands, and whether an email was written for the recipient or for everyone),
   and the user now chooses. Standard needs no name search, so its preview comes at once.
+
+**Session with Claude Code (evening, UI design, no code changes):**
+
+- Reviewed the side panel as a user would see it: it works and is accessible, but reads like a
+  developer tool (one long column, default buttons, the verdict below the paste form, the test
+  prompt visible in production, no extension icon).
+- Decided against a component library: the rule "no frameworks", the no-remote-code tests and
+  the hand-tuned contrast make plain CSS with design tokens the simpler path.
+- Built a mockup on a design canvas (seven screens, light and dark, made-up emails) and iterated
+  on it with Ricardo, partly through comments on the canvas. His decisions: one name per action
+  ("Deep check in the cloud…" everywhere), plain words instead of technical ones ("Names of
+  people", "Checked on this device", "Done in 1.4 s"), the privacy levels as lists of what each
+  one removes, the sent data folded under "Show what will be sent", red-flag and link cards
+  bordered in their severity's colour, and no sample emails for users.
+- Asked whether the loading bar could show a real percentage: only the first download reports
+  progress. The minutes-long load after a Chrome restart reports nothing (it is the GPU driver,
+  see `docs/model-load-debugging.md`), so the panel shows elapsed time and a moving bar instead.
+- The spec for Monday's UI polish is `docs/ui-design.md`, with seven open points; the biggest:
+  folding the sent data conflicts with the promise that the user sees it before consenting.
