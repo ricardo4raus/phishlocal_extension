@@ -42,7 +42,8 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   (domain kept), phone and other long numbers, IBANs and full links (host kept). At privacy level
   "High" it also removes the names of people, found by Gemini Nano on the device; "Standard"
   (the default) keeps names, so the cloud sees whether an email was written for you or for
-  everyone. The panel shows exactly what will be sent; only "Send to the cloud" sends it. Details: [`docs/ai-check.md`](docs/ai-check.md#deep-check-in-the-cloud).
+  everyone. The panel shows exactly what will be sent; only "Send to the cloud" sends it.
+  Details: [`docs/ai-check.md`](docs/ai-check.md#deep-check-in-the-cloud).
 - **Hybrid AI:** a test prompt runs through Firebase AI Logic with
   `InferenceMode.PREFER_ON_DEVICE`. Gemini Nano answers on the device; the cloud (Gemini
   Developer API) is the fallback. The panel loads the on-device model when it opens and shows

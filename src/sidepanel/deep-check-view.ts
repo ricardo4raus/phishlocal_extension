@@ -35,6 +35,9 @@ import { HEADERS_WAIT_MS, judge, STOP_GRACE_MS } from './ai-view';
  */
 export const CLOUD_LIMIT_EXTRA_MS = 10_000;
 
+/** The name search ended because the email changed or the user stopped it: show nothing. */
+const STOPPED = Symbol('stopped');
+
 /** The reason a run is stopped when it reaches its time limit. */
 const TIME_LIMIT = 'time limit';
 
@@ -262,13 +265,14 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     }
   }
 
-  async function prepare(): Promise<void> {
-    if (!shown?.final || !deps.available || phase === 'preparing' || phase === 'sending') return;
-    const { email, findings } = shown;
-    const answerIn = language();
-    // Fixed for this preview: changing it discards the preview (see the listener below).
-    const chosen = level();
-    reset();
+  /**
+   * Gemini Nano's names for the email, or undefined if it could not look (then names may remain);
+   * {@link STOPPED} if the email changed or the user stopped meanwhile.
+   */
+  async function searchNames(
+    email: Email,
+    answerIn: string,
+  ): Promise<string[] | undefined | typeof STOPPED> {
     const mine = generation;
     phase = 'preparing';
     const controller = new AbortController();
@@ -277,18 +281,14 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     elements.level.disabled = true;
     elements.stop.hidden = false;
     elements.stop.focus();
+    set(elements.status, 'Waiting for the on-device model…');
+    // Not inside the search's time limit: a load can take minutes ("Stop" ends the wait).
+    const ready = await settle(
+      () => deps.modelReady(answerIn),
+      () => false,
+    );
+    if (mine !== generation) return STOPPED;
     let names: string[] | undefined;
-    // "standard" keeps names, so it needs no name search and no model.
-    let ready = false;
-    if (chosen === 'high') {
-      set(elements.status, 'Waiting for the on-device model…');
-      // Not inside the search's time limit: a load can take minutes ("Stop" ends the wait).
-      ready = await settle(
-        () => deps.modelReady(answerIn),
-        () => false,
-      );
-      if (mine !== generation) return;
-    }
     if (ready) {
       set(elements.status, 'Looking for names on this device (Gemini Nano)…');
       names = await bounded(
@@ -297,11 +297,23 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
         namesTimeoutMs,
         () => undefined,
       );
-      if (mine !== generation) return;
+      if (mine !== generation) return STOPPED;
     }
     stop = undefined;
     // A search stopped by the time limit may still answer: its list is not trusted to be complete.
-    const found = controller.signal.aborted ? undefined : names;
+    return controller.signal.aborted ? undefined : names;
+  }
+
+  async function prepare(): Promise<void> {
+    if (!shown?.final || !deps.available || phase === 'preparing' || phase === 'sending') return;
+    const { email, findings } = shown;
+    const answerIn = language();
+    // Fixed for this preview: changing it discards the preview (see the listener below).
+    const chosen = level();
+    reset();
+    // "standard" keeps names: no model, no name search, nothing to wait for or stop.
+    const found = chosen === 'high' ? await searchNames(email, answerIn) : [];
+    if (found === STOPPED) return;
     const data = cloudData(email, findings ?? [], found, chosen);
     prepared = { data, language: answerIn };
     phase = 'preview';
@@ -394,6 +406,12 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     // The preview must show exactly what goes: data prepared at the other level is discarded.
     if (phase === 'preview') {
       reset('The privacy level changed, so the prepared data was discarded. Nothing was sent.');
+    } else if (phase === 'done') {
+      // The result stays readable; the data above was sent at the level chosen before.
+      set(
+        elements.status,
+        'The new privacy level applies to the next deep check. The data above was sent at the previous level.',
+      );
     }
   });
   elements.cancel.addEventListener('click', () => {

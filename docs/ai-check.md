@@ -195,10 +195,10 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
      it, so no half number or address goes;
    - text normalized as for the answer reader (NFKC, invisible characters removed, whitespace
      joined);
-   - names are replaced first among the patterns, so that a name inside a link or an address goes
-     with it. Until the end each one stands as a single letter that normalized text cannot hold,
-     so the link and address patterns below still see whole words ("hans.muster@…" goes as one
-     address), and then becomes "[name]". The names: the one after a greeting in the six
+   - at level High, names are replaced first among the patterns, so that a name inside a link or
+     an address goes with it. Until the end each one stands as a single letter that normalized
+     text cannot hold, so the link and address patterns below still see whole words
+     ("hans.muster@…" goes as one address), and then becomes "[name]". The names: the one after a greeting in the six
      languages ("Dear Anna Muster", "Guten Tag Frau Muster", "Grüezi Anna"; "Dear Customer"
      stays, it is evidence; a brand after a greeting is removed too), and Nano's names and their
      parts (split at spaces and hyphens). They match in any case ("ANNA", "STRAUẞ" for

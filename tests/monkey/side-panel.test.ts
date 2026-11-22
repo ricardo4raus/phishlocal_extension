@@ -495,6 +495,11 @@ function checkPanelOnce(): void {
   if (!deep.hidden) {
     if (!get('deep-check-preview').hidden) reached.add('deep: preview');
     const status = get('deep-check-status').textContent ?? '';
+    // A preview waiting for consent says which level made it, and that is the level on screen.
+    if (!get('deep-check-preview').hidden && !get('deep-check-send').hidden) {
+      const standard = get<HTMLSelectElement>('deep-check-level').value === 'standard';
+      expect(status.includes('privacy level Standard'), 'preview matches the level').toBe(standard);
+    }
     // "Looking for names" or "running" only while that work really runs.
     expect(!/running|looking/i.test(status) || deepWork > 0, `stale "${status}"`).toBe(true);
     if (status) reached.add(`deep: ${status.slice(0, 25)}`);
@@ -646,6 +651,7 @@ describe('monkey: side panel', () => {
           'deep: preview',
           'deep: names may remain',
           'deep: Nothing was sent',
+          'deep: The privacy level changed',
           'deep: Sent: the data shown',
           'deep: The deep check failed',
           'deep light',

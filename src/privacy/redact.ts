@@ -7,8 +7,9 @@
  * - email addresses keep only their domain ("[email]@lumorabank.example");
  * - IBANs and long numbers (phone, card, customer and account numbers) become placeholders; dates
  *   stay, because deadlines are evidence;
- * - names become "[name]": the names Gemini Nano found on the device, the name after a greeting
- *   ("Dear Anna Muster"), and the sender's name when Nano could not look for names.
+ * - at privacy level "high" only, names become "[name]": the names Gemini Nano found on the
+ *   device, the name after a greeting ("Dear Anna Muster"), and the sender's name when Nano could
+ *   not look for names. Level "standard" (the default) keeps names.
  *
  * Raw headers never go: they hold the user's address and server IP addresses. Of the headers,
  * only the sender check results (pass/fail and signing domains) and the Reply-To domains go.
@@ -471,7 +472,6 @@ function replaceNames(
   });
 }
 
-/** What the user sees and, after agreeing, sends to the cloud. */
 /**
  * How much the deep check removes. "standard" (the default): addresses, numbers, IBANs and link
  * paths. "high": also the names of people, found by Gemini Nano and after greetings.
@@ -482,6 +482,7 @@ export const PRIVACY_LEVELS: readonly PrivacyLevel[] = ['standard', 'high'];
 
 export const DEFAULT_PRIVACY_LEVEL: PrivacyLevel = 'standard';
 
+/** What the user sees and, after agreeing, sends to the cloud. */
 export interface CloudData {
   /** The data block, exactly as it is shown and sent. */
   json: string;

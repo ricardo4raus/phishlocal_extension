@@ -480,6 +480,21 @@ describe('the privacy level', () => {
     expect(level().disabled).toBe(false);
   });
 
+  it('keeps a result readable after a change, and says which level its data was sent at', async () => {
+    check = create({ savedLevel: () => undefined });
+    check.shown(email, []);
+    click('start');
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    click('send');
+    runs[0]?.resolve(answer('safe'));
+    await vi.waitFor(() => expect(get('result').hidden).toBe(false));
+    choose('high');
+    expect(get('result').hidden).toBe(false);
+    expect(text('status')).toBe(
+      'The new privacy level applies to the next deep check. The data above was sent at the previous level.',
+    );
+  });
+
   it('cannot be chosen when the cloud is not available', () => {
     check = create({ available: false });
     check.shown(email, []);
