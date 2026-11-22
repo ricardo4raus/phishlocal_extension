@@ -1056,3 +1056,8 @@ _To fill in near the submission._
   "Sent from your own address" instead of "Sender not confirmed"; and an AI "suspicious" alone
   becomes notes, also for a note to oneself with a link. Not yet measured on Gmail's "Show
   original" page of a self-sent email which of the two headers it has.
+- For an email sent to yourself, the task line in front of the data now says so in a sentence
+  ("The user sent this email to themselves; it did not come in from outside, so missing sender
+  checks are expected."), on the device and in the deep check. A small model weighs that more
+  than one field inside the JSON. Whether Nano then answers "safe" by itself is still to be
+  seen in Chrome.

@@ -89,8 +89,11 @@ are its input and its lower limit.
    - **Sent to yourself** (22 Nov 2026): when the headers have no `Authentication-Results` at
      all and the sender is the mailbox the email was delivered to (topmost `Delivered-To`, else
      the only `To`), the email went from the user's own address to themselves. The AI gets only
-     `email.sent_to_self: true` (never the address; the deep check's data too), the prompt says
-     that this is why sender checks are missing, the strip says "Sent from your own address",
+     `email.sent_to_self: true` (never the address; the deep check's data too), the system
+     message says that this is why sender checks are missing, and the task line itself says it
+     too ("The user sent this email to themselves; it did not come in from outside, so missing
+     sender checks are expected."), because Gemini Nano weighs a sentence before the data more
+     than one field in it; the strip says "Sent from your own address",
      and an AI "suspicious" alone becomes notes as below, also when the email has links (a note
      to oneself with a link). An AI "dangerous" stands. A forged "from yourself" email comes in
      from outside, so the receiving server's sender checks are there and it does not count.
