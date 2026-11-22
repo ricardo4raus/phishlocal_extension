@@ -1,374 +1,1042 @@
-:root {
-  color-scheme: light dark;
-  font-family: system-ui, sans-serif;
-  font-size: 14px;
-}
-
-body {
-  margin: 0;
-  padding: 12px;
-}
-
-/* Shown only while the settings load; out of the flow, so the panel does not jump when it goes. */
-#panel-starting {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  margin: 0;
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-main {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-h1 {
-  margin: 0 0 4px;
-  font-size: 18px;
-}
-
-h2 {
-  margin: 8px 0 0;
-  font-size: 15px;
-}
-
-.email {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.paste {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.paste[open] {
-  padding-bottom: 4px;
-}
-
-.paste summary {
-  cursor: pointer;
-}
-
-.paste input,
-.paste select {
-  box-sizing: border-box;
-  width: 100%;
-  font: inherit;
-}
-
-.paste .row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.paste .row select {
-  flex: 1;
-}
-
-.hint {
-  margin: 0;
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-.email-status {
-  margin: 0;
-}
-
-.email-status.error {
-  color: #c62828;
-}
-
-.email-details {
-  margin: 0;
-}
-
-.email-details[hidden] {
-  display: none;
-}
-
-.email-details dt {
-  margin-top: 6px;
-  font-weight: 600;
-}
-
-.email-details dd {
-  margin: 2px 0 0;
-  overflow-wrap: anywhere;
-}
-
-.email-details ul {
-  margin: 0;
-  padding-left: 18px;
-}
-
-.findings .danger strong,
-.links .danger .mark {
-  color: #c62828;
-}
-
-/* #8a5300: 4.5:1 or more on white; #b26a00 (the light's amber) was 4.24:1 for this text. */
-.findings .warning strong,
-.links .warning .mark {
-  color: #8a5300;
-}
-
-@media (prefers-color-scheme: dark) {
-  .findings .danger strong,
-  .links .danger .mark {
-    color: #ef9a9a;
-  }
-
-  .findings .warning strong,
-  .links .warning .mark {
-    color: #ffcc80;
-  }
-}
-
-.links .link {
-  margin-bottom: 4px;
-}
-
-.links .mark {
-  font-weight: 600;
-}
-
-/* A marked link stands out with a bar in its severity's colour. */
-.links .danger,
-.links .warning {
-  padding-left: 6px;
-  border-left: 3px solid;
-}
-
-.links .danger {
-  border-color: #c62828;
-}
-
-.links .warning {
-  border-color: #b26a00;
-}
-
-.links .url {
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
-}
-
-.links .link-text {
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-.links .empty {
-  list-style: none;
-}
-
 /*
- * The traffic light. Each level has its own colour, symbol and word, so it reads without colour
- * too. The symbols have a contrast of about 4.5:1 or more on their circles, and the circles at
- * least 3:1 on white and on a dark background.
+ * Side panel styles. The architecture is in docs/ui-design.md ("How to build it"):
+ *
+ * - Cascade layers, nothing outside them: tokens, base, layout, components, utilities.
+ * - Tokens carry semantic names; no raw colour outside the tokens layer.
+ * - Components are classes with their own prefix (.band, .band__word), low specificity, no outer
+ *   margins: the parent sets the spacing with .stack and .row. A component never styles the
+ *   inside of another component, so a later edit on one leaves the others' spacing alone.
+ * - Contrast of every pair was measured (WCAG ratio, in comments at the tokens): text 4.5:1 or
+ *   more, symbols and meaningful borders 3:1 or more, in light and dark mode.
  */
-.verdict {
-  --risk: #757575;
-  --risk-symbol-color: #fff;
-  padding: 8px 10px;
-  border: 1px solid var(--risk);
-  border-left-width: 6px;
-  border-radius: 6px;
-}
+@layer tokens, base, layout, components, utilities;
 
-.verdict[hidden] {
-  display: none;
-}
+@layer tokens {
+  :root {
+    color-scheme: light dark;
 
-.verdict[data-risk='safe'] {
-  --risk: #2e7d32;
-  --risk-symbol: '✓';
-}
+    /* Colours (light). Ratios: text on surface 16.3, secondary 7.9, muted 6.2 (5.7 on bg),
+       accent on surface 6.2, white on accent 6.2. */
+    --color-bg: #f5f6f8;
+    --color-surface: #ffffff;
+    --color-surface-2: #f0f2f5;
+    --color-border: #e2e5ea;
+    --color-border-strong: #cbd2da;
+    --color-text: #16191d;
+    --color-text-2: #4a525c;
+    --color-text-3: #5a626c;
+    --color-accent: #1a56db;
+    --color-on-accent: #ffffff;
+    --color-accent-text: #1e3a7b;
+    --color-accent-tint: #eef3fe;
+    --color-selected-tint: #f3f7ff;
+    /* Danger: text on tint 7.9, white on fill 6.6, fill on surface 6.6. */
+    --color-danger: #b42318;
+    --color-danger-text: #8f1d14;
+    --color-danger-tint: #fdeeec;
+    --color-danger-border: #f2c4be;
+    --color-on-danger: #ffffff;
+    /* Warning: text on tint 6.9, white on fill 6.3, fill on surface 6.3. */
+    --color-warning: #8a5300;
+    --color-warning-text: #7a4a00;
+    --color-warning-tint: #fff4de;
+    --color-warning-border: #ebcb8b;
+    --color-on-warning: #ffffff;
+    /* Safe: text on tint 7.3, white on fill 5.4, fill on surface 5.4. */
+    --color-safe: #1e7a3c;
+    --color-safe-text: #155c2c;
+    --color-safe-tint: #eaf6ee;
+    --color-safe-border: #bfe3cb;
+    --color-on-safe: #ffffff;
+    /* Pending (grey): white on fill 4.8, fill on surface 4.8. */
+    --color-pending: #6b737d;
+    --color-pending-text: #4a525c;
+    --color-pending-tint: #f0f2f5;
+    --color-pending-border: #e2e5ea;
+    --color-on-pending: #ffffff;
+    --color-focus: #1a56db;
 
-.verdict[data-risk='suspicious'] {
-  --risk: #b26a00;
-  --risk-symbol: '!';
-  --risk-symbol-color: #000;
-}
+    /* Type: sizes with line heights on the 4 px grid; weights 400, 600, 700 only. */
+    --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: ui-monospace, Consolas, 'SF Mono', Menlo, monospace;
+    --text-xs: 12px;
+    --text-s: 13px;
+    --text-m: 14px;
+    --text-l: 15px;
+    --text-xl: 18px;
+    --leading-xs: 16px;
+    --leading-s: 18px;
+    --leading-m: 20px;
+    --leading-l: 22px;
+    --leading-xl: 24px;
 
-.verdict[data-risk='dangerous'] {
-  --risk: #c62828;
-  --risk-symbol: '✕';
-}
+    /* Space. */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
 
-.verdict[data-risk='pending'] {
-  --risk-symbol: '…';
-}
+    /* Shape: inner radii smaller than outer. */
+    --radius-card: 12px;
+    --radius-box: 8px;
+    --radius-chip: 6px;
+    --radius-pill: 999px;
+    --control-height: 40px;
+    --control-height-l: 44px;
+  }
 
-.verdict p {
-  margin: 2px 0;
-}
-
-.ai-overall {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-weight: 600;
-  font-size: 15px;
-}
-
-/* The symbol is decoration (empty alternative text): the word says the same. */
-.ai-overall::before {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--risk);
-  color: var(--risk-symbol-color);
-  font-size: 14px;
-  line-height: 22px;
-  text-align: center;
-  content: var(--risk-symbol, '') / '';
-}
-
-/* "The AI check failed (…)": the user must see that only the rules checked this email. */
-.verdict .ai-failed {
-  font-weight: 600;
-  opacity: 1;
-}
-
-.ai-reasons {
-  margin: 4px 0;
-  padding-left: 18px;
-}
-
-.ai-advice {
-  font-style: italic;
-}
-
-.deep-check {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.deep-check[hidden],
-.deep-check-preview[hidden] {
-  display: none;
-}
-
-.deep-check h3 {
-  margin: 4px 0 0;
-  font-size: 14px;
-}
-
-/* The label, the short select and the explanation under it. */
-.deep-check-level {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  font-size: 12px;
-}
-
-.deep-check-level p {
-  margin: 0;
-}
-
-.deep-check-preview {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.deep-check-preview p {
-  margin: 0;
-}
-
-.deep-check .row {
-  display: flex;
-  gap: 8px;
-}
-
-/* Exactly what will be sent: monospace, scrollable, never cut. */
-.deep-check-data {
-  margin: 0;
-  padding: 6px;
-  max-height: 240px;
-  overflow: auto;
-  border: 1px solid #9e9e9e;
-  border-radius: 4px;
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.email-body {
-  white-space: pre-wrap;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.model-status {
-  margin: 0 0 4px;
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-textarea {
-  box-sizing: border-box;
-  width: 100%;
-  font: inherit;
-  resize: vertical;
-}
-
-.checkbox {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.checkbox[hidden] {
-  display: none;
-}
-
-button {
-  align-self: flex-start;
-  padding: 6px 12px;
-  font: inherit;
-  cursor: pointer;
-}
-
-button:disabled {
-  cursor: progress;
-}
-
-.prompt-status {
-  margin: 4px 0 0;
-}
-
-#status {
-  font-weight: 600;
-}
-
-#status.error {
-  color: #c62828;
-}
-
-/* The dark background needs a lighter red: #c62828 is only 3.3:1 there. */
-@media (prefers-color-scheme: dark) {
-  .email-status.error,
-  #status.error {
-    color: #ef9a9a;
+  @media (prefers-color-scheme: dark) {
+    :root {
+      /* Ratios: text on surface 15.3, secondary 8.3, muted 6.6, accent on surface 8.0, text on
+         accent 8.8; danger text on tint 9.0, white on danger fill 3.9 (symbols only), fill on
+         surface 4.3; warning text on tint 9.6, dark on warning fill 13.3; safe text on tint 8.2,
+         dark on safe fill 8.2; white on pending fill 3.1 (symbols only), pending on surface 5.4. */
+      --color-bg: #111418;
+      --color-surface: #1a1e24;
+      --color-surface-2: #232930;
+      --color-border: #2c323a;
+      --color-border-strong: #3a414a;
+      --color-text: #e8eaed;
+      --color-text-2: #b0b8c1;
+      --color-text-3: #9aa3ad;
+      --color-accent: #8ab4ff;
+      --color-on-accent: #111418;
+      --color-accent-text: #b0c8ff;
+      --color-accent-tint: #1c2a47;
+      --color-selected-tint: #1a2740;
+      --color-danger: #e5484d;
+      --color-danger-text: #ffb4ab;
+      --color-danger-tint: #3a1d1b;
+      --color-danger-border: #5c2a25;
+      --color-on-danger: #ffffff;
+      --color-warning: #ffd58a;
+      --color-warning-text: #ffd58a;
+      --color-warning-tint: #3a2e14;
+      --color-warning-border: #5a4720;
+      --color-on-warning: #111418;
+      --color-safe: #4cc27a;
+      --color-safe-text: #8fd6a5;
+      --color-safe-tint: #17321f;
+      --color-safe-border: #2a5236;
+      --color-on-safe: #111418;
+      --color-pending: #8a939d;
+      --color-pending-text: #b0b8c1;
+      --color-pending-tint: #232930;
+      --color-pending-border: #2c323a;
+      --color-on-pending: #ffffff;
+      --color-focus: #8ab4ff;
+    }
   }
 }
 
-#output {
-  margin: 0;
-  font: inherit;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+@layer base {
+  :where(html) {
+    font-family: var(--font);
+    font-size: var(--text-m);
+    line-height: var(--leading-m);
+    color: var(--color-text);
+    background: var(--color-bg);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  :where(body) {
+    margin: 0;
+    min-width: 320px;
+  }
+
+  :where(h1, h2, h3, p, ul, ol, dl, dd, pre, fieldset) {
+    margin: 0;
+  }
+
+  :where(ul, ol) {
+    padding: 0;
+    list-style: none;
+  }
+
+  :where(fieldset) {
+    padding: 0;
+    border: 0;
+  }
+
+  :where(button, input, select, textarea) {
+    font: inherit;
+    color: inherit;
+  }
+
+  :where(button) {
+    cursor: pointer;
+  }
+
+  :where(button:disabled) {
+    cursor: default;
+  }
+
+  :where(summary) {
+    cursor: pointer;
+  }
+
+  :where(:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-box);
+  }
+
+  :where([hidden]) {
+    display: none !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+}
+
+@layer layout {
+  /* The page: one column; parts react to the panel's width, not the viewport's. */
+  .page {
+    container-type: inline-size;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page__main {
+    flex: 1;
+    padding: var(--space-4);
+  }
+
+  /* Vertical rhythm: the parent sets the gap, children have no margins. */
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--stack-gap, var(--space-3));
+  }
+
+  .stack--tight {
+    --stack-gap: var(--space-1);
+  }
+
+  .stack--loose {
+    --stack-gap: var(--space-4);
+  }
+
+  /* One line of items, centred; children that hold email text need min-width: 0 to shrink. */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: var(--row-gap, var(--space-2));
+    min-width: 0;
+  }
+
+  .row > .grow {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Shown only while the settings load; out of the flow, so the panel does not jump when it goes. */
+  .starting {
+    position: absolute;
+    inset-block-start: var(--space-3);
+    inset-inline-end: var(--space-4);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    color: var(--color-text-3);
+  }
+}
+
+@layer components {
+  /* ---- Icons: SVG files through a mask, so the DOM holds no <svg>. ---- */
+  .icon {
+    display: inline-block;
+    flex: none;
+    inline-size: 1.25em;
+    block-size: 1.25em;
+    vertical-align: -0.3em;
+    background-color: currentColor;
+    mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+  }
+
+  .icon--s {
+    inline-size: 14px;
+    block-size: 14px;
+  }
+
+  .icon--m {
+    inline-size: 20px;
+    block-size: 20px;
+  }
+
+  .icon--l {
+    inline-size: 22px;
+    block-size: 22px;
+  }
+
+  .icon[data-icon='shield-check'] {
+    mask-image: url(./icons/shield-check.svg);
+  }
+  .icon[data-icon='refresh'] {
+    mask-image: url(./icons/refresh.svg);
+  }
+  .icon[data-icon='lock'] {
+    mask-image: url(./icons/lock.svg);
+  }
+  .icon[data-icon='cloud'] {
+    mask-image: url(./icons/cloud.svg);
+  }
+  .icon[data-icon='cloud-up'] {
+    mask-image: url(./icons/cloud-up.svg);
+  }
+  .icon[data-icon='bulb'] {
+    mask-image: url(./icons/bulb.svg);
+  }
+  .icon[data-icon='info'] {
+    mask-image: url(./icons/info.svg);
+  }
+  .icon[data-icon='check'] {
+    mask-image: url(./icons/check.svg);
+  }
+  .icon[data-icon='cross'] {
+    mask-image: url(./icons/cross.svg);
+  }
+  .icon[data-icon='alert'] {
+    mask-image: url(./icons/alert.svg);
+  }
+  .icon[data-icon='chevron-down'] {
+    mask-image: url(./icons/chevron-down.svg);
+  }
+  .icon[data-icon='arrow-left'] {
+    mask-image: url(./icons/arrow-left.svg);
+  }
+  .icon[data-icon='download'] {
+    mask-image: url(./icons/download.svg);
+  }
+  .icon[data-icon='device'] {
+    mask-image: url(./icons/device.svg);
+  }
+  .icon[data-icon='eye-off'] {
+    mask-image: url(./icons/eye-off.svg);
+  }
+  .icon[data-icon='dot'] {
+    mask-image: url(./icons/dot.svg);
+  }
+  .icon[data-icon='dots'] {
+    mask-image: url(./icons/dots.svg);
+  }
+  .icon[data-icon='minus'] {
+    mask-image: url(./icons/minus.svg);
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* ---- Top bar: logo, name, model pill. ---- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .topbar__title {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--text-l);
+    line-height: var(--leading-l);
+    font-weight: 700;
+  }
+
+  .logo {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: 28px;
+    block-size: 28px;
+    border-radius: 7px;
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  /* The model pill: neutral in every state; the word says it, the mark repeats it. */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-inline-size: 70%;
+    min-width: 0;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-2);
+    color: var(--color-text-2);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pill__word {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pill__mark {
+    display: inline-block;
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 50%;
+    background: var(--color-text-2);
+  }
+
+  .pill[data-state='loading'] .pill__mark,
+  .pill[data-state='downloading'] .pill__mark {
+    inline-size: 12px;
+    block-size: 12px;
+    border: 2px solid var(--color-border-strong);
+    border-block-start-color: var(--color-accent);
+    background: transparent;
+    animation: spin 1s linear infinite;
+  }
+
+  .pill[data-state='unavailable'] .pill__mark,
+  .pill[data-state='failed'] .pill__mark,
+  .pill[data-state='not-downloaded'] .pill__mark {
+    inline-size: 12px;
+    block-size: 12px;
+    border-radius: 0;
+    mask-image: url(./icons/alert.svg);
+    mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+  }
+
+  .pill__count {
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-3);
+  }
+
+  .pill__count:empty {
+    display: none;
+  }
+
+  /* On a narrow panel the word keeps its place and the counter gives way. */
+  @container (width < 360px) {
+    .pill__count {
+      display: none;
+    }
+  }
+
+  /* ---- Cards and boxes. ---- */
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+  }
+
+  .card--pad {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  /* An info box: one sentence with an icon, on the accent tint. */
+  .note {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-box);
+    background: var(--color-accent-tint);
+    color: var(--color-accent-text);
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
+  }
+
+  /* ---- Banner: the model needs the user (download, unavailable). ---- */
+  .banner {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+  }
+
+  .banner__icon {
+    color: var(--color-accent);
+  }
+
+  .banner[data-state='unavailable'] .banner__icon,
+  .banner[data-state='failed'] .banner__icon {
+    color: var(--color-warning);
+  }
+
+  .banner__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .banner__title {
+    font-size: var(--text-m);
+    line-height: var(--leading-m);
+    font-weight: 600;
+  }
+
+  .banner__text {
+    color: var(--color-text-2);
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
+  }
+
+  /* ---- Progress bar with a real percentage. ---- */
+  .progress {
+    block-size: 6px;
+    border-radius: 3px;
+    background: var(--color-surface-2);
+    overflow: hidden;
+  }
+
+  .progress__bar {
+    display: block;
+    block-size: 100%;
+    inline-size: var(--progress, 0%);
+    border-radius: 3px;
+    background: var(--color-accent);
+    transition: inline-size 120ms linear;
+  }
+
+  /* ---- Buttons: filled, outlined, plain, icon-only. One filled button per screen. ---- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-block-size: var(--control-height);
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-box);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: var(--color-surface-2);
+  }
+
+  .btn:disabled {
+    opacity: 0.55;
+  }
+
+  .btn--primary {
+    border-color: transparent;
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .btn--primary:hover:not(:disabled) {
+    background: var(--color-accent);
+    filter: brightness(0.95);
+  }
+
+  .btn--plain {
+    min-block-size: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .btn--plain:hover:not(:disabled) {
+    background: transparent;
+    text-decoration: underline;
+  }
+
+  .btn--icon {
+    flex: none;
+    inline-size: var(--control-height);
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-text-2);
+  }
+
+  .btn--tall {
+    min-block-size: var(--control-height-l);
+  }
+
+  /* ---- Form fields. ---- */
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .field__label {
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
+    font-weight: 600;
+    color: var(--color-text-2);
+  }
+
+  .field__input,
+  .field__select {
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-block-size: var(--control-height);
+    padding: 0 var(--space-3);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-box);
+    background: var(--color-surface);
+  }
+
+  .field__textarea {
+    box-sizing: border-box;
+    inline-size: 100%;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-box);
+    background: var(--color-surface);
+    resize: vertical;
+  }
+
+  .check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  /* ---- Folds: native <details> as a card. ---- */
+  .fold {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+  }
+
+  .fold__summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-block-size: var(--control-height);
+    padding: var(--space-2) var(--space-4);
+    font-weight: 600;
+    list-style: none;
+  }
+
+  .fold__summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .fold__summary::after {
+    content: '';
+    margin-inline-start: auto;
+    inline-size: 16px;
+    block-size: 16px;
+    background: currentColor;
+    mask-image: url(./icons/chevron-down.svg);
+    mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    transition: transform 150ms;
+  }
+
+  .fold[open] > .fold__summary::after {
+    transform: rotate(180deg);
+  }
+
+  .fold__body {
+    padding: 0 var(--space-4) var(--space-4);
+  }
+
+  /* ---- Section title: small, grey, above a list. ---- */
+  .section-title {
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
+    font-weight: 600;
+    color: var(--color-text-2);
+  }
+
+  /* ---- Empty state: left-aligned, no illustration. ---- */
+  .empty__heading {
+    font-size: var(--text-xl);
+    line-height: var(--leading-xl);
+    font-weight: 700;
+  }
+
+  .point {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+  }
+
+  .point__icon {
+    color: var(--color-accent);
+  }
+
+  .point__lead {
+    font-weight: 600;
+  }
+
+  /* ---- Email strip: subject, sender (domain first), sender status, refresh. ---- */
+  .strip {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+    padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+  }
+
+  .strip__text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .strip__subject {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .strip__sender {
+    overflow-wrap: anywhere;
+  }
+
+  .strip__domain {
+    font-weight: 700;
+  }
+
+  .strip__name {
+    color: var(--color-text-3);
+  }
+
+  .strip__address {
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    color: var(--color-text-3);
+    overflow-wrap: anywhere;
+  }
+
+  .strip__auth {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-block-start: var(--space-1);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    color: var(--color-text-2);
+  }
+
+  .strip__auth[data-state='unconfirmed'] {
+    color: var(--color-text-3);
+  }
+
+  /* ---- Status line under the strip: muted, red for errors. ---- */
+  .status {
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    color: var(--color-text-3);
+    overflow-wrap: anywhere;
+  }
+
+  .status--error {
+    color: var(--color-danger-text);
+    font-weight: 600;
+  }
+
+  /* ---- Verdict band (restyled in the verdict PR; the colours come from data-risk). ---- */
+  .band {
+    --band-color: var(--color-pending);
+    --band-text: var(--color-pending-text);
+    --band-tint: var(--color-pending-tint);
+    --band-border: var(--color-pending-border);
+    --band-on: var(--color-on-pending);
+    background: var(--color-surface);
+    border: 1px solid var(--band-border);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+  }
+
+  .band[data-risk='safe'] {
+    --band-color: var(--color-safe);
+    --band-text: var(--color-safe-text);
+    --band-tint: var(--color-safe-tint);
+    --band-border: var(--color-safe-border);
+    --band-on: var(--color-on-safe);
+  }
+
+  .band[data-risk='suspicious'] {
+    --band-color: var(--color-warning);
+    --band-text: var(--color-warning-text);
+    --band-tint: var(--color-warning-tint);
+    --band-border: var(--color-warning-border);
+    --band-on: var(--color-on-warning);
+  }
+
+  .band[data-risk='dangerous'] {
+    --band-color: var(--color-danger);
+    --band-text: var(--color-danger-text);
+    --band-tint: var(--color-danger-tint);
+    --band-border: var(--color-danger-border);
+    --band-on: var(--color-on-danger);
+  }
+
+  .band__head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--band-tint);
+  }
+
+  .band__word {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: var(--text-l);
+    line-height: var(--leading-l);
+    font-weight: 700;
+    color: var(--band-text);
+  }
+
+  /* The symbol is decoration (no alternative text): the word says the same. The circle is the
+     ::before, the icon the ::after drawn over it (a mask needs its own box). */
+  .band__word {
+    position: relative;
+  }
+
+  .band__word::before {
+    content: '';
+    flex: none;
+    inline-size: 32px;
+    block-size: 32px;
+    border-radius: 50%;
+    background: var(--band-color);
+  }
+
+  .band__word::after {
+    content: '';
+    mask-image: url(./icons/dots.svg);
+    position: absolute;
+    inset-inline-start: 8px;
+    inset-block-start: 50%;
+    inline-size: 16px;
+    block-size: 16px;
+    transform: translateY(-50%);
+    background: var(--band-on);
+    mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+  }
+
+  .band[data-risk='safe'] .band__word::after {
+    mask-image: url(./icons/check.svg);
+  }
+
+  .band[data-risk='suspicious'] .band__word::after {
+    mask-image: url(./icons/alert.svg);
+  }
+
+  .band[data-risk='dangerous'] .band__word::after {
+    mask-image: url(./icons/cross.svg);
+  }
+
+  .band__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .band__body:empty {
+    display: none;
+  }
+
+  .band__line {
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
+    color: var(--color-text-2);
+  }
+
+  .band__line:empty {
+    display: none;
+  }
+
+  /* "The AI check failed": the user must see that only the rules checked this email. */
+  .band__line.ai-failed {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  .band__reasons {
+    padding-inline-start: 18px;
+    list-style: disc;
+  }
+
+  .band__reasons:empty {
+    display: none;
+  }
+
+  .band__advice {
+    display: flex;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-box);
+    background: var(--color-surface-2);
+  }
+
+  .band__advice:has(> p:empty) {
+    display: none;
+  }
+
+  /* ---- Details list (tier 3). ---- */
+  .details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .details__term {
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
+    font-weight: 600;
+    color: var(--color-text-2);
+  }
+
+  .details__value {
+    overflow-wrap: anywhere;
+  }
+
+  /* The email text scrolls inside a fixed box: a 20,000-character body must not push the parts
+     below it off screen. */
+  .details__value--text {
+    white-space: pre-wrap;
+    max-block-size: 200px;
+    overflow-y: auto;
+  }
+
+  /* ---- Findings list (restyled in the findings PR). ---- */
+  .findings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding-inline-start: 18px;
+    list-style: disc;
+  }
+
+  .finding > strong {
+    font-weight: 600;
+  }
+
+  .finding.danger > strong {
+    color: var(--color-danger-text);
+  }
+
+  .finding.warning > strong {
+    color: var(--color-warning-text);
+  }
+
+  /* ---- Links list (restyled in the findings PR). ---- */
+  .links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .link {
+    overflow-wrap: anywhere;
+  }
+
+  .link .domain {
+    font-weight: 700;
+  }
+
+  .link .mark {
+    font-weight: 600;
+  }
+
+  .link.danger .mark {
+    color: var(--color-danger-text);
+  }
+
+  .link.warning .mark {
+    color: var(--color-warning-text);
+  }
+
+  .link .url {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    color: var(--color-text-2);
+  }
+
+  .link .link-text {
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    color: var(--color-text-3);
+  }
+
+  /* ---- Deep check (restyled in the deep check PR). ---- */
+  .deep-check__title {
+    font-size: var(--text-m);
+    line-height: var(--leading-m);
+    font-weight: 600;
+  }
+
+  /* Exactly what will be sent: monospace, scrollable, never cut. */
+  .data {
+    padding: var(--space-2) var(--space-3);
+    max-block-size: 320px;
+    overflow: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-box);
+    background: var(--color-bg);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: var(--leading-s);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* ---- Developer tools (dev builds only). ---- */
+  .output {
+    font: inherit;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+
+@layer utilities {
+  .text-secondary {
+    color: var(--color-text-2);
+  }
+
+  .text-muted {
+    color: var(--color-text-3);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .text-small {
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
 }

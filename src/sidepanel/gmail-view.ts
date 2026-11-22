@@ -13,12 +13,17 @@ export interface GmailViewUi {
    * is false while the headers are still loading.
    */
   show(email: Email, status: string, headersNote?: string, final?: boolean): void;
-  /** Hides the email view. */
-  hide(): void;
+  /**
+   * Hides the email view. `reason` says why there is nothing to show: no email is open on the
+   * Gmail tab, the tab is not Gmail, or the open email could not be read.
+   */
+  hide(reason: EmptyReason): void;
   setStatus(text: string, isError?: boolean): void;
 }
 
-const CHECKED = 'Checked automatically. Nothing left your browser.';
+export type EmptyReason = 'idle' | 'not-gmail' | 'unreadable';
+
+const CHECKED = 'Checked automatically on this device.';
 
 const FAILURES: Record<OriginalFailure, string> = {
   'no-account-key': "Gmail's page has changed",
@@ -49,11 +54,11 @@ export function createGmailView(ui: GmailViewUi): GmailView {
   let source: 'none' | 'gmail' | 'paste' = 'none';
 
   /** No Gmail email to show: hide the Gmail email, but leave a pasted one alone. */
-  const idle = (status: string, isError = false): void => {
+  const idle = (reason: EmptyReason, status: string, isError = false): void => {
     current = undefined;
     if (source === 'gmail') {
       source = 'none';
-      ui.hide();
+      ui.hide(reason);
     }
     if (source !== 'paste') ui.setStatus(status, isError);
   };
@@ -103,15 +108,15 @@ export function createGmailView(ui: GmailViewUi): GmailView {
           }
           break;
         case 'no-email':
-          idle(IDLE);
+          idle('idle', IDLE);
           break;
         case 'unreadable':
-          idle('Could not read this email. Gmail may have changed its page.', true);
+          idle('unreadable', 'Could not read this email. Gmail may have changed its page.', true);
           break;
       }
     },
     disconnected() {
-      idle(NOT_GMAIL);
+      idle('not-gmail', NOT_GMAIL);
     },
     pasted() {
       current = undefined;

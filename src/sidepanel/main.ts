@@ -18,18 +18,20 @@ import { checkEmail } from '../rules';
 import { createAiCheck } from './ai-view';
 import { createDeepCheck } from './deep-check-view';
 import { showEmail } from './email-view';
-import { createGmailView } from './gmail-view';
+import { createGmailView, type EmptyReason } from './gmail-view';
 import { showRuleCheck } from './findings-view';
 import { setUpPaste } from './paste-view';
+import { countElapsed, seconds } from './ui';
 import { watchActiveTab } from './watch';
+
+/** Where "How it works" leads: the README of the public repository. */
+const HOW_IT_WORKS_URL = 'https://github.com/ricardo4raus/phishlocal_extension#readme';
 
 function byId<T extends HTMLElement>(id: string): T {
   const element = document.querySelector<T>(`#${id}`);
   if (!element) throw new Error(`Side panel: #${id} is missing in index.html`);
   return element;
 }
-
-const modelStatus = byId<HTMLElement>('model-status');
 
 // The settings from Remote Config (at most 2 s; otherwise the stored or default values), fixed
 // for this panel before the first model session is made and before any button works. Until then
@@ -40,8 +42,121 @@ configureAi(settings);
 byId<HTMLElement>('app').removeAttribute('inert');
 byId<HTMLElement>('panel-starting').remove();
 
+/* ------------------------------------------------------------------------------------------------
+ * Parts that exist only in some builds: the sample row (dev and judges builds, for the demo and
+ * for judges without phishing in their inbox) and the developer tools (dev builds).
+ * --------------------------------------------------------------------------------------------- */
+
+const isDev = import.meta.env.DEV;
+const isJudges = import.meta.env.MODE === 'judges';
+byId<HTMLElement>('sample-row').hidden = !(isDev || isJudges);
+byId<HTMLElement>('dev-tools').hidden = !isDev;
+
+/* ------------------------------------------------------------------------------------------------
+ * The model pill (top bar) and the model banner: one state, shown twice.
+ * --------------------------------------------------------------------------------------------- */
+
+/** On-device model state, set by the warm-up. `failed`: the warm-up threw; a prompt retries it. */
+type ModelState = WarmUpResult['state'] | 'loading' | 'downloading' | 'failed';
+let modelState: ModelState = 'loading';
+
+const modelPill = byId<HTMLElement>('model-pill');
+const modelStatus = byId<HTMLElement>('model-status');
 const modelProgress = byId<HTMLElement>('model-progress');
+const modelBanner = byId<HTMLElement>('model-banner');
+const modelBannerIcon = byId<HTMLElement>('model-banner-icon');
+const modelBannerTitle = byId<HTMLElement>('model-banner-title');
+const modelBannerText = byId<HTMLElement>('model-banner-text');
+const modelBannerActions = byId<HTMLElement>('model-banner-actions');
+const modelProgressBar = byId<HTMLElement>('model-progressbar');
 const modelDownload = byId<HTMLButtonElement>('model-download');
+
+const PILL_WORDS: Record<ModelState, string> = {
+  loading: 'On-device AI loading',
+  ready: 'On-device AI ready',
+  downloading: 'On-device AI',
+  'not-downloaded': 'AI not set up',
+  unavailable: 'AI not available',
+  failed: 'AI not loaded',
+};
+
+interface Banner {
+  icon: 'download' | 'alert' | 'info';
+  title: string;
+  text: string;
+}
+
+/** What the banner says per state; states without an entry show no banner. */
+const BANNERS: Partial<Record<ModelState, Banner>> = {
+  'not-downloaded': {
+    icon: 'download',
+    title: 'Set up on-device AI',
+    text: 'Chrome downloads Gemini Nano once, about 4 GB. After that, emails are checked on this device, also offline. Until then they get the basic checks only.',
+  },
+  downloading: {
+    icon: 'download',
+    title: 'Setting up on-device AI',
+    text: 'Chrome is downloading Gemini Nano. The basic checks already work while you wait, and you can keep using Gmail.',
+  },
+  unavailable: {
+    icon: 'alert',
+    title: 'On-device AI is not available on this computer',
+    text: 'Chrome cannot run Gemini Nano here. Emails get the basic checks only; the deep check in the cloud still works where it is offered.',
+  },
+  failed: {
+    icon: 'alert',
+    title: 'On-device AI could not load',
+    text: 'Chrome could not load Gemini Nano. Emails get the basic checks only; the next check tries again.',
+  },
+};
+
+/**
+ * Shows the model state in the pill and the banner. `note` is a sentence put in front of the
+ * banner's text (e.g. why a download failed).
+ */
+function setModelState(state: ModelState, note = ''): void {
+  modelState = state;
+  modelPill.dataset.state = state;
+  modelStatus.textContent = PILL_WORDS[state];
+  // The Download button may go away with the state: its focus moves to the banner's title.
+  const buttonHadFocus = document.activeElement === modelDownload;
+  const banner = BANNERS[state];
+  modelBanner.hidden = !banner;
+  if (banner) {
+    modelBanner.dataset.state = state;
+    modelBannerIcon.dataset.icon = banner.icon;
+    modelBannerTitle.textContent = banner.title;
+    modelBannerText.textContent = note ? `${note} ${banner.text}` : banner.text;
+  }
+  modelBannerActions.hidden = state !== 'not-downloaded';
+  // The bar shows only once Chrome has reported a percentage (setDownloadProgress).
+  modelProgressBar.hidden = true;
+  if (buttonHadFocus && modelBannerActions.hidden) modelBannerTitle.focus();
+}
+
+/** The download percentage in the pill and the bar, once Chrome reports one. */
+function setDownloadProgress(loaded: number): void {
+  const percent = Math.round(loaded * 100);
+  modelProgress.textContent = `${percent}%`;
+  modelProgressBar.hidden = false;
+  modelProgressBar.style.setProperty('--progress', `${percent}%`);
+  modelProgressBar.setAttribute('aria-valuenow', String(percent));
+}
+
+/**
+ * Waits for the model like `ensureModelLoaded()`, and tells the pill when a load after a failed
+ * warm-up succeeded (the warm-up is the only other thing that sets the state).
+ */
+async function modelReady(language: string): Promise<boolean> {
+  const ready = await ensureModelLoaded(language);
+  if (ready && (modelState === 'failed' || modelState === 'loading')) setModelState('ready');
+  return ready;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Developer tools: the hybrid test prompt (dev builds only).
+ * --------------------------------------------------------------------------------------------- */
+
 const promptInput = byId<HTMLTextAreaElement>('prompt');
 const forceCloudRow = byId<HTMLLabelElement>('force-cloud-row');
 const forceCloudInput = byId<HTMLInputElement>('force-cloud');
@@ -51,11 +166,11 @@ const progress = byId<HTMLElement>('progress');
 const output = byId<HTMLPreElement>('output');
 
 // The cloud switch exists only to test the cloud path during development.
-forceCloudRow.hidden = !import.meta.env.DEV;
+forceCloudRow.hidden = !isDev;
 
 function setStatus(text: string, isError = false): void {
   status.textContent = text;
-  status.classList.toggle('error', isError);
+  status.classList.toggle('status--error', isError);
 }
 
 function sourceLabel(source: InferenceSource | undefined): string {
@@ -63,29 +178,6 @@ function sourceLabel(source: InferenceSource | undefined): string {
   if (source === InferenceSource.IN_CLOUD) return 'Cloud (Gemini via Firebase AI Logic)';
   return 'Unknown source';
 }
-
-const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)} s`;
-
-/**
- * Counts seconds in `element` until the returned function is called, which clears it. The counter
- * sits next to a live region, not in it, so a screen reader does not announce every second.
- */
-function countSeconds(element: HTMLElement): () => void {
-  const start = performance.now();
-  const show = (): void => {
-    element.textContent = `${Math.round((performance.now() - start) / 1000)} s`;
-  };
-  show();
-  const timer = setInterval(show, 1000);
-  return () => {
-    clearInterval(timer);
-    element.textContent = '';
-  };
-}
-
-/** On-device model state, set by the warm-up. `failed`: the warm-up threw; a prompt retries it. */
-type ModelState = WarmUpResult['state'] | 'loading' | 'failed';
-let modelState: ModelState = 'loading';
 
 /** Where the next prompt will most likely run (the SDK makes the final decision). */
 function expectedRoute(forceCloud: boolean): 'cloud' | 'on-device' | 'unknown' {
@@ -116,7 +208,7 @@ async function run(): Promise<void> {
 
   // Waiting for the model can take minutes, so show that the panel is alive and where it runs.
   setStatus(progressText(forceCloud));
-  const stopCounting = countSeconds(progress);
+  const stopCounting = countElapsed(progress);
 
   try {
     const result = await runPrompt(prompt, forceCloud);
@@ -139,10 +231,18 @@ async function run(): Promise<void> {
 
 runButton.addEventListener('click', () => void run());
 
+/* ------------------------------------------------------------------------------------------------
+ * The email: empty state, strip, verdict, deep check, details.
+ * --------------------------------------------------------------------------------------------- */
+
+const emptySection = byId<HTMLElement>('empty');
+const emptyHeading = byId<HTMLElement>('empty-heading');
+const emptyText = byId<HTMLElement>('empty-text');
+const emailSection = byId<HTMLElement>('email');
 const readEmailButton = byId<HTMLButtonElement>('read-email');
 const emailStatus = byId<HTMLParagraphElement>('email-status');
 const emailElements = {
-  details: byId<HTMLDListElement>('email-details'),
+  details: byId<HTMLElement>('email-details'),
   sender: byId<HTMLElement>('email-sender'),
   subject: byId<HTMLElement>('email-subject'),
   auth: byId<HTMLElement>('email-auth'),
@@ -151,8 +251,40 @@ const emailElements = {
   returnPath: byId<HTMLElement>('email-return-path'),
   links: byId<HTMLOListElement>('email-links'),
   body: byId<HTMLElement>('email-body'),
+  strip: {
+    subject: byId<HTMLElement>('strip-subject'),
+    domain: byId<HTMLElement>('strip-domain'),
+    name: byId<HTMLElement>('strip-name'),
+    address: byId<HTMLElement>('strip-address'),
+    auth: byId<HTMLElement>('strip-auth'),
+    authIcon: byId<HTMLElement>('strip-auth-icon'),
+    authText: byId<HTMLElement>('strip-auth-text'),
+  },
 };
 const findingsList = byId<HTMLUListElement>('email-findings');
+
+/** The empty state's words per reason. */
+const EMPTY: Record<EmptyReason, { heading: string; text: string }> = {
+  idle: {
+    heading: 'Open an email in Gmail',
+    text: 'PhishLocal checks it here, automatically, while this panel is open. The email never leaves your browser.',
+  },
+  'not-gmail': {
+    heading: 'Open Gmail in this tab',
+    text: 'PhishLocal checks the emails you open in Gmail, automatically, while this panel is open. If Gmail was open before PhishLocal was installed or updated, reload the Gmail tab. You can also paste an email from any mail app.',
+  },
+  unreadable: {
+    heading: 'Could not read this email',
+    text: 'Gmail may have changed its page. You can paste the email instead.',
+  },
+};
+
+function showEmpty(reason: EmptyReason): void {
+  emptyHeading.textContent = EMPTY[reason].heading;
+  emptyText.textContent = EMPTY[reason].text;
+  emptySection.hidden = false;
+  emailSection.hidden = true;
+}
 
 /** Where the deep check's privacy level is remembered in this browser. */
 const PRIVACY_LEVEL_KEY = 'phishlocal.deepCheck.privacyLevel';
@@ -172,7 +304,7 @@ const aiCheck = createAiCheck(
   {
     run: runAiCheck,
     uiLanguage: () => chrome.i18n.getUILanguage(),
-    modelReady: ensureModelLoaded,
+    modelReady,
     runTimeoutMs: settings.aiCheckTimeoutMs,
   },
 );
@@ -200,7 +332,7 @@ const deepCheck = createDeepCheck(
   {
     available: appCheckEnabled,
     uiLanguage: () => chrome.i18n.getUILanguage(),
-    modelReady: ensureModelLoaded,
+    modelReady,
     findNames,
     run: runCloudCheck,
     namesTimeoutMs: settings.namesTimeoutMs,
@@ -225,30 +357,41 @@ const deepCheck = createDeepCheck(
 
 function setEmailStatus(text: string, isError = false): void {
   emailStatus.textContent = text;
-  emailStatus.classList.toggle('error', isError);
+  emailStatus.classList.toggle('status--error', isError);
 }
 
-/**
- * Shows an email from Gmail or the paste area with its rule findings; long texts get a note.
- * `headersNote` stands in for the sender checks while an email has no headers.
- */
-function displayEmail(email: Email, message: string, headersNote?: string, final = true): void {
+interface DisplayOptions {
+  /** Stands in for the sender checks while an email has no headers. */
+  headersNote?: string;
+  /** False while a Gmail email still waits for its headers. */
+  final?: boolean;
+  /** The email was read from Gmail's page (its sender checks come from Gmail's own server). */
+  fromGmail: boolean;
+}
+
+/** Shows an email from Gmail or the paste area with its rule findings; long texts get a note. */
+function displayEmail(email: Email, message: string, options: DisplayOptions): void {
+  const { headersNote, final = true, fromGmail } = options;
   const findings = showRuleCheck(() => checkEmail(email), findingsList);
-  showEmail(email, emailElements, headersNote, findings);
+  showEmail(email, emailElements, { headersNote, findings, loading: !final, fromGmail });
+  emptySection.hidden = true;
+  emailSection.hidden = false;
   setEmailStatus(email.truncated ? `${message} The text is long and was cut.` : message);
   aiCheck.shown(email, findings, final);
   deepCheck.shown(email, findings, final);
 }
 
-function hideEmail(): void {
+function hideEmail(reason: EmptyReason = 'idle'): void {
   emailElements.details.hidden = true;
   aiCheck.hidden();
   deepCheck.hidden();
+  showEmpty(reason);
 }
 
 // While the panel is open, every email opened in Gmail is checked automatically.
 const gmailView = createGmailView({
-  show: displayEmail,
+  show: (email, message, headersNote, final) =>
+    displayEmail(email, message, { headersNote, final, fromGmail: true }),
   hide: hideEmail,
   setStatus: setEmailStatus,
 });
@@ -259,11 +402,24 @@ const watch = watchActiveTab({
 
 readEmailButton.addEventListener('click', () => watch.scan());
 
+/* ------------------------------------------------------------------------------------------------
+ * Paste: the fallback for other mail apps (and, in dev and judges builds, the samples).
+ * --------------------------------------------------------------------------------------------- */
+
+const pasteFold = byId<HTMLDetailsElement>('paste');
+const pasteText = byId<HTMLTextAreaElement>('paste-text');
+const pasteStatus = byId<HTMLElement>('paste-status');
+
+function setPasteStatus(text: string, isError = false): void {
+  pasteStatus.textContent = text;
+  pasteStatus.classList.toggle('status--error', isError);
+}
+
 setUpPaste(
   {
     sender: byId<HTMLInputElement>('paste-sender'),
     subject: byId<HTMLInputElement>('paste-subject'),
-    text: byId<HTMLTextAreaElement>('paste-text'),
+    text: pasteText,
     use: byId<HTMLButtonElement>('paste-use'),
     clear: byId<HTMLButtonElement>('paste-clear'),
     sample: byId<HTMLSelectElement>('sample-select'),
@@ -272,44 +428,49 @@ setUpPaste(
   {
     onEmail: (email, message) => {
       gmailView.pasted();
-      displayEmail(email, message);
+      setPasteStatus('');
+      displayEmail(email, message, { fromGmail: false });
     },
     onError: (message) => {
       gmailView.pasted();
       hideEmail();
-      setEmailStatus(message, true);
+      setPasteStatus(message, true);
     },
     onClear: () => {
       gmailView.cleared();
       hideEmail();
+      setPasteStatus('');
       setEmailStatus('');
+      // The Gmail tab may still show an email: back to it.
+      watch.scan();
     },
   },
 );
 
+byId<HTMLButtonElement>('paste-open').addEventListener('click', () => {
+  pasteFold.open = true;
+  pasteText.focus();
+});
+
+byId<HTMLButtonElement>('how-it-works').addEventListener('click', () => {
+  void chrome.tabs.create({ url: HOW_IT_WORKS_URL });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * The on-device model: warm-up when the panel opens, download on request.
+ * --------------------------------------------------------------------------------------------- */
+
 /** Loads the on-device model as soon as the panel opens, so the first check does not wait. */
 async function warmUp(): Promise<void> {
-  modelStatus.textContent =
-    'Loading the on-device model (the first load after Chrome starts can take several minutes)…';
-  const stopCounting = countSeconds(modelProgress);
-
+  setModelState('loading');
+  const stopCounting = countElapsed(modelProgress);
   try {
     const result = await warmUpOnDevice(checkLanguage);
-    modelState = result.state;
-    if (result.state === 'ready') {
-      modelStatus.textContent = `On-device model ready (loaded in ${seconds(result.durationMs)})`;
-    } else if (result.state === 'not-downloaded') {
-      modelStatus.textContent =
-        'On-device model not downloaded yet. The AI check needs it; the rule checks work without it.';
-      modelDownload.hidden = false;
-    } else {
-      modelStatus.textContent =
-        'On-device model not available on this device. Emails get the rule checks only; test prompts use the cloud.';
-    }
+    // A download started meanwhile (the button is a click away) owns the state until it ends.
+    if (modelState !== 'downloading') setModelState(result.state);
   } catch (error) {
-    modelState = 'failed';
     const message = error instanceof Error ? error.message : String(error);
-    modelStatus.textContent = `On-device model could not load: ${message}`;
+    if (modelState !== 'downloading') setModelState('failed', `${message}.`);
   } finally {
     stopCounting();
   }
@@ -318,30 +479,24 @@ async function warmUp(): Promise<void> {
 /** Downloads the model on click: Chrome allows the download only after a user action. */
 async function downloadModel(): Promise<void> {
   modelDownload.disabled = true;
-  modelStatus.textContent = 'Downloading the on-device model…';
-  modelProgress.textContent = '0 %';
+  setModelState('downloading');
   // A progress event can arrive after the download ended; it must not show a stale percentage.
   let done = false;
   try {
     const result = await downloadOnDeviceModel(checkLanguage, (loaded) => {
-      if (!done) modelProgress.textContent = `${Math.round(loaded * 100)} %`;
+      if (!done) setDownloadProgress(loaded);
     });
     done = true;
     modelProgress.textContent = '';
-    modelState = result.state;
-    if (result.state === 'ready') {
-      modelStatus.textContent = 'On-device model ready.';
-      modelDownload.hidden = true;
-      // The email on screen was checked by the rules only: give it the AI check now.
-      aiCheck.recheck();
-    } else {
-      modelStatus.textContent = 'On-device model not available on this device.';
-    }
+    setModelState(result.state);
+    // The email on screen was checked by the rules only: give it the AI check now.
+    if (result.state === 'ready') aiCheck.recheck();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
     done = true;
     modelProgress.textContent = '';
-    modelStatus.textContent = `The download failed: ${message}`;
+    const message = error instanceof Error ? error.message : String(error);
+    // Back to the offer, so the user can try again.
+    setModelState('not-downloaded', `The download failed (${message}).`);
   } finally {
     modelDownload.disabled = false;
   }
@@ -349,4 +504,5 @@ async function downloadModel(): Promise<void> {
 
 modelDownload.addEventListener('click', () => void downloadModel());
 
+showEmpty('idle');
 void warmUp();

@@ -1,10 +1,25 @@
 import type { AuthResults, Email, EmailLink, Mailbox } from '../email';
+import { hostOfAddress } from '../rules/domains';
 import type { Finding, Severity } from '../rules';
 import { revealOverrides } from '../rules/unicode';
+import { GMAIL_SERVER } from '../raw/gmail-original-page';
 import { linkDisplay } from './link-display';
+import { type IconName, setText } from './ui';
 
 /** Number of body characters shown in the panel (the full text is kept for the check). */
 const BODY_PREVIEW_CHARS = 1_000;
+
+/** The email strip: subject, sender with the domain first, and the sender status. */
+export interface StripElements {
+  subject: HTMLElement;
+  domain: HTMLElement;
+  name: HTMLElement;
+  address: HTMLElement;
+  /** The sender status line; its `data-state` picks the icon's colour. */
+  auth: HTMLElement;
+  authIcon: HTMLElement;
+  authText: HTMLElement;
+}
 
 export interface EmailElements {
   details: HTMLElement;
@@ -16,12 +31,27 @@ export interface EmailElements {
   returnPath: HTMLElement;
   links: HTMLOListElement;
   body: HTMLElement;
+  strip?: StripElements;
+}
+
+export interface ShowEmailOptions {
+  /** Replaces the hint in "Sender checks" while an email has no headers ("Loading from Gmail…"). */
+  headersNote?: string;
+  /** Links named by findings are marked. */
+  findings?: readonly Finding[];
+  /** The Gmail headers are still loading: the sender status says "Checking the sender…". */
+  loading?: boolean;
+  /**
+   * The headers were loaded from Gmail's page, where only Gmail's own server is trusted. Pasted
+   * raw source can carry any text, so its confirmation is credited to "your mail server".
+   */
+  fromGmail?: boolean;
 }
 
 /** Where to get the headers when the email was read without them. */
 export const HEADERS_HINT =
   'Not available. For the full check with SPF, DKIM and DMARC: in Gmail, open ⋮ → Show original → ' +
-  'Copy to clipboard, then paste it under "Or paste an email".';
+  'Copy to clipboard, then paste it under "Check another email".';
 
 const mailbox = ({ name, address }: Mailbox): string =>
   name && address ? `${name} <${address}>` : name || address || '–';
@@ -38,14 +68,30 @@ export function authSummary(auth: AuthResults | undefined): string {
   return `SPF ${auth.spf ?? 'none'} · DKIM ${dkim} · DMARC ${auth.dmarc ?? 'none'}, checked by ${auth.server}`;
 }
 
-/**
- * Puts email content into the page. Only as text (`textContent`): the content may come from an
- * attacker. Direction overrides are shown as `<U+202E>`, so "moc.lapyap" is not displayed as
- * "paypal.com" in the panel either.
- */
-const setText = (element: HTMLElement, text: string): void => {
-  element.textContent = revealOverrides(text);
-};
+/** The sender status in plain words (tier 1): confirmed by whom, not confirmed, or still checking. */
+export type SenderStatus = 'confirmed' | 'unconfirmed' | 'checking';
+
+export function senderStatus(
+  email: Email,
+  loading = false,
+  fromGmail = false,
+): { state: SenderStatus; text: string; icon: IconName } {
+  const auth = email.headers?.auth;
+  if (auth?.dmarc === 'pass') {
+    const by = fromGmail && auth.server === GMAIL_SERVER ? 'Gmail' : 'your mail server';
+    return { state: 'confirmed', text: `Sender confirmed by ${by}`, icon: 'check' };
+  }
+  if (loading && !email.headers) {
+    return { state: 'checking', text: 'Checking the sender…', icon: 'dot' };
+  }
+  return { state: 'unconfirmed', text: 'Sender not confirmed', icon: 'alert' };
+}
+
+/** The sender's domain, the one thing in the strip that an attacker cannot choose freely. */
+export function senderDomain(address: string): string {
+  const host = hostOfAddress(address);
+  return host?.domain ?? host?.hostname ?? '';
+}
 
 const MARK: Record<Severity, string> = { danger: 'Danger', warning: 'Warning', info: 'Note' };
 const STRENGTH: Record<Severity, number> = { danger: 2, warning: 1, info: 0 };
@@ -89,21 +135,36 @@ function linkItem(link: EmailLink, severity: Severity | undefined): HTMLLIElemen
   return item;
 }
 
+function showStrip(email: Email, strip: StripElements, loading: boolean, fromGmail: boolean): void {
+  setText(strip.subject, email.subject || '(no subject)');
+  const domain = senderDomain(email.sender.address);
+  setText(strip.domain, domain || email.sender.address || 'Unknown sender');
+  setText(strip.name, email.sender.name ? `· ${email.sender.name}` : '');
+  // The address line repeats the domain only when the address says more than it.
+  setText(strip.address, domain && email.sender.address !== domain ? email.sender.address : '');
+  const status = senderStatus(email, loading, fromGmail);
+  strip.auth.dataset.state = status.state;
+  strip.authIcon.dataset.icon = status.icon;
+  strip.authText.textContent = status.text;
+}
+
 /**
- * Shows the email. `headersNote` replaces the hint in "Sender checks" while an email has no
- * headers (e.g. "Loading from Gmail…"). Links named by `findings` are marked.
+ * Shows the email: the strip (when the panel has one) and the details. `headersNote` replaces
+ * the hint in "Sender checks" while an email has no headers (e.g. "Loading from Gmail…").
  */
 export function showEmail(
   email: Email,
   elements: EmailElements,
-  headersNote: string = HEADERS_HINT,
-  findings: readonly Finding[] = [],
+  options: ShowEmailOptions = {},
 ): void {
+  const { headersNote = HEADERS_HINT, findings = [], loading = false, fromGmail = false } = options;
+  if (elements.strip) showStrip(email, elements.strip, loading, fromGmail);
   setText(elements.sender, mailbox(email.sender));
   setText(elements.subject, email.subject || '–');
 
   const { headers } = email;
-  elements.auth.textContent = headers ? authSummary(headers.auth) : headersNote;
+  // The summary holds domains from the headers (email content): direction overrides revealed.
+  setText(elements.auth, headers ? authSummary(headers.auth) : headersNote);
   elements.headerRows.hidden = !headers;
   setText(elements.replyTo, headers?.replyTo.map(mailbox).join(', ') || '–');
   setText(elements.returnPath, headers?.returnPath || '–');
@@ -119,8 +180,10 @@ export function showEmail(
     elements.links.append(item);
   }
 
-  const preview = email.bodyText.slice(0, BODY_PREVIEW_CHARS);
-  const cut = email.bodyText.length > BODY_PREVIEW_CHARS || email.truncated;
+  // Cut by code points, so the preview never ends in half a character.
+  const chars = [...email.bodyText];
+  const preview = chars.slice(0, BODY_PREVIEW_CHARS).join('');
+  const cut = chars.length > BODY_PREVIEW_CHARS || email.truncated;
   setText(elements.body, cut ? `${preview}…` : preview || '–');
   elements.details.hidden = false;
 }
