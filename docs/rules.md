@@ -22,7 +22,10 @@ The code is in [`src/rules/`](../src/rules/); the entry point is `checkEmail(ema
    flag comes from several links, the one finding names all of them.
 
 A finding has a rule id, a severity, one English sentence and the evidence (the link, domain or
-phrases that triggered it, each cut to 200 characters). Findings of the link and lookalike rules
+phrases that triggered it, each cut to 200 characters; for the lookalike rules the host first and
+then the domain it imitates). The side panel shows danger and warning findings as red flags with a
+plain-word title per rule (`TITLES` in [`findings-view.ts`](../src/sidepanel/findings-view.ts),
+listed in [`ui-design.md`](ui-design.md)) and `info` findings as notes in "Email details". Findings of the link and lookalike rules
 also name the positions of their links (`links`), so the side panel can mark those links. A
 lookalike finding marks every link that goes to the lookalike domain, directly or by forwarding;
 a lookalike sender domain marks no link.
@@ -208,7 +211,8 @@ completely is a red flag of its own. Real emails stay far below both limits.
 1. Put it in the matching file in `src/rules/` (or a new one, called from `checkEmail()`), and add
    its id to `RuleId` in [`types.ts`](../src/rules/types.ts).
 2. Write the message from our own words and limited values (hostnames); put raw email text into
-   `evidence` with `clip()`.
+   `evidence` with `clip()`. Give the rule a plain-word title in `TITLES`
+   ([`findings-view.ts`](../src/sidepanel/findings-view.ts)) and in `ui-design.md`.
 3. Test both directions: what it must flag, and realistic harmless emails it must not flag.
 4. Keep the sample test green: both phishing samples get warnings, the harmless one none
    ([`tests/rules/check-email.test.ts`](../tests/rules/check-email.test.ts)).

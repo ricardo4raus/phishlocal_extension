@@ -1,64 +1,203 @@
-import type { Finding, Severity } from '../rules';
-
-const LABEL: Record<Severity, string> = { danger: 'Danger', warning: 'Warning', info: 'Note' };
-
-function item(severity: Severity, text: string): HTMLLIElement {
-  const element = document.createElement('li');
-  element.className = `finding ${severity}`;
-  const label = document.createElement('strong');
-  label.textContent = `${LABEL[severity]}: `;
-  element.append(label, text);
-  return element;
-}
-
-/** Link numbers named per finding; more are shortened to "…". */
-const MAX_LINK_NUMBERS = 5;
-
-/** " (link 2)" or " (links 1, 3, 4)": the numbers of the link list, which starts at 1. */
-function linkNote(links: readonly number[] | undefined): string {
-  if (!links || links.length === 0) return '';
-  const numbers = links.slice(0, MAX_LINK_NUMBERS).map((index) => index + 1);
-  const more = links.length > MAX_LINK_NUMBERS ? ', …' : '';
-  return ` (${links.length === 1 ? 'link' : 'links'} ${numbers.join(', ')}${more})`;
-}
-
-/**
- * Lists the rule findings. Only as text (`textContent`): messages and evidence contain email
- * content, which may come from an attacker.
+/*
+ * The red flags in the side panel (tier 2 in docs/ui-design.md): one row per danger or warning
+ * finding, with a plain-word title and the evidence; `info` findings are notes in "Email details"
+ * (tier 3). Everything is text (`textContent`): messages and evidence hold email content, which
+ * may come from an attacker.
  */
-export function showFindings(findings: readonly Finding[], list: HTMLUListElement): void {
-  list.replaceChildren(
-    ...findings.map((finding) =>
-      item(finding.severity, `${finding.message}${linkNote(finding.links)}`),
-    ),
-  );
-  if (findings.length === 0) {
-    // Rules only catch known tricks, so "nothing found" must not read as "safe".
-    const empty = document.createElement('li');
-    empty.textContent = 'The rules found no red flags. That does not prove the email is safe.';
-    list.append(empty);
+import type { Email } from '../email';
+import type { Finding, Severity } from '../rules';
+import type { RuleId } from '../rules/types';
+import { linkDisplay } from './link-display';
+import { el, icon, setText } from './ui';
+
+/** The plain-word title per rule (tier 1 and 2 never say "rule", "DKIM" or "DMARC"). */
+export const TITLES: Record<RuleId, string> = {
+  'dangerous-link': 'A link runs code instead of opening a page',
+  'hidden-link-target': 'A link hides where it really goes',
+  'ip-link': 'A link goes to a bare number address',
+  'international-domain': 'A web address uses letters from another alphabet',
+  'link-text-mismatch': "A link doesn't go where its text says",
+  'redirect-link': 'A link goes through a forwarding service',
+  'lookalike-domain': 'A web address imitates a known one',
+  'brand-in-subdomain': 'A known name is used in front of another address',
+  'brand-in-domain': "A web address contains a known name but isn't it",
+  'sender-name-domain': "The sender's name doesn't match the address",
+  'sender-name-brand': 'The sender claims a brand from another address',
+  'hidden-characters': 'Words contain invisible characters',
+  'mixed-script': 'Words mix letters from different alphabets',
+  'direction-override': 'Text is written backwards to disguise an address',
+  'reply-to-mismatch': 'Replies would go to a different company',
+  'dmarc-fail': "The sender's address is forged",
+  'auth-fail': "The sender's mail server didn't confirm this email",
+  'dkim-other-domain': 'Signed by another domain',
+  'no-auth-results': 'No sender checks in this email',
+  'incomplete-check': 'Part of this email could not be checked',
+  urgency: 'Time pressure',
+  threat: 'Threatens consequences',
+  credentials: 'Asks for passwords, identity or card details',
+  payment: 'Asks for a payment',
+};
+
+const BADGE: Record<Severity, string> = { danger: 'Danger', warning: 'Warning', info: 'Note' };
+
+/** Rules whose evidence is the words or phrases found: shown as chips. */
+const PHRASE_RULES: ReadonlySet<RuleId> = new Set([
+  'urgency',
+  'threat',
+  'credentials',
+  'payment',
+  'hidden-characters',
+  'mixed-script',
+]);
+
+/** Rules about the sender: evidence is [name, address]. */
+const SENDER_RULES: ReadonlySet<RuleId> = new Set(['sender-name-domain', 'sender-name-brand']);
+
+/** Rules whose title says it all; the sentence adds the how. */
+const SENTENCE_RULES: ReadonlySet<RuleId> = new Set([
+  'direction-override',
+  'reply-to-mismatch',
+  'dmarc-fail',
+  'auth-fail',
+  'incomplete-check',
+  'dangerous-link',
+  'international-domain',
+]);
+
+export interface FindingsElements {
+  /** The "Red flags" section, hidden when there is none. */
+  section: HTMLElement;
+  /** The count in the heading. */
+  count: HTMLElement;
+  /** The rows, one per danger or warning finding. */
+  list: HTMLUListElement;
+  /** The notes (`info` findings) in "Email details". */
+  notes: HTMLUListElement;
+}
+
+/** A labelled row of evidence: "Says" / "Opens". */
+function row(label: string, value: string, strong = false): HTMLElement[] {
+  const term = el('dt', 'flag__label', label);
+  const detail = el('dd', strong ? 'flag__value flag__value--strong' : 'flag__value');
+  setText(detail, value);
+  return [term, detail];
+}
+
+/** The evidence of a finding, in the form that fits its rule. */
+function evidence(finding: Finding, email: Email | undefined): HTMLElement[] {
+  const { rule } = finding;
+  if (PHRASE_RULES.has(rule)) {
+    if (finding.evidence.length === 0) return [];
+    const chips = el('div', 'cluster');
+    for (const phrase of finding.evidence) {
+      const chip = el('span', 'chip');
+      setText(chip, phrase);
+      chips.append(chip);
+    }
+    return [chips];
   }
+  if (SENDER_RULES.has(rule)) {
+    const [name = '', address = ''] = finding.evidence;
+    const rows = el('dl', 'flag__rows');
+    rows.append(...row('Name says', name), ...row('Address is', address, true));
+    return [rows];
+  }
+  if (SENTENCE_RULES.has(rule)) return [el('p', 'flag__sentence', finding.message)];
+  // Link rules: what the link says, and where it really goes.
+  const index = finding.links?.[0];
+  const link = index === undefined ? undefined : email?.links[index];
+  const rows = el('dl', 'flag__rows');
+  if (rule === 'lookalike-domain' || rule === 'brand-in-domain' || rule === 'brand-in-subdomain') {
+    const [host = '', reference] = finding.evidence;
+    if (reference) rows.append(...row('Looks like', reference));
+    rows.append(...row('Is', host, true));
+  } else if (link) {
+    const display = linkDisplay(link.href);
+    if (link.text) rows.append(...row('Says', link.text));
+    const target = display.forwardsTo ?? display.domain;
+    rows.append(...row('Opens', target || link.href, true));
+  } else {
+    return [el('p', 'flag__sentence', finding.message)];
+  }
+  const more = finding.links && finding.links.length > 1 ? finding.links.length - 1 : 0;
+  const parts: HTMLElement[] = [rows];
+  if (more > 0) {
+    parts.push(
+      el('p', 'flag__sentence', `${more} more ${more === 1 ? 'link' : 'links'} like this.`),
+    );
+  }
+  return parts;
+}
+
+/** One red-flag row: badge, title, evidence. */
+function flagRow(finding: Finding, email: Email | undefined): HTMLLIElement {
+  const item = el('li', `flag finding ${finding.severity}`);
+  const head = el('div', 'flag__head');
+  const badge = el('span', `badge badge--${finding.severity}`);
+  badge.append(
+    icon(finding.severity === 'danger' ? 'cross' : 'alert', 'icon--s'),
+    BADGE[finding.severity],
+  );
+  head.append(badge, el('span', 'flag__title', TITLES[finding.rule]));
+  item.append(head, ...evidence(finding, email));
+  return item;
+}
+
+/** One note (tier 3): the rule's sentence. */
+function noteRow(finding: Finding): HTMLLIElement {
+  const item = el('li', 'note-row');
+  const label = el('strong', '', `${TITLES[finding.rule]}: `);
+  item.append(label, finding.message);
+  return item;
 }
 
 /**
- * Runs the rule check, lists its findings and returns them (undefined if a rule failed). If a
- * rule fails, the panel says so instead of showing a wrong error or nothing at all; the email
- * itself is still shown.
+ * Shows the findings: danger and warning as red-flag rows, `info` as notes. `email` gives the
+ * link rows their text and target.
+ */
+export function showFindings(
+  findings: readonly Finding[],
+  elements: FindingsElements,
+  email?: Email,
+): void {
+  const flags = findings.filter((finding) => finding.severity !== 'info');
+  const notes = findings.filter((finding) => finding.severity === 'info');
+  elements.list.replaceChildren(...flags.map((finding) => flagRow(finding, email)));
+  elements.count.textContent = String(flags.length);
+  elements.section.hidden = flags.length === 0;
+  elements.notes.replaceChildren(...notes.map(noteRow));
+  if (notes.length === 0) elements.notes.append(el('li', 'note-row', 'None.'));
+}
+
+/**
+ * Runs the rule check, shows its findings and returns them (undefined if a rule failed). If a
+ * rule fails, the panel says so as a warning instead of showing nothing; the email itself is
+ * still shown.
  */
 export function showRuleCheck(
   check: () => Finding[],
-  list: HTMLUListElement,
+  elements: FindingsElements,
+  email?: Email,
 ): Finding[] | undefined {
   let findings: Finding[];
   try {
     findings = check();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    list.replaceChildren(
-      item('warning', `The rule check failed (${message}). Treat this email with care.`),
+    showFindings(
+      [
+        {
+          rule: 'incomplete-check',
+          severity: 'warning',
+          message: `The basic checks could not finish (${message}). Treat this email with care.`,
+          evidence: [],
+        },
+      ],
+      elements,
+      email,
     );
     return undefined;
   }
-  showFindings(findings, list);
+  showFindings(findings, elements, email);
   return findings;
 }

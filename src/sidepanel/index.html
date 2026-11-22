@@ -161,6 +161,22 @@
             </div>
           </section>
 
+          <section id="flags" class="card" aria-labelledby="flags-heading" hidden>
+            <h3 id="flags-heading" class="list-heading">
+              Red flags (<span id="flags-count">0</span>)
+            </h3>
+            <ul id="email-findings" class="flags"></ul>
+          </section>
+
+          <section id="links" class="card" aria-labelledby="links-heading" hidden>
+            <h3 id="links-heading" class="list-heading">Links (<span id="links-count">0</span>)</h3>
+            <ol id="email-links" class="link-list"></ol>
+            <details id="links-more" class="fold fold--inner">
+              <summary id="links-more-summary" class="fold__summary">More links</summary>
+              <ol id="email-links-more" class="link-list fold__body"></ol>
+            </details>
+          </section>
+
           <section
             id="deep-check"
             class="card card--pad stack"
@@ -222,10 +238,6 @@
           <details id="email-details" class="fold" hidden>
             <summary class="fold__summary">Email details</summary>
             <dl class="fold__body details">
-              <dt class="details__term">Red flags (rule checks)</dt>
-              <dd class="details__value"><ul id="email-findings" class="findings"></ul></dd>
-              <dt class="details__term">Links</dt>
-              <dd class="details__value"><ol id="email-links" class="links"></ol></dd>
               <dt class="details__term">From</dt>
               <dd id="email-sender" class="details__value"></dd>
               <dt class="details__term">Subject</dt>
@@ -234,6 +246,8 @@
               <dd id="email-auth" class="details__value"></dd>
               <dt class="details__term">AI and basic checks</dt>
               <dd id="ai-detail" class="details__value"></dd>
+              <dt class="details__term">Notes</dt>
+              <dd class="details__value"><ul id="email-notes" class="notes"></ul></dd>
               <div id="email-header-rows" class="details" hidden>
                 <dt class="details__term">Reply-To</dt>
                 <dd id="email-reply-to" class="details__value"></dd>

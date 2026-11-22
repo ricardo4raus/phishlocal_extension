@@ -4,7 +4,7 @@ import type { Finding, Severity } from '../rules';
 import { revealOverrides } from '../rules/unicode';
 import { GMAIL_SERVER } from '../raw/gmail-original-page';
 import { linkDisplay } from './link-display';
-import { type IconName, setText } from './ui';
+import { el, icon, type IconName, setText } from './ui';
 
 /** Number of body characters shown in the panel (the full text is kept for the check). */
 const BODY_PREVIEW_CHARS = 1_000;
@@ -29,9 +29,23 @@ export interface EmailElements {
   headerRows: HTMLElement;
   replyTo: HTMLElement;
   returnPath: HTMLElement;
-  links: HTMLOListElement;
   body: HTMLElement;
   strip?: StripElements;
+  links?: LinksElements;
+}
+
+/** The "Links" section (tier 2): flagged links as rows, the others one fold away. */
+export interface LinksElements {
+  /** The section, hidden when the email has no links. */
+  section: HTMLElement;
+  /** The count in the heading. */
+  count: HTMLElement;
+  /** Rows for the links a finding names. */
+  flagged: HTMLOListElement;
+  /** The fold with the other links. */
+  more: HTMLDetailsElement;
+  moreSummary: HTMLElement;
+  moreList: HTMLOListElement;
 }
 
 export interface ShowEmailOptions {
@@ -95,6 +109,7 @@ export function senderDomain(address: string): string {
 
 const MARK: Record<Severity, string> = { danger: 'Danger', warning: 'Warning', info: 'Note' };
 const STRENGTH: Record<Severity, number> = { danger: 2, warning: 1, info: 0 };
+const MARK_ICON: Record<Severity, IconName> = { danger: 'cross', warning: 'alert', info: 'info' };
 
 /** Per link position: the most severe finding that names it. */
 function linkSeverities(findings: readonly Finding[]): Map<number, Severity> {
@@ -109,30 +124,55 @@ function linkSeverities(findings: readonly Finding[]): Map<number, Severity> {
 }
 
 function part(tag: 'div' | 'span' | 'strong', className: string, text: string): HTMLElement {
-  const element = document.createElement(tag);
-  element.className = className;
+  const element = el(tag, className);
   setText(element, text);
   return element;
 }
 
 /**
- * One link: its mark, where it really goes (bold), the shortened URL (the full one as tooltip)
- * and its text.
+ * One link row: its badge (when a finding names it), where it really goes (bold), and the
+ * shortened URL (the full one as tooltip). The link's text is shown only in the red-flag row.
  */
 function linkItem(link: EmailLink, severity: Severity | undefined): HTMLLIElement {
   const display = linkDisplay(link.href);
-  const item = document.createElement('li');
-  item.className = severity ? `link ${severity}` : 'link';
-  const head = document.createElement('div');
-  if (severity) head.append(part('span', 'mark', `${MARK[severity]}: `));
-  head.append(part('strong', 'domain', display.domain || 'Not a valid web address'));
-  if (display.forwardsTo) {
-    head.append(' forwards to ', part('strong', 'domain', display.forwardsTo));
+  const item = el('li', severity ? `link link--${severity}` : 'link');
+  const head = el('div', 'link__head');
+  if (severity) {
+    const badge = el('span', `badge badge--${severity}`);
+    badge.append(icon(MARK_ICON[severity], 'icon--s'), MARK[severity]);
+    head.append(badge);
   }
-  const url = part('div', 'url', display.short);
+  head.append(part('strong', 'link__domain', display.domain || 'Not a valid web address'));
+  if (display.forwardsTo) {
+    head.append(
+      part('span', 'link__via', 'forwards to'),
+      part('strong', 'link__domain', display.forwardsTo),
+    );
+  }
+  const url = part('div', 'link__url', display.short);
   url.title = revealOverrides(link.href);
-  item.append(head, url, part('div', 'link-text', `Text: ${link.text || '(none)'}`));
+  item.append(head, url);
   return item;
+}
+
+/** Fills the "Links" section: flagged links as rows, the others under "N more links". */
+function showLinks(email: Email, links: LinksElements, findings: readonly Finding[]): void {
+  const severities = linkSeverities(findings);
+  const flagged: HTMLLIElement[] = [];
+  const rest: HTMLLIElement[] = [];
+  email.links.forEach((link, index) => {
+    const severity = severities.get(index);
+    (severity ? flagged : rest).push(linkItem(link, severity));
+  });
+  links.section.hidden = email.links.length === 0;
+  links.count.textContent = String(email.links.length);
+  links.flagged.replaceChildren(...flagged);
+  links.moreList.replaceChildren(...rest);
+  links.more.hidden = rest.length === 0;
+  links.more.open = false;
+  const noun = rest.length === 1 ? 'link' : 'links';
+  links.moreSummary.textContent =
+    flagged.length > 0 ? `${rest.length} more ${noun}` : `Show the ${rest.length} ${noun}`;
 }
 
 function showStrip(email: Email, strip: StripElements, loading: boolean, fromGmail: boolean): void {
@@ -169,16 +209,7 @@ export function showEmail(
   setText(elements.replyTo, headers?.replyTo.map(mailbox).join(', ') || '–');
   setText(elements.returnPath, headers?.returnPath || '–');
 
-  const severities = linkSeverities(findings);
-  elements.links.replaceChildren(
-    ...email.links.map((link, index) => linkItem(link, severities.get(index))),
-  );
-  if (email.links.length === 0) {
-    const item = document.createElement('li');
-    item.className = 'empty';
-    item.textContent = 'No links';
-    elements.links.append(item);
-  }
+  if (elements.links) showLinks(email, elements.links, findings);
 
   // Cut by code points, so the preview never ends in half a character.
   const chars = [...email.bodyText];

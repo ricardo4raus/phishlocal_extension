@@ -249,8 +249,15 @@ const emailElements = {
   headerRows: byId<HTMLElement>('email-header-rows'),
   replyTo: byId<HTMLElement>('email-reply-to'),
   returnPath: byId<HTMLElement>('email-return-path'),
-  links: byId<HTMLOListElement>('email-links'),
   body: byId<HTMLElement>('email-body'),
+  links: {
+    section: byId<HTMLElement>('links'),
+    count: byId<HTMLElement>('links-count'),
+    flagged: byId<HTMLOListElement>('email-links'),
+    more: byId<HTMLDetailsElement>('links-more'),
+    moreSummary: byId<HTMLElement>('links-more-summary'),
+    moreList: byId<HTMLOListElement>('email-links-more'),
+  },
   strip: {
     subject: byId<HTMLElement>('strip-subject'),
     domain: byId<HTMLElement>('strip-domain'),
@@ -261,7 +268,12 @@ const emailElements = {
     authText: byId<HTMLElement>('strip-auth-text'),
   },
 };
-const findingsList = byId<HTMLUListElement>('email-findings');
+const findingsElements = {
+  section: byId<HTMLElement>('flags'),
+  count: byId<HTMLElement>('flags-count'),
+  list: byId<HTMLUListElement>('email-findings'),
+  notes: byId<HTMLUListElement>('email-notes'),
+};
 
 /** The empty state's words per reason. */
 const EMPTY: Record<EmptyReason, { heading: string; text: string }> = {
@@ -376,7 +388,7 @@ interface DisplayOptions {
 /** Shows an email from Gmail or the paste area with its rule findings; long texts get a note. */
 function displayEmail(email: Email, message: string, options: DisplayOptions): void {
   const { headersNote, final = true, fromGmail } = options;
-  const findings = showRuleCheck(() => checkEmail(email), findingsList);
+  const findings = showRuleCheck(() => checkEmail(email), findingsElements, email);
   showEmail(email, emailElements, { headersNote, findings, loading: !final, fromGmail });
   emptySection.hidden = true;
   emailSection.hidden = false;
@@ -387,6 +399,8 @@ function displayEmail(email: Email, message: string, options: DisplayOptions): v
 
 function hideEmail(reason: EmptyReason = 'idle'): void {
   emailElements.details.hidden = true;
+  findingsElements.section.hidden = true;
+  emailElements.links.section.hidden = true;
   aiCheck.hidden();
   deepCheck.hidden();
   showEmpty(reason);

@@ -462,6 +462,13 @@ const STATUS_IDS = [
   'strip-name',
   'strip-address',
   'strip-auth-text',
+  'flags-count',
+  'links-count',
+  'links-more-summary',
+  'email-findings',
+  'email-links',
+  'email-links-more',
+  'email-notes',
   'email-status',
   'paste-status',
   'ai-overall',
@@ -505,7 +512,24 @@ function checkPanelOnce(): void {
     // The strip's domain is the one thing an attacker cannot choose freely; it is never empty.
     expect(get('strip-domain').textContent, 'strip without a domain').not.toBe('');
     reached.add(`sender: ${get('strip-auth-text').textContent}`);
+    // The red flags section shows exactly the danger and warning rows, and counts them.
+    const flagRows = get('email-findings').querySelectorAll('.flag').length;
+    expect(get('flags').hidden, 'red flags section').toBe(flagRows === 0);
+    expect(get('flags-count').textContent).toBe(String(flagRows));
+    expect(get('email-findings').querySelector('.flag.info'), 'a note among the flags').toBeNull();
+    if (flagRows > 0) reached.add('flags shown');
+    // The links section counts every link; the fold holds the unflagged ones.
+    const flagged = get('email-links').children.length;
+    const rest = get('email-links-more').children.length;
+    expect(get('links').hidden, 'links section').toBe(flagged + rest === 0);
+    expect(get('links-count').textContent).toBe(String(flagged + rest));
+    expect(get('links-more').hidden, 'links fold').toBe(rest === 0);
+    if (flagged > 0) reached.add('flagged links');
+    if (rest > 0) reached.add('more links');
   } else {
+    expect(get('flags').hidden && get('links').hidden, 'flags or links without an email').toBe(
+      true,
+    );
     reached.add(`empty: ${get('empty-heading').textContent}`);
   }
   // The model banner shows only in the states that need the user.
@@ -718,6 +742,9 @@ x</pre>`,
           'deep: Sent: the data shown',
           'deep: The deep check failed',
           'deep light',
+          'flags shown',
+          'flagged links',
+          'more links',
           'sender: Sender confirmed by Gmail',
           'sender: Sender not confirmed',
           'sender: Checking the sender…',

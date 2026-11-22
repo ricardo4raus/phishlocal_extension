@@ -976,65 +976,199 @@
     overflow-y: auto;
   }
 
-  /* ---- Findings list (restyled in the findings PR). ---- */
-  .findings {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    padding-inline-start: 18px;
-    list-style: disc;
-  }
-
-  .finding > strong {
+  /* ---- List headings inside a card ("Red flags (3)"). ---- */
+  .list-heading {
+    padding: var(--space-3) var(--space-4) 0;
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
     font-weight: 600;
+    color: var(--color-text-2);
   }
 
-  .finding.danger > strong {
+  /* ---- Badge: the severity, as icon, colour and word. ---- */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 1px var(--space-2);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .badge--danger {
+    background: var(--color-danger-tint);
     color: var(--color-danger-text);
   }
 
-  .finding.warning > strong {
+  .badge--warning {
+    background: var(--color-warning-tint);
     color: var(--color-warning-text);
   }
 
-  /* ---- Links list (restyled in the findings PR). ---- */
-  .links {
+  .badge--info {
+    background: var(--color-pending-tint);
+    color: var(--color-pending-text);
+  }
+
+  /* ---- Chips: quoted phrases. ---- */
+  .cluster {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: var(--space-2);
   }
 
-  .link {
+  .chip {
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-chip);
+    background: var(--color-surface-2);
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
     overflow-wrap: anywhere;
   }
 
-  .link .domain {
-    font-weight: 700;
+  .chip::before,
+  .chip::after {
+    content: '\201C';
   }
 
-  .link .mark {
+  .chip::after {
+    content: '\201D';
+  }
+
+  /* ---- Red flags: rows in one card, separated by hairlines; the badge carries the severity. ---- */
+  .flags {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .flag {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-block-start: 1px solid var(--color-border);
+  }
+
+  .flag:first-child {
+    border-block-start: 0;
+  }
+
+  .flag__head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .flag__title {
+    flex: 1;
+    min-width: 0;
     font-weight: 600;
   }
 
-  .link.danger .mark {
+  .flag__rows {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--space-1) var(--space-2);
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
+  }
+
+  .flag__label {
+    color: var(--color-text-3);
+  }
+
+  .flag__value {
+    font-family: var(--font-mono);
+    overflow-wrap: anywhere;
+  }
+
+  .flag__value--strong {
+    font-weight: 700;
     color: var(--color-danger-text);
   }
 
-  .link.warning .mark {
-    color: var(--color-warning-text);
+  .flag.warning .flag__value--strong {
+    color: var(--color-text);
   }
 
-  .link .url {
+  .flag__sentence {
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
+    color: var(--color-text-2);
+    overflow-wrap: anywhere;
+  }
+
+  /* ---- Links: rows like the red flags. ---- */
+  .link-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .link {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    border-block-start: 1px solid var(--color-border);
+  }
+
+  .link-list > .link:first-child {
+    border-block-start: 0;
+  }
+
+  .link__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .link__domain {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  .link__via {
+    font-size: var(--text-xs);
+    color: var(--color-text-3);
+  }
+
+  .link__url {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     line-height: var(--leading-xs);
     color: var(--color-text-2);
+    overflow-wrap: anywhere;
   }
 
-  .link .link-text {
-    font-size: var(--text-xs);
-    line-height: var(--leading-xs);
-    color: var(--color-text-3);
+  /* The fold with the unflagged links sits inside the links card: no border of its own. */
+  .fold--inner {
+    border: 0;
+    border-block-start: 1px solid var(--color-border);
+    border-radius: 0 0 var(--radius-card) var(--radius-card);
+  }
+
+  .fold--inner > .fold__body {
+    padding: 0;
+  }
+
+  .fold--inner > .fold__body > .link:first-child {
+    border-block-start: 1px solid var(--color-border);
+  }
+
+  /* ---- Notes (tier 3): the info findings. ---- */
+  .notes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .note-row {
+    overflow-wrap: anywhere;
   }
 
   /* ---- Deep check (restyled in the deep check PR). ---- */
