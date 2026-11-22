@@ -53,8 +53,15 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Firebase project `phishlocal` exists, AI Logic enabled with Gemini Developer API.
 - First hybrid prompt works from the side panel (PR #4): on-device with Gemini Nano, cloud via
   Firebase AI Logic. App Check uses a debug token (`VITE_APPCHECK_DEBUG_TOKEN` in `.env.local`),
-  read **only in dev builds** (`npm run dev`); production builds have no App Check yet, so their
-  cloud requests fail. The contest rules accept debug tokens in submissions.
+  read **only in dev builds** (`npm run dev`). Since 22 Nov 2026 other builds get App Check
+  tokens from the token server (`functions/`, a callable Cloud Function in `europe-west6`;
+  client `src/token-server.ts`): anonymous Firebase Auth on a second Firebase app (Auth on the
+  main app would ask App Check, which asks the server: a loop), 30-minute tokens, daily limits
+  per user, per IP address (HMAC only) and for everyone in Firestore. The limits count tokens,
+  not requests: the Gemini API spend cap (5 CHF a month) and the Gemini prepaid credit cap the
+  cost. Deployed and tested in Chrome on 22 Nov 2026 (project on Blaze since then; with billing
+  linked, the Gemini Developer API needs prepaid credits from AI Studio). Deploy with `npm run deploy:functions`; setup steps in
+  the README. The contest rules accept debug tokens in submissions.
 - The side panel warms up the on-device model when it opens. Model load can take seconds or
   many minutes (see the measurements below). Inference on a
   loaded model takes about 1 s for short answers; one run took 39 s, cause unknown. On-device
@@ -242,8 +249,10 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Gmail is read by a content script declared in `manifest.json` `content_scripts` with
   `matches: ['https://mail.google.com/*']`. Do not use crxjs `?script` injection (it exposes
   files to every site).
-- Firebase App Check: use a `CustomProvider` with the debug token, never a reCAPTCHA provider
-  (it loads remote scripts). Firebase Auth, if ever needed: only `firebase/auth/web-extension`.
+- Firebase App Check: use a `CustomProvider` (debug token or the token server), never a
+  reCAPTCHA provider (it loads remote scripts). Firebase Auth: only `firebase/auth/web-extension`,
+  and only on the separate sign-in app in `src/firebase.ts`, never on the app with App Check.
+  The token request carries no email content; keep it after the user's click on Send.
 - The App Check debug token is a secret: read it only behind `import.meta.env.DEV`, so release
   builds never contain it. The `dist` test fails if the token is in the build. The judges build
   (`npm run build:judges`, mode `judges`, output `dist-judges/`, decided 22 Nov 2026) reads a

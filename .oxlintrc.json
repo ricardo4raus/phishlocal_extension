@@ -30,5 +30,5 @@
     "denyWarnings": true,
     "reportUnusedDisableDirectives": "error"
   },
-  "ignorePatterns": ["dist/**", "node_modules/**", "coverage/**", ".vite/**"]
+  "ignorePatterns": ["dist/**", "node_modules/**", "coverage/**", ".vite/**", "functions/lib/**"]
 }

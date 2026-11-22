@@ -168,9 +168,12 @@ describe('network and script injection stay where they belong', () => {
   const using = (pattern: RegExp): string[] =>
     scripts.filter(([, code]) => pattern.test(code)).map(([name]) => name);
 
-  it('only the Gmail content script makes network requests', () => {
+  it('only the Gmail content script and the token client make network requests', () => {
+    // The token client sends only the anonymous user's ID token, and only for the deep check
+    // (src/token-server.ts); the Firebase SDK makes the other cloud requests.
     expect(using(/\b(?:fetch|XMLHttpRequest|sendBeacon|WebSocket|EventSource)\b/)).toEqual([
       'content/gmail-original.ts',
+      'token-server.ts',
     ]);
   });
 

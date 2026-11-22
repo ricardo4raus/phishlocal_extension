@@ -30,7 +30,11 @@ vi.mock('firebase/ai', () => ({
     return { generateContent, generateContentStream: generateContent };
   },
 }));
-vi.mock('../../src/firebase', () => ({ ai: {}, appCheckEnabled: false }));
+vi.mock('../../src/firebase', () => ({
+  ai: {},
+  appCheckEnabled: false,
+  cloudPass: async () => {},
+}));
 
 /** A streamed answer in the given pieces. */
 function answer(...chunks: string[]): StreamResult {

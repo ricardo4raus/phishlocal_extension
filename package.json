@@ -8,12 +8,15 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:judges": "tsc --noEmit && vite build --mode judges",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tests",
+    "build:functions": "tsc -p functions",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tests && tsc --noEmit -p functions",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "oxlint",
     "test": "vitest run",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run build && npm test"
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run build && npm test",
+    "firebase:login": "npx --yes firebase-tools@15.35.0 login",
+    "deploy:functions": "node scripts/deploy-functions.mjs"
   },
   "engines": {
     "node": "^24.15.0 || >=26.0.0"

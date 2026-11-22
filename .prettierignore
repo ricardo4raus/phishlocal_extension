@@ -1,5 +1,6 @@
 # Build output and dependencies
 dist
+functions/lib
 coverage
 .vite
 node_modules

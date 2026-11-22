@@ -251,8 +251,19 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
 7. **Result:** its own block under the on-device verdict, labelled "Deep check", with the same
    rules as the lower limit and the same exception for confirmed senders.
 
-**Needs App Check:** dev builds and the judges build (`npm run build:judges`) have a debug token;
-normal production builds have none, so there the panel says the deep check is not available.
+**Needs App Check:** normal builds get their App Check token from PhishLocal's token server
+(`functions/src/index.ts`, client in `src/token-server.ts`). After the click on Send,
+`runCloudCheck()` first calls `cloudPass()`: the extension signs in anonymously (Firebase Auth on
+a second Firebase app without App Check, because Auth asks App Check for a token on every request
+and App Check would ask the token server, which needs the sign-in), and the callable function
+`appCheckToken` returns a token that lasts 30 minutes (the SDK keeps it until then). The function
+counts tokens per day in Firestore: 10 per anonymous user, 20 per IP address (stored only as an
+HMAC with a random key for the day) and 500 for all users; at the limit the panel says "The deep
+check has reached today's limit" and nothing is sent. The limits count tokens, not requests (a
+token works for any number of requests until it expires), so the Gemini API quota in Google
+Cloud is what caps the cost. The token request
+carries only the ID token, never email content. Dev and judges builds with a debug token skip
+the server. Builds without a Firebase project say the deep check is not available.
 
 **Known limits:**
 

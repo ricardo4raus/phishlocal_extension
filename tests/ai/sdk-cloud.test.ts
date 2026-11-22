@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const browserBuild = vi.hoisted(() => '../../node_modules/@firebase/ai/dist/esm/index.esm.js');
 vi.mock('firebase/ai', () => import(/* @vite-ignore */ browserBuild));
 
+/** The App Check token step before each cloud request (`cloudPass()` in src/firebase.ts). */
+const cloudPass = vi.hoisted(() => ({ run: async (): Promise<void> => {} }));
+
 vi.mock('../../src/firebase', async () => {
   const { initializeApp } = await import('firebase/app');
   const { getAI, GoogleAIBackend } = await import('firebase/ai');
@@ -13,7 +16,11 @@ vi.mock('../../src/firebase', async () => {
     { apiKey: 'test', projectId: 'test', appId: '1:1:web:1' },
     'cloud-test',
   );
-  return { ai: getAI(app, { backend: new GoogleAIBackend() }), appCheckEnabled: false };
+  return {
+    ai: getAI(app, { backend: new GoogleAIBackend() }),
+    appCheckEnabled: false,
+    cloudPass: () => cloudPass.run(),
+  };
 });
 
 interface Sent {
@@ -43,6 +50,7 @@ const reply = (text: string): Response =>
 beforeEach(() => {
   vi.resetModules();
   sent = [];
+  cloudPass.run = async () => {};
   vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
     const request: Sent = {
       url: String(url),
@@ -105,6 +113,33 @@ describe('runCloudCheck through the Firebase SDK', () => {
       reason: 'failed',
       detail: 'the cloud refused the request (HTTP 403)',
     });
+  });
+
+  it('gets the App Check token first, and sends nothing without it', async () => {
+    const { runCloudCheck } = await import('../../src/ai');
+    const { TokenServerError } = await import('../../src/token-server');
+    cloudPass.run = async () => {
+      throw new TokenServerError('limit', 'daily limit reached');
+    };
+    expect(await runCloudCheck('x')).toEqual({ ok: false, reason: 'limit' });
+    cloudPass.run = async () => {
+      throw new TokenServerError('failed', 'no answer from the token server (TypeError)');
+    };
+    expect(await runCloudCheck('x')).toEqual({
+      ok: false,
+      reason: 'failed',
+      detail: 'no answer from the token server (TypeError)',
+    });
+    expect(sent).toHaveLength(0);
+    // With the token at hand, the request goes out.
+    let passed = false;
+    cloudPass.run = async () => {
+      passed = true;
+    };
+    answer = JSON.stringify({ risk: 'safe', reasons: ['Fine.'], advice: 'None.' });
+    expect((await runCloudCheck('x')).ok).toBe(true);
+    expect(passed).toBe(true);
+    expect(sent).toHaveLength(1);
   });
 
   it('reports a request that reaches its time limit in short words', async () => {

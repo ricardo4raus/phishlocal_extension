@@ -14,7 +14,7 @@ vi.mock('../../src/firebase', async () => {
   const { getAI } = await import('firebase/ai');
   // A made-up project: the on-device path never contacts it.
   const app = initializeApp({ apiKey: 'test', projectId: 'test', appId: '1:1:web:1' }, 'sdk-test');
-  return { ai: getAI(app), appCheckEnabled: false };
+  return { ai: getAI(app), appCheckEnabled: false, cloudPass: async () => {} };
 });
 
 interface PromptOptions {

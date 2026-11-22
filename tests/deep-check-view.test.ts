@@ -2,7 +2,7 @@
 // The cloud deep check in the side panel, with the model, Nano's name finder and the cloud
 // replaced by fakes.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AiCheckResult } from '../src/ai';
+import type { CloudCheckResult } from '../src/ai';
 import type { Email } from '../src/email';
 import type { Finding } from '../src/rules';
 import { HEADERS_WAIT_MS, STOP_GRACE_MS } from '../src/sidepanel/ai-view';
@@ -60,7 +60,7 @@ const text = (id: Id): string => get(id).textContent ?? '';
 const click = (id: (typeof BUTTONS)[number]): void => get(id).click();
 
 let nameCalls: { text: string; signal: AbortSignal; resolve: (names?: string[]) => void }[];
-let runs: { prompt: string; signal: AbortSignal; resolve: (result: AiCheckResult) => void }[];
+let runs: { prompt: string; signal: AbortSignal; resolve: (result: CloudCheckResult) => void }[];
 let check: DeepCheck;
 
 /** A fresh panel (new elements, so no listeners of an earlier instance) and a deep check on it. */
@@ -516,6 +516,18 @@ describe('the deep check', () => {
     expect(get('send').hidden).toBe(false);
     click('send');
     expect(runs).toHaveLength(2);
+  });
+
+  it('says when the daily limit is reached, and that nothing was sent', async () => {
+    check.shown(email, []);
+    await prepare();
+    click('send');
+    runs[0]?.resolve({ ok: false, reason: 'limit' });
+    await vi.waitFor(() => expect(text('status')).toContain("reached today's limit"));
+    expect(text('status')).toContain('Nothing was sent');
+    expect(text('detail')).toBe('');
+    expect(get('result').hidden).toBe(true);
+    expect(get('send').hidden).toBe(false);
   });
 
   it('cannot start where the cloud is not available', () => {
