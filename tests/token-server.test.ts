@@ -93,6 +93,19 @@ describe('tokenFetcher', () => {
     expect((await failure(getToken())).kind).toBe('failed');
   });
 
+  it('counts a refusal without a readable body as a failure, not as the limit', async () => {
+    const { getToken } = fetcher(new Response('Too Many Requests', { status: 429 }));
+    const error = await failure(getToken());
+    expect(error.kind).toBe('failed');
+    expect(error.message).toBe('the token server refused (HTTP 429)');
+  });
+
+  it('gives up after its time limit', async () => {
+    const { getToken } = fetcher(new DOMException('The operation timed out.', 'TimeoutError'));
+    const error = await failure(getToken());
+    expect(error.message).toBe('no answer from the token server (TimeoutError)');
+  });
+
   it('reports a network failure by name only, without its message', async () => {
     const { getToken } = fetcher(new TypeError('Failed to fetch https://project-id.example'));
     const error = await failure(getToken());

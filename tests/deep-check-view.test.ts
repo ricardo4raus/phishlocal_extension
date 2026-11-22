@@ -523,7 +523,7 @@ describe('the deep check', () => {
     await prepare();
     click('send');
     runs[0]?.resolve({ ok: false, reason: 'limit' });
-    await vi.waitFor(() => expect(text('status')).toContain('used up for today'));
+    await vi.waitFor(() => expect(text('status')).toContain("reached today's limit"));
     expect(text('status')).toContain('Nothing was sent');
     expect(text('detail')).toBe('');
     expect(get('result').hidden).toBe(true);

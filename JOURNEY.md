@@ -982,7 +982,10 @@ _To fill in near the submission._
   token from a token server (`functions/`, a callable Cloud Function in Zurich) instead of a
   debug token. The extension signs in anonymously only after the click on Send, on a second
   Firebase app (Auth on the main app would ask App Check, which would ask the server: a loop),
-  and gets a token for 30 minutes. The function counts tokens in Firestore, 10 per user and 500
-  for everyone per day; at the limit the panel says so and sends nothing. The email never passes
+  and gets a token for 30 minutes. The function counts tokens in Firestore per day: 10 per user,
+  20 per IP address (as a keyed hash only) and 500 for everyone; at the limit the panel says so
+  and sends nothing. The review pointed out that these limits count tokens, not requests: a token
+  works for any number of requests for its 30 minutes, so the real cost cap is the Gemini API
+  quota in Google Cloud. The email never passes
   through the server. Deploy with one command (`npm run deploy:functions`); the Firebase console
   steps (Blaze plan, anonymous sign-in, Firestore, a signing role) are in the README.

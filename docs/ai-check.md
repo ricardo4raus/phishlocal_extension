@@ -257,8 +257,11 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
 a second Firebase app without App Check, because Auth asks App Check for a token on every request
 and App Check would ask the token server, which needs the sign-in), and the callable function
 `appCheckToken` returns a token that lasts 30 minutes (the SDK keeps it until then). The function
-counts tokens per anonymous user (10 a day) and for all users (500 a day) in Firestore; at the
-limit the panel says "Deep checks are used up for today" and nothing is sent. The token request
+counts tokens per day in Firestore: 10 per anonymous user, 20 per IP address (stored only as an
+HMAC with a random key for the day) and 500 for all users; at the limit the panel says "The deep
+check has reached today's limit" and nothing is sent. The limits count tokens, not requests (a
+token works for any number of requests until it expires), so the Gemini API quota in Google
+Cloud is what caps the cost. The token request
 carries only the ID token, never email content. Dev and judges builds with a debug token skip
 the server. Builds without a Firebase project say the deep check is not available.
 

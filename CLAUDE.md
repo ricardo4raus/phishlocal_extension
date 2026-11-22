@@ -53,11 +53,12 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Firebase project `phishlocal` exists, AI Logic enabled with Gemini Developer API.
 - First hybrid prompt works from the side panel (PR #4): on-device with Gemini Nano, cloud via
   Firebase AI Logic. App Check uses a debug token (`VITE_APPCHECK_DEBUG_TOKEN` in `.env.local`),
-  read **only in dev builds** (`npm run dev`). Since 23 Nov 2026 other builds get App Check
+  read **only in dev builds** (`npm run dev`). Since 22 Nov 2026 other builds get App Check
   tokens from the token server (`functions/`, a callable Cloud Function in `europe-west6`;
   client `src/token-server.ts`): anonymous Firebase Auth on a second Firebase app (Auth on the
   main app would ask App Check, which asks the server: a loop), 30-minute tokens, daily limits
-  per user and for everyone in Firestore. Deploy with `npm run deploy:functions`; setup steps in
+  per user, per IP address (HMAC only) and for everyone in Firestore. The limits count tokens,
+  not requests: the Gemini API quota caps the cost. Deploy with `npm run deploy:functions`; setup steps in
   the README. The contest rules accept debug tokens in submissions.
 - The side panel warms up the on-device model when it opens. Model load can take seconds or
   many minutes (see the measurements below). Inference on a

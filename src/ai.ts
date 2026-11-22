@@ -325,15 +325,15 @@ function deepCheckModel(): ReturnType<typeof getGenerativeModel> {
 }
 
 /**
- * The cloud deep check: sends `prompt` (built from the data the user saw and agreed to) to the
- * cloud and reads the answer as strictly as the on-device one. Call it only after the user's
- * consent. `signal` stops the request.
- */
-/**
  * A deep check result. `limit`: the token server's daily limit is reached, so nothing was sent.
  */
 export type CloudCheckResult = AiCheckResult | { ok: false; reason: 'limit' };
 
+/**
+ * The cloud deep check: sends `prompt` (built from the data the user saw and agreed to) to the
+ * cloud and reads the answer as strictly as the on-device one. Call it only after the user's
+ * consent. `signal` stops the request.
+ */
 export async function runCloudCheck(
   prompt: string,
   signal?: AbortSignal,

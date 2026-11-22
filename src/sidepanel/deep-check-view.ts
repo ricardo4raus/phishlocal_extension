@@ -437,7 +437,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
         result.reason === 'stopped'
           ? 'The deep check was stopped. The data shown may already have reached the cloud; you can send it again.'
           : result.reason === 'limit'
-            ? 'Deep checks are used up for today. Nothing was sent; the result above still applies.'
+            ? "The deep check has reached today's limit. Nothing was sent; the result above still applies."
             : result.reason === 'unreadable-answer'
               ? 'The cloud answer could not be read. The result above still applies; you can send the data again.'
               : 'The deep check did not work. The result above still applies; you can send the data again.',

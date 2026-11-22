@@ -73,7 +73,8 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   cloud", PhishLocal signs in anonymously with Firebase Authentication (an ID without name or
   email, kept in this browser profile) and asks PhishLocal's token server for a token that lasts
   30 minutes. That request carries the anonymous ID, never email content. The server counts the
-  tokens per ID and per day (10) and for all users together (500), so nobody can run up costs.
+  tokens per day: 10 per ID, 20 per IP address and 500 for all users together. It stores the IP
+  address only as a keyed hash (HMAC with a random key for the day), never the address itself.
 - Besides loading "Show original" from Gmail, the only request PhishLocal makes on its own: when
   the side panel opens, it asks Firebase Remote Config (Google) for its settings, at most every
   12 h after a successful answer (a failed one is tried again at the next opening).
@@ -108,10 +109,14 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
    ([`functions/`](functions/)). A browser extension has no App Check attestation of its own
    (reCAPTCHA would load remote scripts), so a small Cloud Function signs the App Check tokens.
    1. Firebase console: switch the project to the **Blaze** plan (Cloud Functions need it) and set
-      a budget alert (e.g. 5 €).
+      a budget alert (e.g. 5 €). Then cap the cost where it arises: in the Google Cloud console
+      (APIs & Services > Generative Language API > Quotas), lower the requests per day. The
+      token server's limits count tokens, and a token allows any number of requests for its 30
+      minutes, so they slow abuse down but are no budget.
    2. **Authentication** > Get started > Sign-in method: enable **Anonymous**.
    3. **Firestore Database** > Create database: production mode, location `europe-west6`
-      (Zurich). It holds only the daily counters.
+      (Zurich). It holds only the daily counters (they are never deleted; a TTL policy on
+      `tokenLimits` can clear old days).
    4. Google Cloud console > IAM: give the **Default compute service account**
       (`<project number>-compute@developer.gserviceaccount.com`) the role **Service Account Token
       Creator**, and enable the **IAM Service Account Credentials API**. The function signs the
