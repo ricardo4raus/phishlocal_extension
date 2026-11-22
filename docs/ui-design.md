@@ -32,9 +32,9 @@ from this file are listed under "Mockup review" at the end.
 - **Honest progress.** A percentage only where Chrome reports one (the model download). Waits
   without a known end show elapsed time and a moving bar, never a made-up percentage. One moving
   indicator per wait, not three.
-- **Never colour alone.** Every state has a colour, a symbol and a word. Green is reserved for
-  the verdict "Looks safe"; a ready model, a confirmed sender and other good news use neutral
-  colours and words.
+- **Never colour alone.** Every state has a colour, a symbol and a word. Green fills only the
+  verdict "Looks safe"; elsewhere it is at most the small dot of a ready model. A confirmed sender
+  and other good news use neutral colours and words.
 - **True claims only.** Every sentence in the panel must hold in every build: no "nothing is
   saved" while a setting is saved, no "Looks safe" when only the rules looked.
 - **Own emails only.** Users check the emails they receive. Sample emails exist only in dev and
@@ -79,8 +79,9 @@ model; "Gemini Nano" appears only in the empty, loading and download texts and i
 Every part is its own component (see "How to build it"); the page sets the spacing between them.
 
 1. **Top bar** (always): logo, "PhishLocal", and the model pill on the right. The pill is
-   neutral (grey) in every state: a dot when ready, a spinner while loading or downloading, a
-   small "!" when the AI is missing. Words: "On-device AI ready", "On-device AI loading" (with
+   grey in every state, with a green dot when ready (decided 22 Nov 2026: users read a grey dot
+   as "not ready"), a grey spinner while loading or downloading, a small "!" when the AI is
+   missing. Words: "On-device AI ready", "On-device AI loading" (with
    the elapsed time, which gives way on panels under 360 px), "On-device AI 42%", "AI not set
    up" (not downloaded), "AI not available", "AI not loaded".
 2. **Model banner** (only when the model needs the user): not downloaded (text and the
@@ -335,7 +336,7 @@ What the mockup shows and this file changes, so that nobody builds from the mock
   outlined block; here one outlined button.
 - `Consent` shows the data at once and has no preparing, sending or result state; it also drops
   the email strip.
-- The header pill is green; here neutral.
+- The header pill is green; here grey with a green dot when ready.
 - `Main` says "Nothing is saved"; here "No email is saved".
 - Missing in the mockup: Suspicious, "No red flags found (not checked by AI)", model unavailable,
   model not downloaded, the paste form, the cloud result.

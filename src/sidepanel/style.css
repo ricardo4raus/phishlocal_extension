@@ -375,7 +375,8 @@
     color: var(--color-on-accent);
   }
 
-  /* The model pill: neutral in every state; the word says it, the mark repeats it. */
+  /* The model pill: grey, the word says the state and the mark repeats it; only the ready dot is
+     green (safe on surface-2: 4.8:1 light, 6.5:1 dark). */
   .pill {
     display: inline-flex;
     align-items: center;
@@ -406,12 +407,16 @@
     background: var(--color-text-2);
   }
 
+  .pill[data-state='ready'] .pill__mark {
+    background: var(--color-safe);
+  }
+
   .pill[data-state='loading'] .pill__mark,
   .pill[data-state='downloading'] .pill__mark {
     inline-size: 12px;
     block-size: 12px;
     border: 2px solid var(--color-border-strong);
-    border-block-start-color: var(--color-accent);
+    border-block-start-color: var(--color-text-2);
     background: transparent;
     animation: spin 1s linear infinite;
   }
