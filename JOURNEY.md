@@ -173,6 +173,10 @@ _Current state, updated as features land._
   browser extension cannot prove it is the real one. Debug tokens worked for development and
   judging but cannot ship. The answer is a small token server: it cannot verify the extension
   either, so it limits instead (anonymous sign-in, tokens per user and day, a cap for everyone).
+- **Billing that closes itself:** each attempt to switch to the Blaze plan made a new billing
+  account, and Google closed all four at once without a reason in the console. Only the billing
+  support chat named it: a first prepayment of 25 CHF was pending. Then the Gemini API needed a
+  second, separate prepayment of its own.
 
 ## What we learned
 
@@ -989,3 +993,12 @@ _To fill in near the submission._
   quota in Google Cloud. The email never passes
   through the server. Deploy with one command (`npm run deploy:functions`); the Firebase console
   steps (Blaze plan, anonymous sign-in, Firestore, a signing role) are in the README.
+- Set the token server up in the consoles, and it took longer than the code. Four "Upgrade to
+  Blaze" attempts each made a new billing account that Google closed at once, with no reason
+  shown and the reopen button disabled; the billing support chat found a pending first
+  prepayment of 25 CHF. After that, the deep check failed with "Your prepayment credits are
+  depleted": with billing linked, the Gemini Developer API leaves the free tier and needs its own
+  prepaid credits from AI Studio. The signing role on the compute service account took about a
+  minute to apply. Each step was checked from the terminal first (anonymous sign-up, then the
+  function, then one tiny Gemini request), so the Chrome test worked on the first try once the
+  credits were in: "Deep check: Looks safe", done in 1.2 s.

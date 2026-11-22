@@ -108,21 +108,32 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 3. **For the cloud path (deep check), once per Firebase project:** set up the token server
    ([`functions/`](functions/)). A browser extension has no App Check attestation of its own
    (reCAPTCHA would load remote scripts), so a small Cloud Function signs the App Check tokens.
-   1. Firebase console: switch the project to the **Blaze** plan (Cloud Functions need it) and set
-      a budget alert (e.g. 5 €). Then cap the cost where it arises: in the Google Cloud console
-      (APIs & Services > Generative Language API > Quotas), lower the requests per day. The
-      token server's limits count tokens, and a token allows any number of requests for its 30
-      minutes, so they slow abuse down but are no budget.
-   2. **Authentication** > Get started > Sign-in method: enable **Anonymous**.
-   3. **Firestore Database** > Create database: production mode, location `europe-west6`
+   1. Firebase console: switch the project to the **Blaze** plan (Cloud Functions need it). A new
+      billing account may stay closed until a first prepayment (25 CHF on 22 Nov 2026; Cloud
+      Billing support said so, the reopen button stayed disabled until then).
+      Then cap the cost where it arises: Google Cloud console > Billing > Budgets & limits >
+      create a budget with **enforced spending cap** for the service **Gemini API** (a cap covers
+      one project and one service). The token server's limits count tokens, and a token allows
+      any number of requests for its 30 minutes, so they slow abuse down but are no budget.
+   2. With billing linked, the Gemini Developer API leaves the free tier and needs **prepaid
+      credits**, separate from the Cloud Billing prepayment: AI Studio > Billing
+      (`aistudio.google.com/billing?billing=<billing account ID>`) > buy credits, auto-reload off.
+      Without them, cloud requests fail with "Your prepayment credits are depleted" (HTTP 429).
+      New credits took a few minutes to apply.
+   3. **Authentication** > Get started > Sign-in method: enable **Anonymous**.
+   4. **Firestore Database** > Create database: production mode, location `europe-west6`
       (Zurich). It holds only the daily counters (they are never deleted; a TTL policy on
       `tokenLimits` can clear old days).
-   4. Google Cloud console > IAM: give the **Default compute service account**
-      (`<project number>-compute@developer.gserviceaccount.com`) the role **Service Account Token
-      Creator**, and enable the **IAM Service Account Credentials API**. The function signs the
-      tokens with this account.
    5. Run `npm run firebase:login` once, then `npm run deploy:functions`. The script reads the
-      project and app ID from `.env.local` and deploys the function and the Firestore rules.
+      project and app ID from `.env.local` and deploys the function and the Firestore rules. If
+      it ends with "could not set up cleanup policy", run
+      `npx firebase-tools@15.35.0 functions:artifacts:setpolicy --location europe-west6 --force`.
+   6. Google Cloud console > IAM (tick "Include Google-provided role grants"): give the **Default
+      compute service account** (`<project number>-compute@developer.gserviceaccount.com`) the
+      role **Service Account Token Creator**, and enable the **IAM Service Account Credentials
+      API**. The function signs the tokens with this account; without it, the function log says
+      "Permission 'iam.serviceAccounts.signBlob' denied". The account exists after the first
+      deploy, and the role took about a minute to apply.
 
    **Debug tokens (development and judging):** with `VITE_APPCHECK_DEBUG_TOKEN` (from App Check >
    Apps > Manage debug tokens) in `.env.local`, `npm run dev` skips the token server. It is a

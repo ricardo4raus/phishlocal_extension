@@ -58,7 +58,9 @@ explain every red flag, and work offline, with a cloud only as fallback."
   client `src/token-server.ts`): anonymous Firebase Auth on a second Firebase app (Auth on the
   main app would ask App Check, which asks the server: a loop), 30-minute tokens, daily limits
   per user, per IP address (HMAC only) and for everyone in Firestore. The limits count tokens,
-  not requests: the Gemini API quota caps the cost. Deploy with `npm run deploy:functions`; setup steps in
+  not requests: the Gemini API spend cap (5 CHF a month) and the Gemini prepaid credit cap the
+  cost. Deployed and tested in Chrome on 22 Nov 2026 (project on Blaze since then; with billing
+  linked, the Gemini Developer API needs prepaid credits from AI Studio). Deploy with `npm run deploy:functions`; setup steps in
   the README. The contest rules accept debug tokens in submissions.
 - The side panel warms up the on-device model when it opens. Model load can take seconds or
   many minutes (see the measurements below). Inference on a
