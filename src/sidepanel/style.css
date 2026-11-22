@@ -1219,7 +1219,7 @@
     padding: 0;
   }
 
-  /* Without flagged links the fold follows the heading directly: no hairline between them. */
+  /* Without flagged links the heading is hidden and the fold is the card's first row: no hairline. */
   .link-list:empty + .fold--inner {
     border-block-start: 0;
   }
