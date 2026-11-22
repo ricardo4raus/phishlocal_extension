@@ -224,8 +224,8 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
 7. **Result:** its own block under the on-device verdict, labelled "Deep check", with the same
    rules as the lower limit and the same exception for confirmed senders.
 
-**Needs App Check:** production builds have no App Check provider yet, so there the panel says
-the deep check is not available. Development builds use the debug token.
+**Needs App Check:** dev builds and the judges build (`npm run build:judges`) have a debug token;
+normal production builds have none, so there the panel says the deep check is not available.
 
 **Known limits:**
 

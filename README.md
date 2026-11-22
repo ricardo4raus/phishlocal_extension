@@ -84,6 +84,13 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
    (App Check > Apps > Manage debug tokens) and set `VITE_APPCHECK_DEBUG_TOKEN`. It is a secret.
    Only development builds (`npm run dev`) use it; release builds leave it out, so their cloud
    requests fail until App Check is set up for them.
+
+   **Judges build:** `npm run build:judges` writes a release build to `dist-judges/` with a
+   second, separate debug token (`VITE_APPCHECK_JUDGES_TOKEN` in `.env.judges.local`), so judges
+   can use the deep check without any setup. That token is revoked after judging. A browser
+   extension has no real App Check attestation (reCAPTCHA would load remote scripts), so a
+   public release would need a small token server; until then, the normal build has no cloud.
+
 4. **Enable Gemini Nano:** open `chrome://flags/#prompt-api-for-gemini-nano`, set it to "Enabled
    Multilingual", and restart Chrome. If the model is not on the device yet, the side panel shows
    "Download the on-device model" (about 4 GB, once).
@@ -92,8 +99,9 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 6. **Load the extension:** open `chrome://extensions`, turn on developer mode, click "Load
    unpacked" and choose `dist/`.
 
-**Model load is slow?** If the model takes minutes to load, exit Chrome completely (also from the
-system tray) and start it again.
+**Model load is slow?** On the dev machine, loads after a Chrome restart sometimes took minutes
+while Chrome sat idle; a PC restart helped. See
+[`docs/model-load-debugging.md`](docs/model-load-debugging.md).
 
 ## Development
 

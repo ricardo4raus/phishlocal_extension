@@ -36,7 +36,8 @@ const distManifestPath = join(distDir, 'manifest.json');
  */
 const BUILD_INPUTS = ['manifest.json', 'vite.config.ts', 'tsconfig.json', 'package-lock.json'];
 
-const DEBUG_TOKEN_KEY = 'VITE_APPCHECK_DEBUG_TOKEN';
+/** The developer's token (dev builds) and the judges' token (judges build only). */
+const DEBUG_TOKEN_KEYS = ['VITE_APPCHECK_DEBUG_TOKEN', 'VITE_APPCHECK_JUDGES_TOKEN'];
 
 /**
  * Every debug token value a build could see: any `.env*` file in the repo root (whatever the
@@ -47,11 +48,8 @@ function localDebugTokens(): string[] {
   const envFiles = readdirSync(fromRoot(), { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.startsWith('.env'))
     .filter((entry) => entry.name !== '.env.example')
-    .map((entry) => fromRoot(entry.name));
-  return [
-    ...envFiles.map((file) => parseDotenv(readText(file))[DEBUG_TOKEN_KEY]),
-    process.env[DEBUG_TOKEN_KEY],
-  ]
+    .map((entry) => parseDotenv(readText(fromRoot(entry.name))));
+  return DEBUG_TOKEN_KEYS.flatMap((key) => [...envFiles.map((env) => env[key]), process.env[key]])
     .map((value) => value?.trim() ?? '')
     .filter((value) => value !== '');
 }
@@ -226,9 +224,10 @@ describe('dist/ build output', () => {
     expect(problems).toEqual([]);
   });
 
-  it('does not contain the App Check debug token', () => {
-    // Vite copies every VITE_* value the code reads into the bundle. The debug token is a secret,
-    // so the source reads it only in dev builds. This checks a production build really drops it.
+  it('does not contain an App Check debug token', () => {
+    // Vite copies every VITE_* value the code reads into the bundle. The debug tokens are
+    // secrets, so the source reads them only in dev builds and in the judges build (which goes to
+    // dist-judges/). This checks a normal production build really drops both.
     // Without a local token (e.g. in CI) there is nothing to look for.
     const tokens = localDebugTokens();
 
@@ -239,7 +238,7 @@ describe('dist/ build output', () => {
         return tokens.some((token) => text.includes(token));
       })
       .map((file) => toPosixRelative(distDir, file));
-    expect(leaks, 'read the token only behind `import.meta.env.DEV`').toEqual([]);
+    expect(leaks, 'read the tokens only behind `DEV` / `MODE === "judges"`').toEqual([]);
   });
 
   it('contains no .env files', () => {

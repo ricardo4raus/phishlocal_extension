@@ -16,12 +16,19 @@ export const firebaseApp = initializeApp(firebaseConfig);
 /*
  * App Check (enforced for Firebase AI Logic, so cloud requests need a valid token).
  *
- * The debug token is a secret, and Vite copies every VITE_* value it sees into the bundle. It is
- * therefore read only in dev builds (`npm run dev`): in `npm run build` the condition below is
- * `false`, the bundler drops the branch, and the token never reaches a release build.
+ * The debug tokens are secrets, and Vite copies every VITE_* value it sees into the bundle. So:
+ * - dev builds (`npm run dev`) read the developer's token;
+ * - the judges build (`npm run build:judges`, mode "judges", written to dist-judges/) reads a
+ *   separate token made only for the judges, which can be revoked after judging;
+ * - `npm run build` reads neither: both conditions are constant `false` there, the bundler drops
+ *   the branches, and no token reaches a normal release build.
  * Without App Check, on-device prompts still work; cloud requests are rejected.
  */
-const debugToken = import.meta.env.DEV ? import.meta.env.VITE_APPCHECK_DEBUG_TOKEN : undefined;
+const debugToken = import.meta.env.DEV
+  ? import.meta.env.VITE_APPCHECK_DEBUG_TOKEN
+  : import.meta.env.MODE === 'judges'
+    ? import.meta.env.VITE_APPCHECK_JUDGES_TOKEN
+    : undefined;
 
 /** Whether cloud requests can pass App Check in this build. */
 export const appCheckEnabled = Boolean(debugToken);

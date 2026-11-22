@@ -188,7 +188,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
 
   function intro(): string {
     if (!deps.available) {
-      return 'Not available in this build: the cloud needs App Check, which only the development build has for now.';
+      return 'Not available in this build: the cloud needs App Check, which only the development build and the judges build have.';
     }
     if (shown && !shown.final) return 'Waiting for the sender checks of this email…';
     const lead = EXPERIMENTAL_LANGUAGES.has(language())

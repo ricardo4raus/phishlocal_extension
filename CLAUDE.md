@@ -216,7 +216,10 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Firebase App Check: use a `CustomProvider` with the debug token, never a reCAPTCHA provider
   (it loads remote scripts). Firebase Auth, if ever needed: only `firebase/auth/web-extension`.
 - The App Check debug token is a secret: read it only behind `import.meta.env.DEV`, so release
-  builds never contain it. The `dist` test fails if the token is in the build.
+  builds never contain it. The `dist` test fails if the token is in the build. The judges build
+  (`npm run build:judges`, mode `judges`, output `dist-judges/`, decided 22 Nov 2026) reads a
+  separate judges' token (`VITE_APPCHECK_JUDGES_TOKEN` in `.env.judges.local`) behind
+  `MODE === 'judges'`; never ship `dist-judges/` publicly, and revoke that token after judging.
 - No custom `content_security_policy` in the manifest; the MV3 default is what we want.
 - Email content is attacker-controlled: show it only with `textContent`. `src/` must not turn
   strings into HTML (no `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `srcdoc`,
