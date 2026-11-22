@@ -821,6 +821,12 @@ _To fill in near the submission._
 - The UI monkey had a hidden weakness: with random seeds it reached the "sent" state of the deep
   check in only 1 of 6 runs, also before this work; the fixed CI seed reached it by luck. Its calm
   phase now runs one whole deep check. It also caught that jsdom ignores `.inert = false`.
+- Tested in Chrome: Ricardo created the five Remote Config parameters and the judges' token. The
+  dev build and the judges build (loaded from `dist-judges/`, no dev server) both ran a deep check
+  (1.9 s and 1.7 s). In one run Gemini Nano listed 32 "names", among them "Google", so the
+  sender's name and the DKIM and address domains became "[name]": safe for privacy, but the cloud
+  lost evidence. In the next run Nano found none. To fix after the freeze.
+- Feature freeze.
 - Again the PowerShell encoding trap: rewriting a file with `Get-Content -Raw` turned "…" into
   "â€¦", and the tool layer turned `͏` in a regex into the real character. Code points now
   go into code as numbers.
