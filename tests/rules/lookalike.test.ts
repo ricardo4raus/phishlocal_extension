@@ -103,7 +103,7 @@ describe('checkLookalikes', () => {
         severity: 'warning',
         message:
           'lumora-bank-verify.example contains the name "lumorabank", but it is not lumorabank.example.',
-        evidence: ['lumora-bank-verify.example'],
+        evidence: ['lumora-bank-verify.example', 'lumorabank.example'],
         // The sender has the same domain, but only the link is marked.
         links: [0],
       },

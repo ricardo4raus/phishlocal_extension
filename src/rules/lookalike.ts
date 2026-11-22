@@ -120,7 +120,8 @@ function compare(candidate: Host, reference: Reference): Finding | undefined {
   // "shop.us14.list-manage.com" for a newsletter from shop.example: normal click tracking.
   if (!reference.isBrand && MAILING_SERVICES.has(candidate.domain)) return undefined;
   const name = skeleton(label);
-  const evidence = [clip(candidate.hostname)];
+  // The host, then the domain it imitates (the panel shows them side by side).
+  const evidence = [clip(candidate.hostname), domain];
 
   const subdomainMinimum = reference.isBrand ? MIN_BRAND_SUBDOMAIN_LENGTH : MIN_NAME_LENGTH;
   if (label.length >= subdomainMinimum && `.${candidate.subdomain}.`.includes(`.${label}.`)) {
