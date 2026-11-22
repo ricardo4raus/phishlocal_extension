@@ -80,7 +80,8 @@ Every part is its own component (see "How to build it"); the page sets the spaci
 
 1. **Top bar** (always): logo, "PhishLocal", and the model pill on the right. The pill is
    grey in every state, with a green dot when ready (decided 22 Nov 2026: users read a grey dot
-   as "not ready"), a grey spinner while loading or downloading, a small "!" when the AI is
+   as "not ready"; a soft green halo swells and fades around it every 2.4 s, the dot keeps its
+   colour, and it stands still with reduced motion), a grey spinner while loading or downloading, a small "!" when the AI is
    missing. Words: "On-device AI ready", "On-device AI loading" (with
    the elapsed time, which gives way on panels under 360 px), "On-device AI 42%", "AI not set
    up" (not downloaded), "AI not available", "AI not loaded".

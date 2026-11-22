@@ -346,6 +346,17 @@
     }
   }
 
+  @keyframes glow {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-safe) 0%, transparent);
+    }
+
+    50% {
+      box-shadow: 0 0 4px 2px color-mix(in srgb, var(--color-safe) 60%, transparent);
+    }
+  }
+
   /* ---- Top bar: logo, name, model pill. ---- */
   .topbar {
     display: flex;
@@ -407,8 +418,10 @@
     background: var(--color-text-2);
   }
 
+  /* The ready dot glows: a soft green halo swells and fades, the dot itself keeps its colour. */
   .pill[data-state='ready'] .pill__mark {
     background: var(--color-safe);
+    animation: glow 2.4s ease-in-out infinite;
   }
 
   .pill[data-state='loading'] .pill__mark,
