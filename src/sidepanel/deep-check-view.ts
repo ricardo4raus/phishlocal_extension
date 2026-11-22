@@ -493,7 +493,11 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     const controller = new AbortController();
     stop = controller;
     const answer = await bounded(
-      () => deps.run(buildCloudPrompt(data.json, answerIn), controller.signal),
+      () =>
+        deps.run(
+          buildCloudPrompt(data.json, answerIn, email.headers?.sentToSelf === true),
+          controller.signal,
+        ),
       controller,
       cloudLimitMs,
       (error): CloudCheckResult =>

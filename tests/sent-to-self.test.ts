@@ -2,7 +2,7 @@
 // from outside. Gmail adds no sender checks to such mail, which made Gemini Nano call a developer's
 // error log suspicious (seen in Chrome, 22 Nov 2026). The fact comes from the headers only.
 import { describe, expect, it } from 'vitest';
-import { promptData } from '../src/ai/prompt';
+import { buildCloudPrompt, buildUserPrompt, promptData, SENT_TO_SELF_NOTE } from '../src/ai/prompt';
 import type { Email } from '../src/email';
 import { cloudData } from '../src/privacy/redact';
 import { headersFromOriginalPage } from '../src/raw/gmail-original-page';
@@ -10,6 +10,9 @@ import { parseRawEmail } from '../src/raw/parse-raw-email';
 import { senderStatus } from '../src/sidepanel/email-view';
 
 const raw = (...lines: string[]): string => lines.join('\r\n');
+
+/** The first line of a prompt: the task, before the data. */
+const task = (prompt: string): string => prompt.split(String.fromCodePoint(10))[0] ?? '';
 
 const body = ['Subject: ', 'Content-Type: text/plain', '', 'Console Error: two children', ''];
 
@@ -113,5 +116,16 @@ describe('sent to yourself, in the panel and the AI data', () => {
       email: { sent_to_self: boolean };
     };
     expect(other.email.sent_to_self).toBe(false);
+  });
+
+  it('says it in the task itself, in front of the data, only when it is true', () => {
+    expect(task(buildUserPrompt(email, [], 'de'))).toBe(
+      `Check this email for phishing. ${SENT_TO_SELF_NOTE} Write the reasons and the advice in German, also when the email is in another language.`,
+    );
+    expect(buildUserPrompt({ ...email, headers: { replyTo: [] } }, [], 'de')).not.toContain(
+      SENT_TO_SELF_NOTE,
+    );
+    expect(task(buildCloudPrompt('{}', 'en', true))).toContain(SENT_TO_SELF_NOTE);
+    expect(buildCloudPrompt('{}', 'en')).not.toContain(SENT_TO_SELF_NOTE);
   });
 });
