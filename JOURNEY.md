@@ -1065,4 +1065,7 @@ _To fill in near the submission._
   log, with matching reasons. In light mode the bulb looked brown and the ready dot dark green:
   light mode now has a gold-yellow bulb and a bright green dot (both decorative marks next to
   the words that carry their meaning, so below the 3:1 for symbols on purpose), and the bulb's
-  glow is stronger in both modes; dark mode keeps its colours.
+  glow is stronger in both modes; dark mode keeps its colours. Two stacked glows on the bulb
+  faded out of step (Chrome did not blend one of them smoothly), so it is one glow again, a bit
+  stronger than the first; the dot is a shade lighter than the verdict's green, because a small
+  dot looks darker than the large circle.

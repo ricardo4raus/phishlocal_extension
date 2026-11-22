@@ -50,9 +50,10 @@
     --color-on-safe: #ffffff;
     /* The advice bulb and the ready dot: decorative marks, each next to the words that carry
        their meaning (the advice; "ready"), so they may be lighter than the 3:1 for symbols:
-       gold-yellow 2.3:1 and bright green 2.0:1 on surface-2 (decided 22 Nov 2026). */
+       gold-yellow 2.3:1 and green 2.9:1 on surface-2 (a small dot looks darker than the
+       verdict's large circle, so it is a shade lighter than --color-safe) (decided 22 Nov 2026). */
     --color-tip: #d19a00;
-    --color-ready: #22c55e;
+    --color-ready: #16a34a;
     /* Pending (grey): white on fill 4.8, fill on surface 4.8. */
     --color-pending: #6b737d;
     --color-pending-text: #4a525c;
@@ -357,13 +358,11 @@
   @keyframes bulb-glow {
     0%,
     100% {
-      filter: drop-shadow(0 0 0 color-mix(in srgb, var(--color-tip) 0%, transparent))
-        drop-shadow(0 0 0 color-mix(in srgb, var(--color-tip) 0%, transparent));
+      filter: drop-shadow(0 0 0 color-mix(in srgb, var(--color-tip) 0%, transparent));
     }
 
     50% {
-      filter: drop-shadow(0 0 3px var(--color-tip))
-        drop-shadow(0 0 8px color-mix(in srgb, var(--color-tip) 70%, transparent));
+      filter: drop-shadow(0 0 5px var(--color-tip));
     }
   }
 
@@ -408,7 +407,7 @@
   }
 
   /* The model pill: grey, the word says the state and the mark repeats it; only the ready dot is
-     green (--color-ready: 2.0:1 light, a decorative mark next to "ready"; 6.5:1 dark). */
+     green (--color-ready: 2.9:1 light, a decorative mark next to "ready"; 6.5:1 dark). */
   .pill {
     display: inline-flex;
     align-items: center;
