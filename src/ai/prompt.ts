@@ -38,9 +38,16 @@ export function answerLanguage(panelLanguage: string): string {
 const CHECK_INSTRUCTIONS = [
   'You get one email as data, together with the findings of rule checks that already ran.',
   'Decide how likely the email is phishing: safe, suspicious or dangerous.',
+  'Judge mainly by what the email wants the reader to do: open a link, enter or send data, pay, ' +
+    'reply with information, or act under time pressure. An email without links and without ' +
+    'such a request is safe unless something specific in it speaks against it; an empty subject ' +
+    'or technical content alone is not a sign of phishing.',
   'Give up to five short reasons that a non-expert understands, each one complete sentence, and ' +
-    'one short piece of advice.',
-  'sender_checks show what the receiving mail server verified. If the sender domain is ' +
+    'one short piece of advice. Use plain words: do not name technical checks such as SPF, DKIM ' +
+    'or DMARC.',
+  'sender_checks show what the receiving mail server verified. "not available" means they could ' +
+    'not be read, for example in an email the user sent to themselves: that alone is not a sign ' +
+    'of phishing. If the sender domain is ' +
     'confirmed (DMARC pass), the email really comes from that domain: then judge whether the ' +
     'domain belongs to the company the email speaks for, and do not call it suspicious only ' +
     'because it is about the account or its security. Normal notices from a confirmed sender ' +
