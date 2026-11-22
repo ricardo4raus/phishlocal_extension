@@ -17,7 +17,7 @@ import { FULL_URL, normalizeText, replacePhoneNumbers } from '../ai/patterns';
 import { PROMPT_LIMITS } from '../ai/prompt';
 import { type Email, FIELD_LIMITS, MAX_BODY_CHARS } from '../email';
 import type { Finding } from '../rules';
-import { parseUrl } from '../rules/domains';
+import { hostOf, hostOfAddress, parseUrl } from '../rules/domains';
 
 export const PLACEHOLDER = {
   name: '[name]',
@@ -542,6 +542,42 @@ export function nameSearchText(email: Email): string {
 }
 
 /**
+ * The brand labels of the domains the receiving server confirmed, lower case: the sender's
+ * domain when DMARC passed, and each domain whose DKIM signature passed ("google" for
+ * google.com). Unconfirmed domains never count, so a sender cannot pick what stays.
+ */
+function confirmedBrands(email: Email): Set<string> {
+  const auth = email.headers?.auth;
+  const labels = new Set<string>();
+  if (!auth) return labels;
+  if (auth.dmarc === 'pass') {
+    const label = hostOfAddress(email.sender.address)?.label;
+    if (label) labels.add(label);
+  }
+  for (const { result, domain } of auth.dkim) {
+    const label = result === 'pass' && domain ? hostOf(domain.toLowerCase()).label : undefined;
+    if (label) labels.add(label);
+  }
+  return labels;
+}
+
+/** A name without the punctuation around it, as nameVariants() takes it ("Google."), lower case. */
+const bareLowerCase = (name: string): string =>
+  name.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').toLowerCase();
+
+/**
+ * Nano's names without the ones that are exactly a confirmed brand: Nano sometimes lists a company
+ * ("Google") as a person, and removing it took the evidence the cloud needs most, the confirmed
+ * sender and DKIM domains (found in Chrome on 22 Nov 2026: "[email]@[name].com"). Names found in
+ * greetings are not affected.
+ */
+function withoutConfirmedBrands(names: readonly string[], email: Email): string[] {
+  const brands = confirmedBrands(email);
+  if (brands.size === 0) return [...names];
+  return names.filter((name) => !brands.has(bareLowerCase(name)));
+}
+
+/**
  * The cloud data for one email. `foundNames`: the names Gemini Nano found in
  * {@link nameSearchText}, or `undefined` if it could not look; then the sender's name is removed
  * entirely, since it may be a person's.
@@ -554,7 +590,10 @@ export function cloudData(
   const removed = none();
   const fields = cloudFields(email);
   const fromModel = modelNames(foundNames ?? []);
-  const names = nameVariants([...greetingNames(nameSearchText(email)), ...fromModel.names]);
+  const names = nameVariants([
+    ...greetingNames(nameSearchText(email)),
+    ...withoutConfirmedBrands(fromModel.names, email),
+  ]);
   const clean = (text: string): string => redactText(text, names, removed);
   // Hosts and domains go through the name and number filter too: "secure.anna-muster.example" is
   // a host, and a name in it is still a name (found in review round 5).

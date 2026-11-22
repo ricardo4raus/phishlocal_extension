@@ -857,3 +857,12 @@ _To fill in near the submission._
 - Nothing public matches the pattern; it may be specific to this GPU and driver. Next: measure on
   a second PC, then file a Chromium bug with the trace. Details in
   `docs/model-load-debugging.md`.
+
+**Session with Claude Code (after the freeze, bug fix):**
+
+- Fixed the brand that Gemini Nano took for a name: an entry from Nano that is exactly the brand
+  of a confirmed domain (the sender's with DMARC pass, or one whose DKIM signature passed) is no
+  longer removed, so "Google" and "[email]@accounts.google.com" reach the cloud again. Only
+  confirmed domains count, so a sender cannot choose what stays; greeting names and longer names
+  holding the brand are still removed. A person named exactly like such a brand stays readable
+  when only Nano found them; documented as a limit.

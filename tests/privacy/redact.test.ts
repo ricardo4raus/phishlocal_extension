@@ -391,6 +391,29 @@ describe('cloudCut', () => {
   });
 });
 
+/** An email from Lumora whose domain the given DMARC and DKIM results confirm or not. */
+const lumoraEmail = (dmarc: string, dkim: string): Email =>
+  email({
+    sender: { name: 'Lumora', address: 'noreply@accounts.lumora.example' },
+    subject: 'Lumora account',
+    bodyText: 'Hi Anna Muster, you signed in to a site with Lumora.',
+    headers: {
+      replyTo: [],
+      auth: {
+        server: 'mx.google.com',
+        spf: 'pass',
+        dkim: [{ result: dkim, domain: 'lumora.example' }],
+        dmarc,
+      },
+    },
+  });
+
+const parseCloudData = (json: string) =>
+  JSON.parse(json) as {
+    sender_checks: { dkim: string[] };
+    email: { from: { name: string; address: string }; body: string };
+  };
+
 describe('cloudData', () => {
   const findings: Finding[] = [
     { rule: 'urgency', severity: 'warning', message: 'Time pressure', evidence: ['raw text'] },
@@ -437,6 +460,47 @@ describe('cloudData', () => {
     expect(data.json).not.toMatch(/anna|bounce|mx\.google|raw text/i);
     expect(data.namesChecked).toBe(true);
     expect(data.removed).toEqual({ names: 2, emails: 0, numbers: 1, ibans: 0, links: 0 });
+  });
+
+  describe('a brand Nano takes for a name', () => {
+    it('stays when the sender domain is confirmed (found in Chrome: "[email]@[name].com")', () => {
+      const data = parseCloudData(
+        cloudData(lumoraEmail('pass', 'pass'), [], ['Lumora', 'Anna Muster']).json,
+      );
+      expect(data.email.from).toEqual({
+        name: 'Lumora',
+        address: '[email]@accounts.lumora.example',
+      });
+      expect(data.sender_checks.dkim).toEqual(['pass (lumora.example)']);
+      // The person is still removed.
+      expect(data.email.body).toBe('Hi [name], you signed in to a site with Lumora.');
+    });
+
+    it('stays when only the DKIM signature of its domain passed', () => {
+      const data = parseCloudData(cloudData(lumoraEmail('none', 'pass'), [], ['LUMORA.']).json);
+      expect(data.email.from.name).toBe('Lumora');
+    });
+
+    it('is removed when no check confirmed the domain, since a sender cannot pick what stays', () => {
+      const data = parseCloudData(cloudData(lumoraEmail('fail', 'fail'), [], ['Lumora']).json);
+      expect(data.email.from).toEqual({
+        name: '[name]',
+        address: '[email]@accounts.[name].example',
+      });
+      expect(data.sender_checks.dkim).toEqual(['fail ([name].example)']);
+    });
+
+    it('is removed as part of a longer name, and when a greeting names it', () => {
+      const longer = parseCloudData(
+        cloudData(lumoraEmail('pass', 'pass'), [], ['Anna Lumora']).json,
+      );
+      expect(longer.email.from.name).toBe('[name]');
+      const greeted = lumoraEmail('pass', 'pass');
+      greeted.bodyText = 'Dear Mr Lumora, you signed in.';
+      expect(parseCloudData(cloudData(greeted, [], []).json).email.body).toBe(
+        'Dear Mr [name], you signed in.',
+      );
+    });
   });
 
   it("keeps a company's sender name when Nano found no person's name in it", () => {
