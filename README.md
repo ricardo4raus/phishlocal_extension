@@ -65,9 +65,9 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   tracking pixels or run scripts.
 - The cloud deep check runs only when you ask for it and agree to the data shown: personal data
   is removed on the device first (addresses, numbers, IBANs, link paths; at privacy level "High"
-  also names), raw headers are never sent, and you see exactly the email data
-  that goes (besides PhishLocal's own instructions, which hold no personal data). Each email
-  needs its own consent.
+  also names), raw headers are never sent, and you see what was removed and, under "Show what
+  will be sent", exactly the email data that goes (besides PhishLocal's own instructions, which
+  hold no personal data). Each email needs its own consent.
 - Besides loading "Show original" from Gmail, the only request PhishLocal makes on its own: when
   the side panel opens, it asks Firebase Remote Config (Google) for its settings, at most every
   12 h after a successful answer (a failed one is tried again at the next opening).

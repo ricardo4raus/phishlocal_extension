@@ -229,8 +229,10 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
    another host ("lumorabank.example%2Eevil.example") shows the real one. **Never:** raw headers (they hold the user's
    address and server IP addresses), the Return-Path (often holds the user's address), full
    links, the user's own address.
-5. **Consent:** the panel shows exactly that data (the JSON that is sent) and a summary of what
-   was removed. Only "Send to the cloud" sends it, once; "Cancel" sends nothing. Consent is asked
+5. **Consent:** the panel shows what was removed (counts per kind, and what is never sent) and,
+   one click away under "Show what will be sent", exactly that data (the JSON that is sent;
+   decided 22 Nov 2026, see [`ui-design.md`](ui-design.md)). Only "Send to the cloud" sends it,
+   once; "Cancel" sends nothing. Consent is asked
    every time, for every email. The sent data stays on screen as the record. When the email
    changes under a preview, a request or a result (Gmail shows it again with new details), the
    panel says so: a running request's data had been sent, its answer is dropped.
