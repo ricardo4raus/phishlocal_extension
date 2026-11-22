@@ -96,7 +96,7 @@ function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
     }
     // As in index.html: the data and the result can take the focus.
     if (id === 'data') element.tabIndex = 0;
-    if (id === 'result') element.tabIndex = -1;
+    if (id === 'result' || id === 'consent' || id === 'preview') element.tabIndex = -1;
     return element;
   });
   // As in index.html, the section holds everything else.
@@ -184,7 +184,8 @@ describe('the deep check', () => {
     expect(shownData).not.toMatch(/anna|CH93|123 45 67|pay\?user/i);
     expect(shownData).toContain('"goes_to": "evil.example"');
     expect(text('removed')).toContain('2 names');
-    expect(document.activeElement).toBe(get('send'));
+    // The focus lands on the preview, never on Send: a second Enter must not send unread data.
+    expect(document.activeElement).toBe(get('preview'));
     // The exact data is one click away, and that click opens it.
     expect(get('dataPanel').hidden).toBe(true);
     expect(get('show').getAttribute('aria-expanded')).toBe('false');
@@ -302,6 +303,56 @@ describe('the deep check', () => {
     expect(runs).toHaveLength(1);
   });
 
+  it('keeps the focus on the level cards when a keyboard user changes the level', async () => {
+    check = create({ savedLevel: () => 'standard' });
+    check.shown(email, []);
+    click('start');
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    radio('high').focus();
+    choose('high');
+    await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
+    expect(document.activeElement).toBe(radio('high'));
+    nameCalls[0]?.resolve([]);
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    expect(document.activeElement).toBe(radio('high'));
+  });
+
+  it("shows the card's text without technical terms", async () => {
+    check.shown(email, []);
+    await prepare();
+    expect(get('consent').textContent).not.toMatch(/\b(rule|DKIM|DMARC|SPF|JSON)\b/);
+  });
+
+  it('recovers when building the data throws', async () => {
+    const broken = vi.spyOn(console, 'error').mockImplementation(() => {});
+    check = create({
+      savedLevel: () => 'standard',
+      // cloudData() reads the email: a hostile shape makes it throw.
+      uiLanguage: () => 'en',
+    });
+    check.shown({ ...email, links: undefined as unknown as Email['links'] }, []);
+    click('start');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(text('status')).toBe('The deep check could not prepare its data. Nothing was sent.');
+    expect(get('consent').hidden).toBe(true);
+    expect(levelsDisabled()).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    broken.mockRestore();
+  });
+
+  it('keeps the card open while the data is on its way: Back is disabled, Stop is the way out', async () => {
+    check.shown(email, []);
+    await prepare();
+    click('send');
+    expect((get('back') as HTMLButtonElement).disabled).toBe(true);
+    click('back');
+    expect(get('consent').hidden).toBe(false);
+    expect(get('preview').hidden).toBe(false);
+    runs[0]?.resolve(answer('safe'));
+    await vi.waitFor(() => expect(get('result').hidden).toBe(false));
+    expect((get('back') as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('can be stopped while it looks for names and while it sends', async () => {
     check.shown(email, []);
     click('start');
@@ -376,8 +427,9 @@ describe('the deep check', () => {
     await vi.advanceTimersByTimeAsync(CLOUD_LIMIT_MS);
     expect(runs[0]?.signal.aborted).toBe(true);
     await vi.advanceTimersByTimeAsync(STOP_GRACE_MS);
-    expect(text('status')).toBe(
-      `The deep check did not work (no answer within ${CLOUD_LIMIT_MS / 1000} s). The result above still applies.`,
+    expect(text('status')).toMatch(/^The deep check did not work\./);
+    expect(text('detail')).toBe(
+      `The cloud request failed: no answer within ${CLOUD_LIMIT_MS / 1000} s.`,
     );
     // Nothing left running once zero-delay tasks have run.
     await vi.advanceTimersByTimeAsync(1);
@@ -400,9 +452,7 @@ describe('the deep check', () => {
     expect(get('preview').hidden).toBe(false);
     click('send');
     await vi.advanceTimersByTimeAsync(20_000 + STOP_GRACE_MS);
-    expect(text('status')).toBe(
-      'The deep check did not work (no answer within 20 s). The result above still applies.',
-    );
+    expect(text('detail')).toBe('The cloud request failed: no answer within 20 s.');
   });
 
   it('treats a throwing name finder like one that could not look', async () => {
@@ -454,7 +504,9 @@ describe('the deep check', () => {
     await prepare();
     click('send');
     runs[0]?.resolve({ ok: false, reason: 'failed', detail: 'the cloud refused the request' });
-    await vi.waitFor(() => expect(text('status')).toContain('the cloud refused the request'));
+    await vi.waitFor(() => expect(text('status')).toContain('did not work'));
+    // The cloud's own words are tier 3.
+    expect(text('detail')).toBe('The cloud request failed: the cloud refused the request.');
     expect(get('result').hidden).toBe(true);
     // The card stays open with the data: the user can send again or go back.
     expect(get('consent').hidden).toBe(false);

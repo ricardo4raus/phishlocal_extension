@@ -323,6 +323,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     set(elements.status, status);
     elements.status.classList.remove('status--error');
     elements.stop.hidden = true;
+    elements.back.disabled = false;
     setLevelsDisabled(!deps.available);
     if (close) setConsent(false);
     showOffer();
@@ -359,7 +360,6 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     stop = controller;
     setLevelsDisabled(true);
     running('Waiting for the on-device AI…');
-    elements.stop.focus();
     // Not inside the search's time limit: a load can take minutes ("Stop" ends the wait).
     const ready = await settle(
       () => deps.modelReady(answerIn),
@@ -382,51 +382,70 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     return controller.signal.aborted ? undefined : names;
   }
 
-  /** Builds the data at the chosen level and shows the preview. */
+  /** Builds the data at the chosen level and shows the preview. Never throws. */
   async function prepare(): Promise<void> {
     if (!shown?.final || !deps.available || phase === 'preparing' || phase === 'sending') return;
     const { email, findings } = shown;
     const answerIn = language();
     // Fixed for this preview: changing it builds the data again (see the listener below).
     const chosen = level();
+    // The offer button goes away with the card: its focus moves to the card. A focus on the
+    // level cards (a keyboard user changing the level) stays there.
+    const fromOffer = document.activeElement === elements.start;
     reset('', { close: false });
     setConsent(true);
-    // "standard" keeps names: no model, no name search, nothing to wait for or stop.
-    const found = chosen === 'high' ? await searchNames(email, answerIn) : [];
-    if (found === STOPPED) return;
-    const data = cloudData(email, findings ?? [], found, chosen);
-    prepared = { data, language: answerIn };
-    phase = 'preview';
-    clearCounter();
-    elements.stop.hidden = true;
-    setLevelsDisabled(false);
-    elements.removed.replaceChildren(
-      ...removedChips(data.removed, chosen).map((chip) => el('span', 'chip chip--plain', chip)),
-    );
-    set(elements.data, data.json);
-    elements.warning.hidden = data.namesChecked;
-    elements.preview.hidden = false;
-    set(elements.status, '');
-    elements.send.focus();
+    if (fromOffer) elements.consent.focus();
+    try {
+      // "standard" keeps names: no model, no name search, nothing to wait for or stop.
+      const found = chosen === 'high' ? await searchNames(email, answerIn) : [];
+      if (found === STOPPED) return;
+      const data = cloudData(email, findings ?? [], found, chosen);
+      prepared = { data, language: answerIn };
+      phase = 'preview';
+      clearCounter();
+      elements.stop.hidden = true;
+      setLevelsDisabled(false);
+      elements.removed.replaceChildren(
+        ...removedChips(data.removed, chosen).map((chip) => el('span', 'chip chip--plain', chip)),
+      );
+      set(elements.data, data.json);
+      elements.warning.hidden = data.namesChecked;
+      elements.preview.hidden = false;
+      set(elements.status, '');
+      // Never on Send: a second Enter must not send data the user has not looked at.
+      if (!elements.levels.contains(document.activeElement)) elements.preview.focus();
+    } catch (error) {
+      console.error('PhishLocal: the deep check could not prepare its data', error);
+      reset('The deep check could not prepare its data. Nothing was sent.');
+      elements.status.classList.add('status--error');
+    }
   }
 
   function showResult(result: AiCheckResult, findings: Finding[] | undefined, email: Email): void {
     phase = 'done';
     clearCounter();
     elements.stop.hidden = true;
+    elements.back.disabled = false;
     setLevelsDisabled(false);
     if (!result.ok) {
       set(
         elements.status,
         result.reason === 'stopped'
-          ? 'The deep check was stopped. The data shown may already have reached the cloud.'
+          ? 'The deep check was stopped. The data shown may already have reached the cloud; you can send it again.'
           : result.reason === 'unreadable-answer'
-            ? 'The cloud answer could not be read. The result above still applies.'
-            : `The deep check did not work (${result.detail ?? 'unknown error'}). The result above still applies.`,
+            ? 'The cloud answer could not be read. The result above still applies; you can send the data again.'
+            : 'The deep check did not work. The result above still applies; you can send the data again.',
       );
       elements.status.classList.add('status--error');
-      // The card stays open with the data as the record; the user can send the same data again
-      // (the same consent) or go back.
+      // What went wrong, in the cloud's or the network's words: tier 3.
+      set(
+        elements.detail,
+        result.reason === 'failed'
+          ? `The cloud request failed: ${result.detail ?? 'unknown error'}.`
+          : '',
+      );
+      // The card stays open with the data as the record; a new click on Send is a new consent
+      // to the same, still shown data.
       elements.send.hidden = false;
       elements.cancel.hidden = false;
       phase = 'preview';
@@ -474,6 +493,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     // The data stays visible as the record of what was sent; it is sent only once.
     elements.send.hidden = true;
     elements.cancel.hidden = true;
+    elements.back.disabled = true;
     running('Checking in the cloud…');
     elements.stop.focus();
     const controller = new AbortController();
@@ -497,7 +517,13 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
       controller.signal.reason === TIME_LIMIT && !answer.ok
         ? { ok: false, reason: 'failed', detail: `no answer within ${cloudLimitMs / 1000} s` }
         : answer;
-    showResult(result, findings, email);
+    try {
+      showResult(result, findings, email);
+    } catch (error) {
+      console.error('PhishLocal: the deep check could not show its result', error);
+      reset('The deep check result could not be shown.', { keepResult: false, close: false });
+      elements.status.classList.add('status--error');
+    }
   }
 
   elements.start.addEventListener('click', () => void prepare());
@@ -541,8 +567,9 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
   elements.back.addEventListener('click', () => {
     if (phase === 'preview' || phase === 'preparing') {
       cancel();
-    } else {
-      // Done, or nothing prepared: close the card and keep the result.
+    } else if (phase !== 'sending') {
+      // Done, or nothing prepared: close the card and keep the result. While the data is on
+      // its way, Stop is the way out (the button is disabled then), so the record stays in view.
       setConsent(false);
       showOffer();
       elements.start.focus();

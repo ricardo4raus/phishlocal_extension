@@ -238,8 +238,9 @@
     min-width: 0;
   }
 
-  /* While the consent card is open, the tier-2 lists step aside: the user decides about one
-     email, with the strip and the verdict still in view. */
+  /* While the consent card is open (main.ts sets data-consent on the page when the deep check
+     says so), the tier-2 lists step aside: the user decides about one email, with the strip and
+     the verdict still in view. */
   .page[data-consent='open'] .consent-hides {
     display: none;
   }
@@ -1044,6 +1045,19 @@
     content: '\201D';
   }
 
+  /* A plain chip (no quotation marks): a count or a label on the accent tint. */
+  .chip--plain {
+    background: var(--color-accent-tint);
+    color: var(--color-accent-text);
+    font-weight: 600;
+    border-radius: var(--radius-pill);
+  }
+
+  .chip--plain::before,
+  .chip--plain::after {
+    content: none;
+  }
+
   /* ---- Red flags: rows in one card, separated by hairlines; the badge carries the severity. ---- */
   .flags {
     display: flex;
@@ -1277,19 +1291,6 @@
   .level__item--strong {
     color: var(--color-text);
     font-weight: 600;
-  }
-
-  /* Chips of what was removed: on the accent tint, without quotation marks. */
-  .chip--plain {
-    background: var(--color-accent-tint);
-    color: var(--color-accent-text);
-    font-weight: 600;
-    border-radius: var(--radius-pill);
-  }
-
-  .chip--plain::before,
-  .chip--plain::after {
-    content: none;
   }
 
   /* Exactly what will be sent: monospace, scrollable, never cut. */
