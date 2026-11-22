@@ -120,6 +120,9 @@ _Current state, updated as features land._
   Chrome's verbose log silent. RAM, disk, crash backoff, the GPU cache and a new NVIDIA driver
   were ruled out one by one. Only a PC restart helped (14.1 s), and only for the first Chrome
   start. The cause lies outside the extension; the demo routine is now "restart the PC first".
+  Later that night a Chrome trace found where the minutes go: not into loading the weights
+  (2.5 s), but into the first prefill, where the NVIDIA D3D12 driver blocks 1–7 s for about 80
+  of 334 GPU compute pipelines that Chrome's ML library creates for every new service process.
 - **Reading Gmail without guessing:** Gmail's class names are generated and undocumented. A
   DevTools snippet that printed only counts and class names (no email content) measured the
   real page before any code was written. Gmail's details box (with "Reply-To") closes as soon as
@@ -164,6 +167,11 @@ _Current state, updated as features land._
 - A slow step is not always heavy work: sampling CPU, GPU and memory every 5 s showed that a
   minutes-long model load was Chrome waiting, not loading. That ruled out every hardware theory
   at once.
+- Sampling says "idle", a trace says where: Chrome's own trace (recorded over the DevTools
+  protocol with the `gpu` and `optimization_guide` categories) and `chrome://histograms` named
+  the exact call that waited, after three days of theories. Chrome also accepts a copied model
+  folder in a fresh user data directory, so such measurements can run automated and repeatedly
+  without touching the real profile.
 - Vite copies every `VITE_*` variable into the built JavaScript. Anything in `.env.local` that
   the code uses is public in the extension, so secrets (e.g. an App Check debug token) must
   never ship in a release build.
@@ -826,7 +834,26 @@ _To fill in near the submission._
   (1.9 s and 1.7 s). In one run Gemini Nano listed 32 "names", among them "Google", so the
   sender's name and the DKIM and address domains became "[name]": safe for privacy, but the cloud
   lost evidence. In the next run Nano found none. To fix after the freeze.
-- Feature freeze.
 - Again the PowerShell encoding trap: rewriting a file with `Get-Content -Raw` turned "…" into
-  "â€¦", and the tool layer turned `͏` in a regex into the real character. Code points now
-  go into code as numbers.
+  "â€¦", and the tool layer turned an escaped code point in a regex into the real, invisible
+  character. Code points now go into code as numbers.
+- PR #17 merged. Feature freeze.
+
+**Second session with Claude Code (night, research only, no code changes):**
+
+- Research task: find the cause of the slow model loads. Two agents read Chromium's source
+  (release 157) and searched for public reports; a test page, a copied Chrome test profile and
+  a trace recorded over the DevTools protocol measured six fresh Chrome starts without touching
+  the real profile.
+- Found: the weights load in 2.5 s (`OnDeviceModel.LoadModelDuration`). The minutes are the
+  first prefill: Chrome's ML library creates 334 GPU compute pipelines, and about 80 of them
+  block 1–7 s each in the NVIDIA D3D12 driver with the CPU idle (107–315 s in total). Without
+  `initialPrompts`, `create()` takes 3 s and the first prompt takes the minutes; the panel's
+  sessions have `initialPrompts`, so for the panel the wait sits in `create()`.
+- Every new service process (after each Chrome restart and after idle time) rebuilds the
+  pipelines, because Chrome's program cache stays empty. Three Chrome switches (integrated GPU,
+  no host-mapped pointers, no driver warm-up) changed nothing. Defender, the network and the
+  Wi-Fi card's PCIe warnings were ruled out.
+- Nothing public matches the pattern; it may be specific to this GPU and driver. Next: measure on
+  a second PC, then file a Chromium bug with the trace. Details in
+  `docs/model-load-debugging.md`.
