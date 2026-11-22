@@ -1182,6 +1182,11 @@
     padding: 0;
   }
 
+  /* Without flagged links the fold follows the heading directly: no hairline between them. */
+  .link-list:empty + .fold--inner {
+    border-block-start: 0;
+  }
+
   /* A link list inside a fold starts under the summary's hairline: its first row keeps its own. */
   .link-list--folded > .link:first-child {
     border-block-start: 1px solid var(--color-border);
