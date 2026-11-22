@@ -256,7 +256,7 @@ describe('monkey: AI check view', () => {
       shown = undefined;
       calm = false;
       document.body.innerHTML =
-        '<div id="verdict" hidden><p id="overall"></p><p id="status"></p>' +
+        '<div id="verdict" hidden><p id="overall" tabindex="-1"></p><p id="status"></p>' +
         '<ul id="reasons"></ul><p id="advice"></p><span id="source"></span><span id="time"></span>' +
         '<button id="stop" hidden></button></div><dd id="detail"></dd>';
       check = create(rng);
