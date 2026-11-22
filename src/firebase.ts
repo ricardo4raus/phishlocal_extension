@@ -22,13 +22,16 @@ export const firebaseApp = initializeApp(firebaseConfig);
  *   separate token made only for the judges, which can be revoked after judging;
  * - `npm run build` reads neither: both conditions are constant `false` there, the bundler drops
  *   the branches, and no token reaches a normal release build.
+ * The judges mode is checked first, so the developer's token (in `.env.local`, which Vite loads
+ * in every mode) never reaches the judges build, even if something turns `DEV` on there.
  * Without App Check, on-device prompts still work; cloud requests are rejected.
  */
-const debugToken = import.meta.env.DEV
-  ? import.meta.env.VITE_APPCHECK_DEBUG_TOKEN
-  : import.meta.env.MODE === 'judges'
+const debugToken =
+  import.meta.env.MODE === 'judges'
     ? import.meta.env.VITE_APPCHECK_JUDGES_TOKEN
-    : undefined;
+    : import.meta.env.DEV
+      ? import.meta.env.VITE_APPCHECK_DEBUG_TOKEN
+      : undefined;
 
 /** Whether cloud requests can pass App Check in this build. */
 export const appCheckEnabled = Boolean(debugToken);

@@ -39,6 +39,11 @@ let modelWork = 0;
 let promptWork = 0;
 /** Name searches and cloud requests of the deep check that have started and not ended. */
 let deepWork = 0;
+/** Set by configureAi(): no model work may start before the settings are fixed. */
+let aiConfigured = false;
+const afterConfigure = (what: string): void => {
+  if (!aiConfigured) violations.push(`${what} before configureAi()`);
+};
 /** The cloud can be reached in this case's build. */
 let cloudAvailable = true;
 /** The data on screen when the user last clicked "Send to the cloud", if the preview showed. */
@@ -112,8 +117,12 @@ function deepWorkFake<T>(
   });
 }
 vi.mock('../../src/ai', () => ({
-  configureAi: (): void => undefined,
+  configureAi: (): void => {
+    if (aiConfigured) violations.push('configureAi() called twice');
+    aiConfigured = true;
+  },
   warmUpOnDevice: (): Promise<WarmUpResult> => {
+    afterConfigure('warm-up');
     const state = calm
       ? 'ready'
       : rng.pick(['ready', 'ready', 'not-downloaded', 'unavailable', 'throw'] as const);
@@ -126,6 +135,7 @@ vi.mock('../../src/ai', () => ({
     }, delay());
   },
   ensureModelLoaded: (): Promise<boolean> => {
+    afterConfigure('model load');
     const ready = calm || rng.chance(0.8);
     return later(() => ready, delay());
   },
@@ -135,6 +145,7 @@ vi.mock('../../src/ai', () => ({
     _known: ReadonlySet<string>,
     signal: AbortSignal,
   ): Promise<AiCheckResult> => {
+    afterConfigure('AI check');
     // The prompt is the only thing the model sees: it must hold the email as JSON, nothing else.
     if (!prompt.startsWith('Check this email for phishing.')) violations.push('odd AI prompt');
     const behaviour = calm
@@ -170,14 +181,17 @@ vi.mock('../../src/ai', () => ({
       }, delay());
     });
   },
-  findNames: (_text: string, _language: string, signal: AbortSignal) =>
-    deepWorkFake<string[] | undefined>(
+  findNames: (_text: string, _language: string, signal: AbortSignal) => {
+    afterConfigure('name search');
+    return deepWorkFake<string[] | undefined>(
       signal,
       () => rng.pick([['Anna Muster'], [], ['x'.repeat(100)], undefined]),
       undefined,
       'name search',
-    ),
+    );
+  },
   runCloudCheck: (prompt: string, signal: AbortSignal): Promise<AiCheckResult> => {
+    afterConfigure('cloud check');
     // Only during a click on "Send to the cloud", once, with exactly the data the preview showed
     // and nothing else: without it, only the fixed instruction lines are left.
     if (!consent || !prompt.includes(consent)) {
@@ -207,6 +221,7 @@ vi.mock('../../src/ai', () => ({
     );
   },
   runPrompt: (): Promise<PromptResult> => {
+    afterConfigure('test prompt');
     const fails = !calm && rng.chance(0.3);
     promptWork++;
     return later(() => {
@@ -219,6 +234,7 @@ vi.mock('../../src/ai', () => ({
     _language: string,
     onProgress: (loaded: number) => void,
   ): Promise<WarmUpResult> => {
+    afterConfigure('download');
     const steps = rng.int(0, 4);
     for (let step = 1; step <= steps; step++)
       setTimeout(() => onProgress(step / steps), step * 100);
@@ -440,6 +456,8 @@ const STATUS_IDS = [
 
 function checkPanelOnce(): void {
   expect(violations).toEqual([]);
+  // Inert only while the settings load, before anything else happens.
+  expect(document.body.hasAttribute('inert'), 'panel left inert').toBe(false);
   // Email content never becomes markup: nothing that loads, runs or links.
   expect(
     document.body.querySelectorAll(
@@ -541,6 +559,7 @@ describe('monkey: side panel', () => {
       modelWork = 0;
       promptWork = 0;
       deepWork = 0;
+      aiConfigured = false;
       consent = undefined;
       cloudAvailable = rng.chance(0.8);
       vi.clearAllTimers();

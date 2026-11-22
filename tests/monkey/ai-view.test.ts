@@ -177,6 +177,7 @@ function create(rng: Rng): AiCheck {
         });
       },
       headersWaitMs: 3_000,
+      runTimeoutMs: 60_000,
     },
   );
 }

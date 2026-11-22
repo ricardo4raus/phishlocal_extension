@@ -12,7 +12,6 @@ import { answerLanguage, buildUserPrompt, EXPERIMENTAL_LANGUAGES, promptData } f
 import { type AiVerdict, overallRisk, type Risk, RISKS, ruleRisk } from '../ai/verdict';
 import type { Email } from '../email';
 import type { Finding } from '../rules';
-import { DEFAULT_SETTINGS } from '../settings';
 
 /** How long the AI waits for a Gmail email's headers before it runs without them. */
 export const HEADERS_WAIT_MS = 3_000;
@@ -120,8 +119,11 @@ export interface AiCheckDeps {
    */
   modelReady: (language: string) => Promise<boolean>;
   headersWaitMs?: number;
-  /** Time limit of one run (Remote Config `ai_check_timeout_s`); default RUN_TIMEOUT_MS. */
-  runTimeoutMs?: number;
+  /**
+   * A run that has not answered after this long is stopped and the queue moves on (settings'
+   * `aiCheckTimeoutMs`).
+   */
+  runTimeoutMs: number;
 }
 
 export interface AiCheck {
@@ -162,9 +164,6 @@ interface Request {
  */
 export const STABLE_MS = 500;
 
-/** A run that has not answered after this long is stopped (the queue moves on). */
-export const RUN_TIMEOUT_MS = DEFAULT_SETTINGS.aiCheckTimeoutMs;
-
 /**
  * After a stop, how long a run gets to end before the queue moves on without it. A run that
  * follows its signal ends at once; this only bounds one that does not.
@@ -201,7 +200,7 @@ const seconds = (ms: number): string => `${Math.round(ms / 1000)} s`;
 
 export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck {
   const waitMs = deps.headersWaitMs ?? HEADERS_WAIT_MS;
-  const runTimeoutMs = deps.runTimeoutMs ?? RUN_TIMEOUT_MS;
+  const { runTimeoutMs } = deps;
   /** Id of the email shown now; results for other ids are dropped. */
   let shownId = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;

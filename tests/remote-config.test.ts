@@ -13,6 +13,7 @@ const sdk = vi.hoisted(() => ({
   fetched: {} as Record<string, FakeValue>,
   active: {} as Record<string, FakeValue>,
   fetch: 'ok' as 'ok' | 'fail' | 'hang',
+  init: 'ok' as 'ok' | 'fail' | 'hang',
   broken: false,
 }));
 
@@ -21,8 +22,11 @@ vi.mock('firebase/remote-config', () => ({
     if (sdk.broken) throw new Error('remote-config/indexed-db-unavailable');
     return { settings: sdk.settings };
   },
-  ensureInitialized: async () => {
+  ensureInitialized: () => {
+    if (sdk.init === 'hang') return new Promise(() => {});
+    if (sdk.init === 'fail') return Promise.reject(new Error('remote-config/storage-open'));
     sdk.active = { ...sdk.stored };
+    return Promise.resolve();
   },
   fetchAndActivate: () => {
     if (sdk.fetch === 'hang') return new Promise(() => {});
@@ -48,6 +52,7 @@ beforeEach(() => {
   sdk.fetched = {};
   sdk.active = {};
   sdk.fetch = 'ok';
+  sdk.init = 'ok';
   sdk.broken = false;
 });
 
@@ -66,6 +71,21 @@ describe('loadSettings', () => {
     });
     expect(sdk.settings.minimumFetchIntervalMillis).toBe(FETCH_INTERVAL_MS);
     expect(FETCH_INTERVAL_MS).toBeGreaterThanOrEqual(60_000);
+    // The 2 s limit's timer does not outlive a quick answer.
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('never waits longer than its limit, even when the stored values cannot be read', async () => {
+    const { LOAD_LIMIT_MS, loadSettings } = await import('../src/remote-config');
+    for (const init of ['hang', 'fail'] as const) {
+      sdk.init = init;
+      sdk.stored = { names_timeout_s: remote('30') };
+      sdk.active = {};
+      const settings = loadSettings();
+      await vi.advanceTimersByTimeAsync(LOAD_LIMIT_MS);
+      expect(await settings, init).toEqual(DEFAULT_SETTINGS);
+      expect(vi.getTimerCount()).toBe(0);
+    }
   });
 
   it('ignores values that did not come from Remote Config', async () => {

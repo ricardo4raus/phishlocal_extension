@@ -63,10 +63,14 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   tracking pixels or run scripts.
 - The cloud deep check runs only when you ask for it and agree to the data shown: personal data
   is removed on the device first, raw headers are never sent, and you see exactly the email data
-  that goes (besides PhishLocal's fixed instructions). Each email needs its own consent.
-- When the side panel opens, it asks Firebase Remote Config for its settings, at most twice a
-  day. That request holds a random Firebase installation ID, the app ID, the SDK version and the
-  browser language, never email content.
+  that goes (besides PhishLocal's own instructions, which hold no personal data). Each email
+  needs its own consent.
+- The one network request PhishLocal makes on its own: when the side panel opens, it asks Firebase
+  Remote Config (Google) for its settings, at most every 12 h after a successful answer (a failed
+  one is tried again at the next opening). It holds a Firebase installation ID that stays the same
+  for this browser profile, an installation token, the app's API key and project ID, the SDK
+  versions, the days the extension was used (Firebase's heartbeat header) and the browser
+  language; Google also sees your IP address. Never email content.
 - Permissions: the side panel, and Gmail only (`https://mail.google.com/*`). The `scripting`
   permission is used once after an install or update, to start PhishLocal's Gmail script in
   Gmail tabs that were already open, so you don't have to reload Gmail.
@@ -97,6 +101,9 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
    can use the deep check without any setup. That token is revoked after judging. A browser
    extension has no real App Check attestation (reCAPTCHA would load remote scripts), so a
    public release would need a small token server; until then, the normal build has no cloud.
+   The token passes App Check for the whole Firebase project, so share the judges build only
+   privately (Devpost links and uploaded files are public) and cap the Gemini API quota while
+   judging runs.
 
 4. **Enable Gemini Nano:** open `chrome://flags/#prompt-api-for-gemini-nano`, set it to "Enabled
    Multilingual", and restart Chrome. If the model is not on the device yet, the side panel shows

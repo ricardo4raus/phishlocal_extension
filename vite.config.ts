@@ -10,14 +10,15 @@ export const JUDGES_OUT_DIR = 'dist-judges';
 
 export default defineConfig(({ mode }) => {
   if (mode === JUDGES_MODE) {
+    const env = loadEnv(mode, process.cwd(), 'VITE_APPCHECK_');
+    const token = env.VITE_APPCHECK_JUDGES_TOKEN?.trim();
     // A judges build without its token would silently lack the deep check.
-    const token = loadEnv(
-      mode,
-      process.cwd(),
-      'VITE_APPCHECK_JUDGES_TOKEN',
-    ).VITE_APPCHECK_JUDGES_TOKEN;
-    if (!token?.trim()) {
+    if (!token) {
       throw new Error('Judges build: set VITE_APPCHECK_JUDGES_TOKEN in .env.judges.local.');
+    }
+    // The judges' token is revoked after judging; the developer's own token must not go out.
+    if (token === env.VITE_APPCHECK_DEBUG_TOKEN?.trim()) {
+      throw new Error('Judges build: VITE_APPCHECK_JUDGES_TOKEN must be its own token.');
     }
   }
   return {

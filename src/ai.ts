@@ -340,7 +340,7 @@ export async function runCloudCheck(prompt: string, signal?: AbortSignal): Promi
 
 /**
  * A short reason for a failed cloud request. The SDK's messages are long and name the request URL
- * with the project ID ("Error fetching from https://â€¦: [403 ] â€¦").
+ * with the project ID ("Error fetching from https://...: [403 ] ...").
  */
 export function cloudError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);

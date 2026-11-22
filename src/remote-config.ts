@@ -35,7 +35,8 @@ export async function loadSettings(): Promise<Settings> {
     remoteConfig.settings.fetchTimeoutMillis = 10_000;
 
     const loaded = (async () => {
-      // The stored values first, so a slow request still leaves those of the last one.
+      // The stored values first, so a slow request still leaves those of the last one. If even
+      // they cannot be read within the limit (a slow or broken IndexedDB), the defaults apply.
       await ensureInitialized(remoteConfig);
       await fetchAndActivate(remoteConfig);
     })().catch(() => undefined);

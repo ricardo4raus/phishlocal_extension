@@ -7,13 +7,16 @@ import type { Email } from '../src/email';
 import type { Finding } from '../src/rules';
 import { HEADERS_WAIT_MS, STOP_GRACE_MS } from '../src/sidepanel/ai-view';
 import {
-  CLOUD_LIMIT_MS,
+  CLOUD_LIMIT_EXTRA_MS,
   createDeepCheck,
   type DeepCheck,
   type DeepCheckDeps,
-  NAMES_TIMEOUT_MS,
   removedSummary,
 } from '../src/sidepanel/deep-check-view';
+import { DEFAULT_SETTINGS } from '../src/settings';
+
+const NAMES_TIMEOUT_MS = DEFAULT_SETTINGS.namesTimeoutMs;
+const CLOUD_LIMIT_MS = DEFAULT_SETTINGS.cloudTimeoutMs + CLOUD_LIMIT_EXTRA_MS;
 
 const email: Email = {
   sender: { name: 'Anna Muster', address: 'anna.muster@mail.example' },
@@ -100,6 +103,8 @@ function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
           runs.push({ prompt, signal, resolve });
           signal.addEventListener('abort', () => resolve({ ok: false, reason: 'stopped' }));
         }),
+      namesTimeoutMs: NAMES_TIMEOUT_MS,
+      cloudTimeoutMs: DEFAULT_SETTINGS.cloudTimeoutMs,
       ...deps,
     },
   );
@@ -307,7 +312,7 @@ describe('the deep check', () => {
   it('uses the time limits it is given (from Remote Config)', async () => {
     check = create({
       namesTimeoutMs: 5_000,
-      cloudLimitMs: 20_000,
+      cloudTimeoutMs: 10_000,
       findNames: () => new Promise(() => {}),
       run: (prompt, signal) => {
         runs.push({ prompt, signal, resolve: () => {} });

@@ -52,10 +52,36 @@ export const MAX_EXTRA_INSTRUCTIONS = 500;
 
 /**
  * Characters extra instructions may not hold: controls (except the line break), invisible format
- * characters such as bidi overrides and zero-width spaces, private-use and unassigned code points,
- * and line or paragraph separators.
+ * characters such as bidi overrides and zero-width spaces, private-use, unassigned and surrogate
+ * code points, and line or paragraph separators.
  */
-const FORBIDDEN_IN_TEXT = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Zl}\p{Zp}]/u;
+const FORBIDDEN_CATEGORIES = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Cs}\p{Zl}\p{Zp}]/u;
+
+/**
+ * Characters that show nothing although they are letters, marks or symbols: the combining
+ * grapheme joiner, Hangul and Khmer fillers, Mongolian and other variation selectors (they can
+ * hide data in text), and the blank Braille pattern. Code point ranges, first to last.
+ */
+const BLANK_RANGES: readonly (readonly [number, number])[] = [
+  [0x034f, 0x034f],
+  [0x115f, 0x1160],
+  [0x17b4, 0x17b5],
+  [0x180b, 0x180f],
+  [0x2800, 0x2800],
+  [0x3164, 0x3164],
+  [0xfe00, 0xfe0f],
+  [0xffa0, 0xffa0],
+  [0xe0100, 0xe01ef],
+];
+
+function hasHiddenCharacters(text: string): boolean {
+  if (FORBIDDEN_CATEGORIES.test(text)) return true;
+  for (const character of text) {
+    const code = character.codePointAt(0) ?? 0;
+    if (BLANK_RANGES.some(([first, last]) => code >= first && code <= last)) return true;
+  }
+  return false;
+}
 
 function seconds(value: string | undefined, parameter: string, fallbackMs: number): number {
   const range = SECONDS_RANGE[parameter];
@@ -73,7 +99,7 @@ function extraInstructions(value: string | undefined): string {
   const text = value?.replaceAll('\r\n', '\n').trim() ?? '';
   // A value that breaks a rule is dropped whole, never cut: half a sentence can mean the opposite.
   const withoutBreaks = text.replaceAll('\n', ' ');
-  if (text.length > MAX_EXTRA_INSTRUCTIONS || FORBIDDEN_IN_TEXT.test(withoutBreaks)) return '';
+  if (text.length > MAX_EXTRA_INSTRUCTIONS || hasHiddenCharacters(withoutBreaks)) return '';
   return text;
 }
 

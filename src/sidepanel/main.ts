@@ -16,7 +16,7 @@ import type { Email } from '../email';
 import { loadSettings } from '../remote-config';
 import { checkEmail } from '../rules';
 import { createAiCheck } from './ai-view';
-import { CLOUD_LIMIT_EXTRA_MS, createDeepCheck } from './deep-check-view';
+import { createDeepCheck } from './deep-check-view';
 import { showEmail } from './email-view';
 import { createGmailView } from './gmail-view';
 import { showRuleCheck } from './findings-view';
@@ -30,6 +30,17 @@ function byId<T extends HTMLElement>(id: string): T {
 }
 
 const modelStatus = byId<HTMLElement>('model-status');
+
+// The settings from Remote Config (at most 2 s; otherwise the stored or default values), fixed
+// for this panel before the first model session is made and before any button works. Until then
+// the panel is inert, so no click or paste is lost to a listener that is not there yet.
+document.body.toggleAttribute('inert', true);
+modelStatus.textContent = 'Starting…';
+const settings = await loadSettings();
+configureAi(settings);
+document.body.toggleAttribute('inert', false);
+modelStatus.textContent = '';
+
 const modelProgress = byId<HTMLElement>('model-progress');
 const modelDownload = byId<HTMLButtonElement>('model-download');
 const promptInput = byId<HTMLTextAreaElement>('prompt');
@@ -147,11 +158,6 @@ const findingsList = byId<HTMLUListElement>('email-findings');
 /** The AI check's answer language; the warm-up loads the model for exactly this one. */
 const checkLanguage = answerLanguage(chrome.i18n.getUILanguage());
 
-// The settings from Remote Config (at most 2 s; otherwise the stored or default values), fixed
-// for this panel before the first model session is made.
-const settings = await loadSettings();
-configureAi(settings);
-
 // The AI check of every shown email: on-device only, with the rules as its lower limit.
 const aiCheck = createAiCheck(
   {
@@ -195,7 +201,7 @@ const deepCheck = createDeepCheck(
     findNames,
     run: runCloudCheck,
     namesTimeoutMs: settings.namesTimeoutMs,
-    cloudLimitMs: settings.cloudTimeoutMs + CLOUD_LIMIT_EXTRA_MS,
+    cloudTimeoutMs: settings.cloudTimeoutMs,
   },
 );
 

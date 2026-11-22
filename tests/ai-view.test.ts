@@ -11,10 +11,12 @@ import {
   HEADERS_WAIT_MS,
   LOADING_HINT_MS,
   MAX_REMEMBERED,
-  RUN_TIMEOUT_MS,
   STABLE_MS,
   STOP_GRACE_MS,
 } from '../src/sidepanel/ai-view';
+import { DEFAULT_SETTINGS } from '../src/settings';
+
+const RUN_TIMEOUT_MS = DEFAULT_SETTINGS.aiCheckTimeoutMs;
 
 const email: Email = {
   sender: { name: 'Lumora Bank', address: 'news@lumorabank.example' },
@@ -76,6 +78,7 @@ function create(deps: Partial<AiCheckDeps> = {}): AiCheck {
       },
       uiLanguage: () => 'de-CH',
       modelReady: () => modelReady(),
+      runTimeoutMs: RUN_TIMEOUT_MS,
       ...deps,
     },
   );
