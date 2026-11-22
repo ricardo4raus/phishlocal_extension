@@ -642,6 +642,37 @@
     background: var(--color-surface);
   }
 
+  /* A menu: our own chevron with the same inset as the text, instead of Chrome's arrow at the
+     edge. The wrapper draws it, because a <select> cannot hold a pseudo-element. */
+  .select {
+    position: relative;
+    display: block;
+    min-width: 0;
+  }
+
+  .select::after {
+    content: '';
+    position: absolute;
+    inset-inline-end: var(--space-3);
+    inset-block-start: 50%;
+    inline-size: 16px;
+    block-size: 16px;
+    translate: 0 -50%;
+    background: var(--color-text-2);
+    mask-image: url(./icons/chevron-down.svg);
+    mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    pointer-events: none;
+  }
+
+  .field__select {
+    appearance: none;
+    padding-inline-end: calc(var(--space-3) + 16px + var(--space-2));
+    color: inherit;
+    font: inherit;
+  }
+
   .field__textarea {
     box-sizing: border-box;
     inline-size: 100%;

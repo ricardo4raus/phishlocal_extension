@@ -468,9 +468,11 @@
                 >Or load a made-up sample</label
               >
               <div class="row">
-                <select id="sample-select" class="field__select grow">
-                  <option value="" data-t="chooseSample">Choose a sample…</option>
-                </select>
+                <span class="select grow">
+                  <select id="sample-select" class="field__select">
+                    <option value="" data-t="chooseSample">Choose a sample…</option>
+                  </select>
+                </span>
                 <button id="sample-load" type="button" class="btn" data-t="load">Load</button>
               </div>
             </div>
@@ -483,9 +485,11 @@
           <div class="fold__body stack">
             <div class="field">
               <label for="language-select" class="field__label" data-t="language">Language</label>
-              <select id="language-select" class="field__select">
-                <option value="auto">Automatic</option>
-              </select>
+              <span class="select">
+                <select id="language-select" class="field__select">
+                  <option value="auto">Automatic</option>
+                </select>
+              </span>
               <p class="text-muted" data-t="languageHint">
                 Sets the language of the panel and of the AI's answers. The panel restarts to
                 switch.
