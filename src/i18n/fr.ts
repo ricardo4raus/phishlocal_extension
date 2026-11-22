@@ -330,6 +330,18 @@ export const fr: Messages = {
     unknownError: 'erreur inconnue',
   },
 
+  errors: {
+    noAnswerWithin: (seconds) => `pas de réponse en ${seconds} s`,
+    modelWrote: (count) => `le modèle avait écrit ${count} caractères`,
+    tooLong: (count) => `la réponse ne s’est pas terminée (plus de ${count} caractères)`,
+    refused: (status) => `le cloud a refusé la requête (HTTP ${status})`,
+    cloudFailed: 'la requête au cloud a échoué',
+    offline: 'pas de connexion au cloud',
+    tokenNoAnswer: (name) => `pas de réponse du serveur de jetons (${name})`,
+    tokenRefused: (status) => `le serveur de jetons a refusé (HTTP ${status})`,
+    signInFailed: (code) => `échec de la connexion (${code})`,
+  },
+
   deepCheck: {
     notAvailable: 'Non disponible dans cette version.',
     waitingHeaders: 'En attente des vérifications de l’expéditeur…',
@@ -372,7 +384,6 @@ export const fr: Messages = {
     note: (time) => `Cloud (Gemini via Firebase AI Logic). L’IA peut se tromper. ${time}.`,
     sentOnce: 'Envoyé une fois, pour cette analyse seulement.',
     checking: 'Vérification dans le cloud…',
-    noAnswerWithin: (seconds) => `pas de réponse en ${seconds} s`,
     showFailed: 'Le résultat de l’analyse approfondie n’a pas pu être affiché.',
     levelChanged:
       'Le nouveau niveau de confidentialité s’applique à la prochaine analyse approfondie. Les données ci-dessus ont été envoyées au niveau précédent.',

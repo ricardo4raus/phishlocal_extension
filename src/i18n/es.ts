@@ -328,6 +328,18 @@ export const es: Messages = {
     unknownError: 'error desconocido',
   },
 
+  errors: {
+    noAnswerWithin: (seconds) => `sin respuesta en ${seconds} s`,
+    modelWrote: (count) => `el modelo había escrito ${count} caracteres`,
+    tooLong: (count) => `la respuesta no terminó (más de ${count} caracteres)`,
+    refused: (status) => `la nube rechazó la petición (HTTP ${status})`,
+    cloudFailed: 'la petición a la nube falló',
+    offline: 'sin conexión con la nube',
+    tokenNoAnswer: (name) => `sin respuesta del servidor de tokens (${name})`,
+    tokenRefused: (status) => `el servidor de tokens rechazó la petición (HTTP ${status})`,
+    signInFailed: (code) => `falló el inicio de sesión (${code})`,
+  },
+
   deepCheck: {
     notAvailable: 'No disponible en esta versión.',
     waitingHeaders: 'Esperando las comprobaciones del remitente…',
@@ -368,7 +380,6 @@ export const es: Messages = {
     note: (time) => `Nube (Gemini mediante Firebase AI Logic). La IA puede equivocarse. ${time}.`,
     sentOnce: 'Enviado una vez, solo para esta revisión.',
     checking: 'Revisando en la nube…',
-    noAnswerWithin: (seconds) => `sin respuesta en ${seconds} s`,
     showFailed: 'No se pudo mostrar el resultado de la revisión a fondo.',
     levelChanged:
       'El nuevo nivel de privacidad se aplica a la próxima revisión a fondo. Los datos de arriba se enviaron con el nivel anterior.',

@@ -326,6 +326,18 @@ export const pt: Messages = {
     unknownError: 'erro desconhecido',
   },
 
+  errors: {
+    noAnswerWithin: (seconds) => `sem resposta em ${seconds} s`,
+    modelWrote: (count) => `o modelo tinha escrito ${count} caracteres`,
+    tooLong: (count) => `a resposta não terminou (mais de ${count} caracteres)`,
+    refused: (status) => `a nuvem recusou o pedido (HTTP ${status})`,
+    cloudFailed: 'o pedido à nuvem falhou',
+    offline: 'sem ligação à nuvem',
+    tokenNoAnswer: (name) => `sem resposta do servidor de tokens (${name})`,
+    tokenRefused: (status) => `o servidor de tokens recusou (HTTP ${status})`,
+    signInFailed: (code) => `falha no início de sessão (${code})`,
+  },
+
   deepCheck: {
     notAvailable: 'Não disponível nesta versão.',
     waitingHeaders: 'À espera das verificações do remetente…',
@@ -348,7 +360,7 @@ export const pt: Messages = {
       preview:
         'O e-mail mudou, por isso os dados preparados foram descartados. Não foi enviado nada.',
       sending:
-        'O e-mail mudou durante a verificação aprofundada: os seus dados já tinham sido enviados, a resposta foi descartada.',
+        'O e-mail mudou durante a verificação aprofundada: os dados dele já tinham sido enviados, a resposta foi descartada.',
       done: 'O e-mail mudou, por isso o resultado da verificação aprofundada foi apagado.',
     },
     waitingModel: 'À espera da IA no dispositivo…',
@@ -369,7 +381,6 @@ export const pt: Messages = {
     note: (time) => `Nuvem (Gemini através do Firebase AI Logic). A IA pode errar. ${time}.`,
     sentOnce: 'Enviado uma vez, só para esta verificação.',
     checking: 'A verificar na nuvem…',
-    noAnswerWithin: (seconds) => `sem resposta em ${seconds} s`,
     showFailed: 'Não foi possível mostrar o resultado da verificação aprofundada.',
     levelChanged:
       'O novo nível de privacidade aplica-se à próxima verificação aprofundada. Os dados acima foram enviados com o nível anterior.',

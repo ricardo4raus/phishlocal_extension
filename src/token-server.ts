@@ -7,6 +7,8 @@
  * request and keeps it until it expires), never when the panel opens.
  */
 
+import { en } from './i18n/en';
+
 /** Must match `region` and the export name in `functions/src/index.ts`. */
 export const TOKEN_REGION = 'europe-west6';
 export const TOKEN_FUNCTION = 'appCheckToken';
@@ -64,7 +66,7 @@ export function tokenFetcher(deps: TokenServerDeps): () => Promise<AppCheckToken
     try {
       idToken = await deps.idToken();
     } catch (error) {
-      throw new TokenServerError('failed', `sign-in failed (${errorName(error)})`);
+      throw new TokenServerError('failed', en.errors.signInFailed(errorName(error)));
     }
     let response: Response;
     try {
@@ -75,7 +77,7 @@ export function tokenFetcher(deps: TokenServerDeps): () => Promise<AppCheckToken
         signal: AbortSignal.timeout(deps.timeoutMs ?? TOKEN_TIMEOUT_MS),
       });
     } catch (error) {
-      throw new TokenServerError('failed', `no answer from the token server (${errorName(error)})`);
+      throw new TokenServerError('failed', en.errors.tokenNoAnswer(errorName(error)));
     }
     const body: unknown = await response.json().catch(() => undefined);
     const answer = readAnswer(body, now());
@@ -83,7 +85,7 @@ export function tokenFetcher(deps: TokenServerDeps): () => Promise<AppCheckToken
     if (errorStatus(body) === 'RESOURCE_EXHAUSTED') {
       throw new TokenServerError('limit', 'daily limit reached');
     }
-    throw new TokenServerError('failed', `the token server refused (HTTP ${response.status})`);
+    throw new TokenServerError('failed', en.errors.tokenRefused(String(response.status)));
   };
 }
 

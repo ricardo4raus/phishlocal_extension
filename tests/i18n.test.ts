@@ -2,7 +2,8 @@
 // The panel's languages: the dictionaries, the saved choice, the static text and the menu.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import body from '../src/sidepanel/index.html?raw';
-import { MESSAGES } from '../src/i18n';
+import { localDetail, MESSAGES } from '../src/i18n';
+import { en } from '../src/i18n/en';
 import type { Messages } from '../src/i18n/en';
 import {
   LANGUAGE_KEY,
@@ -88,7 +89,10 @@ describe('the dictionaries', () => {
         m.empty,
         m.flags,
         m.severity,
-        m.deepCheck.chips,
+        m.deepCheck,
+        m.gmail,
+        m.paste,
+        m.aiCheck,
         { ...m.sentences, 'dmarc-fail': '', 'auth-fail': '', 'dkim-other-domain': '' },
       ];
       for (const text of plainTiers.flatMap((part) => allTexts(part as unknown as Messages))) {
@@ -246,5 +250,43 @@ describe('the language menu', () => {
     select.dispatchEvent(new Event('change'));
     expect(reload).not.toHaveBeenCalled();
     setItem.mockRestore();
+  });
+});
+
+describe('the engine reasons in the panel language', () => {
+  const reasons = [
+    en.errors.noAnswerWithin('60'),
+    en.errors.modelWrote('120'),
+    en.errors.tooLong('4000'),
+    en.errors.refused('429'),
+    en.errors.cloudFailed,
+    en.errors.offline,
+    en.errors.tokenNoAnswer('TimeoutError'),
+    en.errors.tokenRefused('404'),
+    en.errors.signInFailed('auth/admin-restricted-operation'),
+  ];
+
+  it('stay as they are in English', () => {
+    for (const reason of reasons) expect(localDetail(reason, MESSAGES.en)).toBe(reason);
+  });
+
+  it('are translated in every other language, also when two are joined', () => {
+    for (const language of LANGUAGES.filter((code) => code !== 'en')) {
+      for (const reason of reasons) {
+        const local = localDetail(reason, MESSAGES[language]);
+        expect(local, `${language}: ${reason}`).not.toBe(reason);
+      }
+      const joined = `${en.errors.noAnswerWithin('60')}; ${en.errors.modelWrote('12')}`;
+      expect(localDetail(joined, MESSAGES[language])).toBe(
+        `${MESSAGES[language].errors.noAnswerWithin('60')}; ${MESSAGES[language].errors.modelWrote('12')}`,
+      );
+    }
+    expect(localDetail(en.errors.refused('429'), MESSAGES.de)).toBe(
+      'die Cloud hat die Anfrage abgelehnt (HTTP 429)',
+    );
+  });
+
+  it('leave a message they do not know alone', () => {
+    expect(localDetail('Failed to fetch', MESSAGES.de)).toBe('Failed to fetch');
   });
 });

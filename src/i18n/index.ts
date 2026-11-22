@@ -29,3 +29,36 @@ const oneDecimal = new Intl.NumberFormat(language, {
 export const seconds = (ms: number): string => `${oneDecimal.format(ms / 1000)} s`;
 
 export type { Messages };
+
+/**
+ * The engine's English reason for a failure (built from `en.errors`) in the panel's language:
+ * "no answer within 60 s; the model had written 120 characters" → German, French, …. Parts it
+ * does not know (an SDK's own message) stay as they are.
+ */
+export function localDetail(detail: string, messages: Messages = m): string {
+  const errors = messages.errors;
+  const patterns: [RegExp, (match: string) => string][] = [
+    [/^no answer within (\d+) s$/, errors.noAnswerWithin],
+    [/^the model had written (\d+) characters$/, errors.modelWrote],
+    [/^the answer did not end \(over (\d+) characters\)$/, errors.tooLong],
+    [/^the cloud refused the request \(HTTP (\d{3})\)$/, errors.refused],
+    [/^no answer from the token server \(([\w/-]+)\)$/, errors.tokenNoAnswer],
+    [/^the token server refused \(HTTP (\d{3})\)$/, errors.tokenRefused],
+    [/^sign-in failed \(([\w/-]+)\)$/, errors.signInFailed],
+  ];
+  const fixed: Record<string, string> = {
+    [en.errors.cloudFailed]: errors.cloudFailed,
+    [en.errors.offline]: errors.offline,
+  };
+  return detail
+    .split('; ')
+    .map((part) => {
+      if (Object.hasOwn(fixed, part)) return fixed[part] ?? part;
+      for (const [pattern, translate] of patterns) {
+        const value = pattern.exec(part)?.[1];
+        if (value !== undefined) return translate(value);
+      }
+      return part;
+    })
+    .join('; ');
+}

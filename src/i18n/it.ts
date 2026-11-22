@@ -328,6 +328,18 @@ export const it: Messages = {
     unknownError: 'errore sconosciuto',
   },
 
+  errors: {
+    noAnswerWithin: (seconds) => `nessuna risposta entro ${seconds} s`,
+    modelWrote: (count) => `il modello aveva scritto ${count} caratteri`,
+    tooLong: (count) => `la risposta non è terminata (oltre ${count} caratteri)`,
+    refused: (status) => `il cloud ha rifiutato la richiesta (HTTP ${status})`,
+    cloudFailed: 'la richiesta al cloud non è riuscita',
+    offline: 'nessuna connessione al cloud',
+    tokenNoAnswer: (name) => `nessuna risposta dal server dei token (${name})`,
+    tokenRefused: (status) => `il server dei token ha rifiutato (HTTP ${status})`,
+    signInFailed: (code) => `accesso non riuscito (${code})`,
+  },
+
   deepCheck: {
     notAvailable: 'Non disponibile in questa versione.',
     waitingHeaders: 'In attesa delle verifiche del mittente…',
@@ -371,7 +383,6 @@ export const it: Messages = {
     note: (time) => `Cloud (Gemini tramite Firebase AI Logic). L’IA può sbagliare. ${time}.`,
     sentOnce: 'Inviato una volta, solo per questo controllo.',
     checking: 'Controllo nel cloud…',
-    noAnswerWithin: (seconds) => `nessuna risposta entro ${seconds} s`,
     showFailed: 'Non è stato possibile mostrare il risultato del controllo approfondito.',
     levelChanged:
       'Il nuovo livello di privacy vale per il prossimo controllo approfondito. I dati sopra sono stati inviati con il livello precedente.',

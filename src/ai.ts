@@ -9,6 +9,7 @@ import {
 import { CLOUD_SYSTEM_PROMPT, SYSTEM_PROMPT, withExtraInstructions } from './ai/prompt';
 import { type AiVerdict, parseVerdict, VERDICT_SCHEMA } from './ai/verdict';
 import { ai, cloudPass } from './firebase';
+import { en } from './i18n/en';
 import { TokenServerError } from './token-server';
 import { DEFAULT_SETTINGS, type Settings } from './settings';
 
@@ -151,7 +152,7 @@ export type AiCheckResult =
  */
 export const MAX_ANSWER_CHARS = 4_000;
 
-const written = (text: string): string => `the model had written ${text.length} characters`;
+const written = (text: string): string => en.errors.modelWrote(String(text.length));
 
 /**
  * Runs the AI check of one email on-device, answering in `language`, and reads its answer
@@ -196,7 +197,7 @@ export async function runAiCheck(
         return {
           ok: false,
           reason: 'failed',
-          detail: `the answer did not end (over ${MAX_ANSWER_CHARS} characters)`,
+          detail: en.errors.tooLong(String(MAX_ANSWER_CHARS)),
         };
       }
     }
@@ -371,11 +372,11 @@ export function cloudError(error: unknown): string {
   if (error instanceof TokenServerError) return error.message;
   const message = error instanceof Error ? error.message : String(error);
   if (/timeout|timed out/i.test(message)) {
-    return `no answer within ${currentSettings().cloudTimeoutMs / 1000} s`;
+    return en.errors.noAnswerWithin(String(currentSettings().cloudTimeoutMs / 1000));
   }
   const status = /\[(\d{3})\b/.exec(message)?.[1];
-  if (status) return `the cloud refused the request (HTTP ${status})`;
-  return navigator.onLine ? 'the cloud request failed' : 'no connection to the cloud';
+  if (status) return en.errors.refused(status);
+  return navigator.onLine ? en.errors.cloudFailed : en.errors.offline;
 }
 
 export type WarmUpResult =

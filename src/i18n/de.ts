@@ -333,6 +333,18 @@ export const de: Messages = {
     unknownError: 'unbekannter Fehler',
   },
 
+  errors: {
+    noAnswerWithin: (seconds) => `keine Antwort innerhalb von ${seconds} s`,
+    modelWrote: (count) => `das Modell hatte ${count} Zeichen geschrieben`,
+    tooLong: (count) => `die Antwort endete nicht (über ${count} Zeichen)`,
+    refused: (status) => `die Cloud hat die Anfrage abgelehnt (HTTP ${status})`,
+    cloudFailed: 'die Anfrage an die Cloud ist fehlgeschlagen',
+    offline: 'keine Verbindung zur Cloud',
+    tokenNoAnswer: (name) => `keine Antwort vom Token-Server (${name})`,
+    tokenRefused: (status) => `der Token-Server hat abgelehnt (HTTP ${status})`,
+    signInFailed: (code) => `Anmeldung fehlgeschlagen (${code})`,
+  },
+
   deepCheck: {
     notAvailable: 'In dieser Version nicht verfügbar.',
     waitingHeaders: 'Warte auf die Absenderprüfungen…',
@@ -355,7 +367,7 @@ export const de: Messages = {
       preview:
         'Die E-Mail hat sich geändert, also wurden die vorbereiteten Daten verworfen. Nichts wurde gesendet.',
       sending:
-        'Die E-Mail hat sich während der Tiefenprüfung geändert: Ihre Daten waren gesendet, die Antwort wurde verworfen.',
+        'Die E-Mail hat sich während der Tiefenprüfung geändert: ihre Daten waren gesendet, die Antwort wurde verworfen.',
       done: 'Die E-Mail hat sich geändert, also wurde das Ergebnis der Tiefenprüfung entfernt.',
     },
     waitingModel: 'Warte auf die KI auf dem Gerät…',
@@ -375,7 +387,6 @@ export const de: Messages = {
     note: (time) => `Cloud (Gemini über Firebase AI Logic). KI kann sich irren. ${time}.`,
     sentOnce: 'Einmal gesendet, nur für diese Prüfung.',
     checking: 'Wird in der Cloud geprüft…',
-    noAnswerWithin: (seconds) => `keine Antwort innerhalb von ${seconds} s`,
     showFailed: 'Das Ergebnis der Tiefenprüfung konnte nicht angezeigt werden.',
     levelChanged:
       'Die neue Datenschutzstufe gilt für die nächste Tiefenprüfung. Die Daten oben wurden mit der vorherigen Stufe gesendet.',

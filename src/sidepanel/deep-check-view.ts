@@ -16,7 +16,8 @@
  */
 import type { CloudCheckResult } from '../ai';
 import { answerLanguage, buildCloudPrompt, EXPERIMENTAL_LANGUAGES } from '../ai/prompt';
-import { m } from '../i18n';
+import { localDetail, m } from '../i18n';
+import { en } from '../i18n/en';
 import { isLanguage } from '../i18n/languages';
 import type { Email } from '../email';
 import {
@@ -235,29 +236,28 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
 
   const language = (): string => answerLanguage(deps.panelLanguage());
 
-  /** The line under the offer button: only when the deep check is recommended or unavailable. */
-  function intro(): string {
-    if (!deps.available) return NOT_AVAILABLE;
-    if (shown && !shown.final) return m.deepCheck.waitingHeaders;
+  /**
+   * The line under the offer button (only when the deep check is recommended or unavailable), and
+   * whether it is a recommendation.
+   */
+  function intro(): { text: string; recommended: boolean } {
+    if (!deps.available) return { text: NOT_AVAILABLE, recommended: false };
+    if (shown && !shown.final) return { text: m.deepCheck.waitingHeaders, recommended: false };
     const answerIn = language();
     if (EXPERIMENTAL_LANGUAGES.has(answerIn)) {
-      return m.deepCheck.recommendedExperimental(
-        isLanguage(answerIn) ? m.languageNames[answerIn] : answerIn,
-      );
+      const name = isLanguage(answerIn) ? m.languageNames[answerIn] : answerIn;
+      return { text: m.deepCheck.recommendedExperimental(name), recommended: true };
     }
-    if (deps.aiUnchecked?.()) return m.deepCheck.recommendedUnchecked;
-    return '';
+    if (deps.aiUnchecked?.()) return { text: m.deepCheck.recommendedUnchecked, recommended: true };
+    return { text: '', recommended: false };
   }
 
   /** The offer button: filled when recommended, disabled when the cloud cannot be reached. */
   function showOffer(): void {
-    const text = intro();
+    const { text, recommended } = intro();
     set(elements.intro, text);
     elements.start.disabled = !deps.available || !shown?.final;
-    elements.start.classList.toggle(
-      'btn--primary',
-      deps.available && text !== '' && text !== m.deepCheck.waitingHeaders,
-    );
+    elements.start.classList.toggle('btn--primary', recommended);
   }
 
   function setConsent(open: boolean): void {
@@ -438,7 +438,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
       set(
         elements.detail,
         result.reason === 'failed'
-          ? m.deepCheck.failedDetail(result.detail ?? m.aiCheck.unknownError)
+          ? m.deepCheck.failedDetail(localDetail(result.detail ?? m.aiCheck.unknownError))
           : '',
       );
       // The card stays open with the data as the record; a new click on Send is a new consent
@@ -509,7 +509,11 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     stop = undefined;
     const result: CloudCheckResult =
       controller.signal.reason === TIME_LIMIT && !answer.ok
-        ? { ok: false, reason: 'failed', detail: m.deepCheck.noAnswerWithin(cloudLimitMs / 1000) }
+        ? {
+            ok: false,
+            reason: 'failed',
+            detail: en.errors.noAnswerWithin(String(cloudLimitMs / 1000)),
+          }
         : answer;
     try {
       showResult(result, findings, email);

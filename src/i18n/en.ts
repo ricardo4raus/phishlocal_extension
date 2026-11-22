@@ -323,6 +323,19 @@ export const en = {
     unknownError: 'unknown error',
   },
 
+  /** Why a check failed (tier 3). The engine writes these in English; the panel translates. */
+  errors: {
+    noAnswerWithin: (seconds: string) => `no answer within ${seconds} s`,
+    modelWrote: (count: string) => `the model had written ${count} characters`,
+    tooLong: (count: string) => `the answer did not end (over ${count} characters)`,
+    refused: (status: string) => `the cloud refused the request (HTTP ${status})`,
+    cloudFailed: 'the cloud request failed',
+    offline: 'no connection to the cloud',
+    tokenNoAnswer: (name: string) => `no answer from the token server (${name})`,
+    tokenRefused: (status: string) => `the token server refused (HTTP ${status})`,
+    signInFailed: (code: string) => `sign-in failed (${code})`,
+  },
+
   /** The deep check in the cloud. */
   deepCheck: {
     notAvailable: 'Not available in this build.',
@@ -364,7 +377,6 @@ export const en = {
     note: (time: string) => `Cloud (Gemini via Firebase AI Logic). AI can be wrong. ${time}.`,
     sentOnce: 'Sent once, for this check only.',
     checking: 'Checking in the cloud…',
-    noAnswerWithin: (seconds: number) => `no answer within ${seconds} s`,
     showFailed: 'The deep check result could not be shown.',
     levelChanged:
       'The new privacy level applies to the next deep check. The data above was sent at the previous level.',

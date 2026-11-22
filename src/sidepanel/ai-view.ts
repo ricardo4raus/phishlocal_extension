@@ -15,7 +15,8 @@ import { answerLanguage, buildUserPrompt, EXPERIMENTAL_LANGUAGES, promptData } f
 import { type AiVerdict, overallRisk, type Risk, RISKS, ruleRisk } from '../ai/verdict';
 import type { Email } from '../email';
 import type { Finding } from '../rules';
-import { m } from '../i18n';
+import { localDetail, m } from '../i18n';
+import { en } from '../i18n/en';
 import { clock, seconds } from './ui';
 
 /** How long the AI waits for a Gmail email's headers before it runs without them. */
@@ -223,8 +224,6 @@ const retryable = (result: AiCheckResult): boolean =>
   (result.reason === 'unreadable-answer' ||
     (result.reason === 'failed' && !LASTING_ERROR.test(result.detail ?? '')));
 
-const wholeSeconds = (ms: number): string => `${Math.round(ms / 1000)} s`;
-
 /** Why the AI gave no answer, in one tier-3 sentence. */
 function failureDetail(result: AiCheckResult & { ok: false }, attempt: number | undefined): string {
   // The two tries may have failed differently: name only the last reason.
@@ -235,7 +234,7 @@ function failureDetail(result: AiCheckResult & { ok: false }, attempt: number | 
     case 'stopped':
       return m.aiCheck.stopped;
     case 'failed':
-      return m.aiCheck.failed(again, result.detail ?? m.aiCheck.unknownError);
+      return m.aiCheck.failed(again, localDetail(result.detail ?? m.aiCheck.unknownError));
     default:
       return m.aiCheck.unreadable(again);
   }
@@ -403,7 +402,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
         return {
           ok: false,
           reason: 'failed',
-          detail: `no answer within ${wholeSeconds(runTimeoutMs)}${progress}`,
+          detail: `${en.errors.noAnswerWithin(String(Math.round(runTimeoutMs / 1000)))}${progress}`,
         };
       }
       return result;
