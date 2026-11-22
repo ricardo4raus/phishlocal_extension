@@ -15,8 +15,9 @@ differ, this file wins, and the difference belongs in "Open points" below.
 
 - **Answer first.** The verdict is the first thing under the header. Details, links and the
   email itself come after it, folded where they are long.
-- **Plain words.** Users see what to do, not how it works: no "rules", "Gemini Nano", "DKIM" or
-  "Authentication-Results" in the main view. Technical terms stay in "Email details".
+- **Plain words.** A result says what to do, not how it was found: no "rules", "Gemini Nano",
+  "DKIM" or "Authentication-Results" on the result screens. Technical terms stay in "Email
+  details". The empty and loading screens may name the parts once, to explain what happens.
 - **Privacy you can see.** "On this device" appears where a result appears; the cloud is always
   an explicit step with its own screen.
 - **Honest progress.** A percentage only where Chrome reports one (the model download). Waits
