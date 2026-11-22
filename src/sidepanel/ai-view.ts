@@ -295,21 +295,20 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   /** Shows how long the shown email's check has been running or waiting. */
   const tick = (): void => {
     const now = performance.now();
-    if (current?.id === shownId) {
+    if (current?.id === shownId && !current.cancelled) {
       const elapsed = now - current.since;
       const second = current.attempt === 2 ? ' (second try)' : '';
       set(
         elements.status,
         current.phase === 'model' && elapsed >= LOADING_HINT_MS
-          ? `On-device AI loading${second}… ${clock(elapsed)}. The first load after Chrome restarts can take a few minutes; the result appears here by itself.`
-          : `AI check running${second}… ${wholeSeconds(elapsed)}`,
+          ? `On-device AI loading${second}… The first load after Chrome restarts can take a few minutes; the result appears here by itself.`
+          : `AI check running${second}…`,
       );
+      set(elements.time, clock(elapsed));
       elements.stop.hidden = false;
     } else if (waiting?.id === shownId && current) {
-      set(
-        elements.status,
-        `Waiting for the previous email's check… ${wholeSeconds(now - waiting.since)}`,
-      );
+      set(elements.status, "Waiting for the previous email's check…");
+      set(elements.time, clock(now - waiting.since));
       elements.stop.hidden = false;
     }
     if (!current && !waiting) {
@@ -492,7 +491,10 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       const finished = current;
       current = undefined;
       remember(finished.key, result);
-      if (finished.id === shownId) showResult(finished, result);
+      // A run the user stopped was shown as "unchecked" at the click; its late end changes nothing.
+      if (finished.id === shownId && !(finished.cancelled && !result.ok)) {
+        showResult(finished, result);
+      }
     }
     tick();
   }
@@ -562,30 +564,39 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     timer = setTimeout(() => enqueue(request), final ? STABLE_MS : waitMs);
   }
 
-  /** The user stops the check of the shown email: the rules' verdict stands, as "unchecked". */
+  /**
+   * The user stops the check of the shown email: the rules' verdict shows at once, as
+   * "unchecked", whatever the run is doing (waiting behind another email, waiting for the model,
+   * asking the model, or not started yet). The Stop button goes away, so the focus moves to the
+   * verdict word.
+   */
   elements.stop.addEventListener('click', () => {
     clearTimeout(timer);
+    const stopped = failureDetail({ ok: false, reason: 'stopped' }, undefined);
+    const hadFocus = document.activeElement === elements.stop;
     if (waiting?.id === shownId) {
-      const stopped = waiting;
+      const request = waiting;
       waiting = undefined;
-      showUnchecked(stopped, failureDetail({ ok: false, reason: 'stopped' }, undefined));
-      return;
-    }
-    if (current?.id === shownId) {
+      showUnchecked(request, stopped);
+    } else if (current?.id === shownId) {
       current.cancelled = true;
       current.stop?.abort();
+      showUnchecked(current, stopped);
     } else if (last) {
       // Nothing is running yet (the stable delay): show the rules' verdict instead.
-      const request: Request = {
-        id: shownId,
-        email: last.email,
-        findings: last.findings,
-        language: '',
-        key: '',
-        since: 0,
-      };
-      showUnchecked(request, failureDetail({ ok: false, reason: 'stopped' }, undefined));
+      showUnchecked(
+        {
+          id: shownId,
+          email: last.email,
+          findings: last.findings,
+          language: '',
+          key: '',
+          since: 0,
+        },
+        stopped,
+      );
     }
+    if (hadFocus) elements.overall.focus();
   });
 
   return {
