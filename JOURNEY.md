@@ -1061,3 +1061,8 @@ _To fill in near the submission._
   checks are expected."), on the device and in the deep check. A small model weighs that more
   than one field inside the JSON. Whether Nano then answers "safe" by itself is still to be
   seen in Chrome.
+- Seen in Chrome: with the task sentence, Nano itself now answers "safe" for the self-sent error
+  log, with matching reasons. In light mode the bulb looked brown and the ready dot dark green:
+  light mode now has a gold-yellow bulb and a bright green dot (both decorative marks next to
+  the words that carry their meaning, so below the 3:1 for symbols on purpose), and the bulb's
+  glow is stronger in both modes; dark mode keeps its colours.

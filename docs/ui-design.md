@@ -279,16 +279,19 @@ one.
 | warning-text   | `#7A4A00` | `#FFD58A` | badge text                            |
 | warning-tint   | `#FFF4DE` | `#3A2E14` | badge                                 |
 | warning-border | `#EBCB8B` | `#5A4720` | cards                                 |
-| safe           | `#1E7A3C` | `#4CC27A` | symbols, ready dot                    |
+| safe           | `#1E7A3C` | `#4CC27A` | symbols                               |
 | safe-text      | `#155C2C` | `#8FD6A5` | verdict word                          |
 | safe-tint      | `#EAF6EE` | `#17321F` | verdict band                          |
 | safe-border    | `#BFE3CB` | `#2A5236` | verdict card                          |
 | pending        | `#6B737D` | `#8A939D` | "Checking…" and "unchecked" symbol    |
 | pending-tint   | `#F0F2F5` | `#232930` | "Checking…" band, loading pill, chips |
-| tip            | `#A16207` | `#F5C542` | advice bulb                           |
+| tip            | `#D19A00` | `#F5C542` | advice bulb (decorative)              |
+| ready          | `#22C55E` | `#4CC27A` | ready dot (decorative)                |
 
 Every pair is measured before use (text 4.5:1, symbols and meaningful borders 3:1); the
-measurements live as comments in `style.css`.
+measurements live as comments in `style.css`. The bulb and the ready dot are decorative marks next to the words
+that carry their meaning, so in light mode they may be lighter than 3:1 (gold-yellow and bright
+green, decided 22 Nov 2026).
 
 ## How to build it
 
