@@ -946,8 +946,8 @@
     font-size: var(--text-s);
   }
 
-  .band[data-risk='unchecked'] {
-    --band-symbol: '–';
+  .band[data-risk='unchecked'] .band__word::after {
+    mask-image: url(./icons/minus.svg);
   }
 
   /* ---- Details list (tier 3). ---- */

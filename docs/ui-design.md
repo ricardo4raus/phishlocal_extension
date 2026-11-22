@@ -45,31 +45,31 @@ from this file are listed under "Mockup review" at the end.
 The panel is one column. Its parts show and hide by state; no part moves. The columns name the
 mockup artboard where one exists.
 
-| State                      | Mockup          | Tier-1 words                                                                                                                                                                   |
-| -------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| No email, Gmail tab        | `Main`          | "Open an email in Gmail", "PhishLocal checks it here, automatically, while this panel is open. The email never leaves your browser."                                           |
-| No email, other tab        | –               | "Open Gmail in this tab" and the hint to reload a Gmail tab that was open before the install                                                                                   |
-| Email unreadable           | –               | "Could not read this email", "Gmail may have changed its page. You can paste the email instead."                                                                               |
-| Model loading              | `Checking`      | Pill "On-device AI loading"; band "Checking…", step "Chrome is preparing Gemini Nano", elapsed time, info "The first check after Chrome restarts can take a few minutes", Stop |
-| Model not downloaded       | –               | Banner "Set up on-device AI", "Chrome downloads Gemini Nano once, about 4 GB", button "Download now"                                                                           |
-| Model downloading          | `Download`      | Pill "On-device AI 42%"; banner with the real percentage, "Rule checks already work while you wait"                                                                            |
-| Model unavailable          | –               | Pill "AI not available"; banner "On-device AI is not available on this computer. Emails get the basic checks only."                                                            |
-| Model failed to load       | –               | Pill "AI not loaded"; the band shows "Not checked by AI" for every email until a check loads it                                                                                |
-| Checking, no red flags yet | `Checking`      | Band grey "Checking…", line "Basic checks done, AI check running"                                                                                                              |
-| Checking, rules found some | –               | Band already yellow or red with the rules' verdict; the line says the AI check is still running                                                                                |
-| Dangerous                  | `Dangerous`     | "Dangerous", "Don't click the links, don't reply, don't open attachments."                                                                                                     |
-| Suspicious                 | –               | "Suspicious", "Some signs of phishing. Don't enter passwords or pay through this email."                                                                                       |
-| Looks safe                 | `Safe`          | "Looks safe", "No signs of phishing found."                                                                                                                                    |
-| Not checked by AI          | –               | Grey band, "No red flags found", "Not checked by AI. The basic checks alone can miss a well-written scam."                                                                     |
-| Deep check offered         | `Dangerous`     | Button "Deep check in the cloud…", under it one line only when it is recommended or unavailable                                                                                |
-| Consent, preparing         | –               | "Looking for names on this device…" with elapsed time and Stop; Send is not shown yet                                                                                          |
-| Consent, preview           | `Consent`       | Level cards, chips of what was removed, "Never sent: …", fold "Show what will be sent", Send, Cancel                                                                           |
-| Consent, names unchecked   | –               | Same, plus the warning "Some names may still be in the text: read it before you send."                                                                                         |
-| Sending                    | –               | "Checking in the cloud…" with elapsed time and Stop                                                                                                                            |
-| Cloud result               | –               | A second band "Deep check: Dangerous / Suspicious / Looks safe" with reasons and advice; "Sent once: the data above."                                                          |
-| Cloud failed               | –               | "The deep check did not work (short reason). The result above still applies."                                                                                                  |
-| Email changed meanwhile    | –               | The five messages in `deep-check-view.ts` (`CHANGED`), in the consent's status line                                                                                            |
-| Dark mode                  | `DangerousDark` | Same words, dark tokens                                                                                                                                                        |
+| State                      | Mockup                                                                  | Tier-1 words                                                                                                                                                                   |
+| -------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| No email, Gmail tab        | `Main`                                                                  | "Open an email in Gmail", "PhishLocal checks it here, automatically, while this panel is open. The email never leaves your browser."                                           |
+| No email, other tab        | –                                                                       | "Open Gmail in this tab" and the hint to reload a Gmail tab that was open before the install                                                                                   |
+| Email unreadable           | –                                                                       | "Could not read this email", "Gmail may have changed its page. You can paste the email instead."                                                                               |
+| Model loading              | `Checking`                                                              | Pill "On-device AI loading"; band "Checking…", step "Chrome is preparing Gemini Nano", elapsed time, info "The first check after Chrome restarts can take a few minutes", Stop |
+| Model not downloaded       | –                                                                       | Banner "Set up on-device AI", "Chrome downloads Gemini Nano once, about 4 GB", button "Download now"                                                                           |
+| Model downloading          | `Download`                                                              | Pill "On-device AI 42%"; banner with the real percentage, "Rule checks already work while you wait"                                                                            |
+| Model unavailable          | –                                                                       | Pill "AI not available"; banner "On-device AI is not available on this computer. Emails get the basic checks only."                                                            |
+| Model failed to load       | –                                                                       | Pill "AI not loaded"; the band shows "Not checked by AI" for every email until a check loads it                                                                                |
+| Checking, no red flags yet | `Checking`                                                              | Band grey "Checking…", line "Basic checks done, AI check running"                                                                                                              |
+| Checking, rules found some | –                                                                       | Band already yellow or red with the rules' verdict; the line says the AI check is still running                                                                                |
+| Dangerous                  | `Dangerous`                                                             | "Dangerous", "This looks like phishing."; the advice box says what to do                                                                                                       |
+| Suspicious                 | –                                                                       | "Suspicious", "Be careful: some signs of phishing."; the advice box says what to do                                                                                            |
+| Looks safe                 | `Safe`                                                                  | "Looks safe", "No signs of phishing found."                                                                                                                                    |
+| Not checked by AI          | Not checked by AI. The basic checks alone can miss a well-written scam. |
+| Deep check offered         | `Dangerous`                                                             | Button "Deep check in the cloud…", under it one line only when it is recommended or unavailable                                                                                |
+| Consent, preparing         | –                                                                       | "Looking for names on this device…" with elapsed time and Stop; Send is not shown yet                                                                                          |
+| Consent, preview           | `Consent`                                                               | Level cards, chips of what was removed, "Never sent: …", fold "Show what will be sent", Send, Cancel                                                                           |
+| Consent, names unchecked   | –                                                                       | Same, plus the warning "Some names may still be in the text: read it before you send."                                                                                         |
+| Sending                    | –                                                                       | "Checking in the cloud…" with elapsed time and Stop                                                                                                                            |
+| Cloud result               | –                                                                       | A second band "Deep check: Dangerous / Suspicious / Looks safe" with reasons and advice; "Sent once: the data above."                                                          |
+| Cloud failed               | –                                                                       | "The deep check did not work (short reason). The result above still applies."                                                                                                  |
+| Email changed meanwhile    | –                                                                       | The five messages in `deep-check-view.ts` (`CHANGED`), in the consent's status line                                                                                            |
+| Dark mode                  | `DangerousDark`                                                         | Same words, dark tokens                                                                                                                                                        |
 
 "Basic checks" is the tier-1 name for the rule checks. "AI" is the tier-1 name for the on-device
 model; "Gemini Nano" appears only in the empty, loading and download texts and in tier 3.
@@ -165,30 +165,30 @@ without sideways scrolling.
 
 Tier-1 texts. The same thing has the same name everywhere.
 
-| Thing                       | Words                                                                                      |
-| --------------------------- | ------------------------------------------------------------------------------------------ |
-| Verdict words               | Checking… / Dangerous / Suspicious / Looks safe / No red flags found                       |
-| Dangerous line              | This looks like phishing. Don't click the links, don't reply, don't open attachments.      |
-| Suspicious line             | Be careful: some signs of phishing. Don't enter passwords or pay through this email.       |
-| Looks safe line             | No signs of phishing found.                                                                |
-| Not checked by AI           | Not checked by AI. The basic checks alone can miss a well-written scam.                    |
-| AI running line             | Basic checks done, AI check running (or: Basic checks found red flags, AI check running)   |
-| Result footer               | Checked on this device · Done in 1.4 s                                                     |
-| Cloud result footer         | Checked in the cloud · Done in 1.9 s                                                       |
-| Sender status               | Sender confirmed by Gmail / Sender not confirmed / Checking the sender…                    |
-| Hedges                      | Verdict words are nouns; the line under them hedges ("looks like", "some signs"), never    |
-|                             | "this is phishing" and never "this is safe"                                                |
-| The rule checks             | basic checks (tier 1 and 2); "rule checks" in tier 3 and in the docs                       |
-| The on-device model         | AI, on-device AI; "Gemini Nano" in the empty, loading, download texts and tier 3           |
-| Deep check button           | Deep check in the cloud…                                                                   |
-| Privacy levels              | Standard / High; "Names of people"                                                         |
-| Data fold                   | Show what will be sent                                                                     |
-| Cloud send                  | Send to the cloud / Cancel / Stop                                                          |
-| After sending               | Sent once: the data above.                                                                 |
-| Paste                       | Paste an email (empty card), Check another email (fold), Use pasted email, Clear           |
-| Refresh                     | Check the open email again                                                                 |
-| Privacy points (empty card) | Checked on this device / No email is saved / Cloud only if you ask                         |
-| Not                         | Get a second opinion, Prepare a deep check…, AI loading, Checked 2:14 PM, Nothing is saved |
+| Thing                       | Words                                                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Verdict words               | Checking… / Dangerous / Suspicious / Looks safe / No red flags found                                               |
+| Dangerous line              | This looks like phishing.                                                                                          |
+| Suspicious line             | Be careful: some signs of phishing.                                                                                |
+| Looks safe line             | No signs of phishing found.                                                                                        |
+| Not checked by AI           | Not checked by AI. The basic checks alone can miss a well-written scam.                                            |
+| AI running line             | AI check starting… / AI check running… 12 s / On-device AI loading… 2:14 / Waiting for the previous email's check… |
+| Result footer               | Checked on this device · Done in 1.4 s; Basic checks only (when the AI gave no answer)                             |
+| Cloud result footer         | Checked in the cloud · Done in 1.9 s                                                                               |
+| Sender status               | Sender confirmed by Gmail / Sender not confirmed / Checking the sender…                                            |
+| Hedges                      | Verdict words are nouns; the line under them hedges ("looks like", "some signs"), never                            |
+|                             | "this is phishing" and never "this is safe"                                                                        |
+| The rule checks             | basic checks (tier 1 and 2); "rule checks" in tier 3 and in the docs                                               |
+| The on-device model         | AI, on-device AI; "Gemini Nano" in the empty, loading, download texts and tier 3                                   |
+| Deep check button           | Deep check in the cloud…                                                                                           |
+| Privacy levels              | Standard / High; "Names of people"                                                                                 |
+| Data fold                   | Show what will be sent                                                                                             |
+| Cloud send                  | Send to the cloud / Cancel / Stop                                                                                  |
+| After sending               | Sent once: the data above.                                                                                         |
+| Paste                       | Paste an email (empty card), Check another email (fold), Use pasted email, Clear                                   |
+| Refresh                     | Check the open email again                                                                                         |
+| Privacy points (empty card) | Checked on this device / No email is saved / Cloud only if you ask                                                 |
+| Not                         | Get a second opinion, Prepare a deep check…, AI loading, Checked 2:14 PM, Nothing is saved                         |
 
 ### Red-flag titles
 
