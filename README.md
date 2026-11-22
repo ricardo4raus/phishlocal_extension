@@ -46,6 +46,10 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   `InferenceMode.PREFER_ON_DEVICE`. Gemini Nano answers on the device; the cloud (Gemini
   Developer API) is the fallback. The panel loads the on-device model when it opens and shows
   where each prompt ran.
+- **Settings without a new release:** Firebase Remote Config sets the cloud model (from an
+  allow-list), the time limits and extra guidance for the AI, all checked on arrival and with
+  defaults in the code. The prompt's security rules stay in the code. Details:
+  [`docs/ai-check.md`](docs/ai-check.md#settings-from-remote-config).
 
 ## Privacy
 
@@ -60,6 +64,9 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 - The cloud deep check runs only when you ask for it and agree to the data shown: personal data
   is removed on the device first, raw headers are never sent, and you see exactly the email data
   that goes (besides PhishLocal's fixed instructions). Each email needs its own consent.
+- When the side panel opens, it asks Firebase Remote Config for its settings, at most twice a
+  day. That request holds a random Firebase installation ID, the app ID, the SDK version and the
+  browser language, never email content.
 - Permissions: the side panel, and Gmail only (`https://mail.google.com/*`). The `scripting`
   permission is used once after an install or update, to start PhishLocal's Gmail script in
   Gmail tabs that were already open, so you don't have to reload Gmail.

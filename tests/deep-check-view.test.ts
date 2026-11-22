@@ -304,6 +304,27 @@ describe('the deep check', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('uses the time limits it is given (from Remote Config)', async () => {
+    check = create({
+      namesTimeoutMs: 5_000,
+      cloudLimitMs: 20_000,
+      findNames: () => new Promise(() => {}),
+      run: (prompt, signal) => {
+        runs.push({ prompt, signal, resolve: () => {} });
+        return new Promise(() => {});
+      },
+    });
+    check.shown(email, []);
+    click('start');
+    await vi.advanceTimersByTimeAsync(5_000 + STOP_GRACE_MS);
+    expect(get('preview').hidden).toBe(false);
+    click('send');
+    await vi.advanceTimersByTimeAsync(20_000 + STOP_GRACE_MS);
+    expect(text('status')).toBe(
+      'The deep check failed (no answer within 20 s). The on-device and rule checks still apply.',
+    );
+  });
+
   it('treats a throwing name finder like one that could not look', async () => {
     check = create({
       findNames: () => {

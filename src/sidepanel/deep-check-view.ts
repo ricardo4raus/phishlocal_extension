@@ -19,19 +19,23 @@ import {
 import type { Email } from '../email';
 import { type CloudData, cloudData, nameSearchText, type Removed } from '../privacy/redact';
 import type { Finding } from '../rules';
+import { DEFAULT_SETTINGS } from '../settings';
 import { HEADERS_WAIT_MS, judge, STOP_GRACE_MS } from './ai-view';
 
 /**
  * How long Gemini Nano may look for names before the data is built without its list. It starts
  * after the model is loaded: a load can take minutes and is not the search's fault.
  */
-export const NAMES_TIMEOUT_MS = 20_000;
+export const NAMES_TIMEOUT_MS = DEFAULT_SETTINGS.namesTimeoutMs;
+
+/** How much longer than the cloud request's own limit the panel waits for it. */
+export const CLOUD_LIMIT_EXTRA_MS = 10_000;
 
 /**
- * How long the panel waits for the cloud. The request has its own limit of 30 s
- * (`CLOUD_TIMEOUT_MS`); this one also bounds a request that does not keep it.
+ * How long the panel waits for the cloud by default. The request has its own limit (settings'
+ * `cloudTimeoutMs`, 30 s by default); this one also bounds a request that does not keep it.
  */
-export const CLOUD_LIMIT_MS = 40_000;
+export const CLOUD_LIMIT_MS = DEFAULT_SETTINGS.cloudTimeoutMs + CLOUD_LIMIT_EXTRA_MS;
 
 /** The reason a run is stopped when it reaches its time limit. */
 const TIME_LIMIT = 'time limit';
@@ -67,6 +71,8 @@ export interface DeepCheckDeps {
   /** Sends one prompt to the cloud. Called only after the user agreed to the data in it. */
   run: (prompt: string, signal: AbortSignal) => Promise<AiCheckResult>;
   namesTimeoutMs?: number;
+  /** How long the panel waits for the cloud; default CLOUD_LIMIT_MS. */
+  cloudLimitMs?: number;
   headersWaitMs?: number;
 }
 
@@ -173,6 +179,7 @@ const CHANGED: Record<Phase, string> = {
 
 export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps): DeepCheck {
   const namesTimeoutMs = deps.namesTimeoutMs ?? NAMES_TIMEOUT_MS;
+  const cloudLimitMs = deps.cloudLimitMs ?? CLOUD_LIMIT_MS;
   let shown: Shown | undefined;
   let phase: Phase = 'idle';
   /** The data shown for consent; only this is ever sent. */
@@ -332,7 +339,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     const answer = await bounded(
       () => deps.run(buildCloudPrompt(data.json, answerIn), controller.signal),
       controller,
-      CLOUD_LIMIT_MS,
+      cloudLimitMs,
       (error): AiCheckResult =>
         controller.signal.aborted
           ? { ok: false, reason: 'stopped' }
@@ -346,7 +353,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     stop = undefined;
     const result: AiCheckResult =
       controller.signal.reason === TIME_LIMIT && !answer.ok
-        ? { ok: false, reason: 'failed', detail: `no answer within ${CLOUD_LIMIT_MS / 1000} s` }
+        ? { ok: false, reason: 'failed', detail: `no answer within ${cloudLimitMs / 1000} s` }
         : answer;
     showResult(result, findings, email);
   }

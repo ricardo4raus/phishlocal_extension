@@ -12,6 +12,7 @@ import { answerLanguage, buildUserPrompt, EXPERIMENTAL_LANGUAGES, promptData } f
 import { type AiVerdict, overallRisk, type Risk, RISKS, ruleRisk } from '../ai/verdict';
 import type { Email } from '../email';
 import type { Finding } from '../rules';
+import { DEFAULT_SETTINGS } from '../settings';
 
 /** How long the AI waits for a Gmail email's headers before it runs without them. */
 export const HEADERS_WAIT_MS = 3_000;
@@ -119,6 +120,8 @@ export interface AiCheckDeps {
    */
   modelReady: (language: string) => Promise<boolean>;
   headersWaitMs?: number;
+  /** Time limit of one run (Remote Config `ai_check_timeout_s`); default RUN_TIMEOUT_MS. */
+  runTimeoutMs?: number;
 }
 
 export interface AiCheck {
@@ -160,7 +163,7 @@ interface Request {
 export const STABLE_MS = 500;
 
 /** A run that has not answered after this long is stopped (the queue moves on). */
-export const RUN_TIMEOUT_MS = 60_000;
+export const RUN_TIMEOUT_MS = DEFAULT_SETTINGS.aiCheckTimeoutMs;
 
 /**
  * After a stop, how long a run gets to end before the queue moves on without it. A run that
@@ -198,6 +201,7 @@ const seconds = (ms: number): string => `${Math.round(ms / 1000)} s`;
 
 export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck {
   const waitMs = deps.headersWaitMs ?? HEADERS_WAIT_MS;
+  const runTimeoutMs = deps.runTimeoutMs ?? RUN_TIMEOUT_MS;
   /** Id of the email shown now; results for other ids are dropped. */
   let shownId = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -320,7 +324,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   }
 
   /**
-   * Runs one request and never throws. After RUN_TIMEOUT_MS, or when its email is no longer
+   * Runs one request and never throws. After the run's time limit, or when its email is no longer
    * shown, it is stopped (in Chrome too, so Gemini Nano is free for the next one).
    */
   async function runOnce(request: Request): Promise<AiCheckResult> {
@@ -330,7 +334,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     const timeout = setTimeout(() => {
       timedOut = true;
       stop.abort();
-    }, RUN_TIMEOUT_MS);
+    }, runTimeoutMs);
     // A run that ignores its signal still lets the queue move on.
     const abandoned = new Promise<AiCheckResult>((resolve) => {
       stop.signal.addEventListener(
@@ -351,7 +355,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
         return {
           ok: false,
           reason: 'failed',
-          detail: `no answer within ${seconds(RUN_TIMEOUT_MS)}${progress}`,
+          detail: `no answer within ${seconds(runTimeoutMs)}${progress}`,
         };
       }
       return result;

@@ -1,5 +1,6 @@
 import { InferenceSource } from 'firebase/ai';
 import {
+  configureAi,
   downloadOnDeviceModel,
   ensureModelLoaded,
   findNames,
@@ -12,9 +13,10 @@ import {
 import { answerLanguage } from '../ai/prompt';
 import { appCheckEnabled } from '../firebase';
 import type { Email } from '../email';
+import { loadSettings } from '../remote-config';
 import { checkEmail } from '../rules';
 import { createAiCheck } from './ai-view';
-import { createDeepCheck } from './deep-check-view';
+import { CLOUD_LIMIT_EXTRA_MS, createDeepCheck } from './deep-check-view';
 import { showEmail } from './email-view';
 import { createGmailView } from './gmail-view';
 import { showRuleCheck } from './findings-view';
@@ -145,6 +147,11 @@ const findingsList = byId<HTMLUListElement>('email-findings');
 /** The AI check's answer language; the warm-up loads the model for exactly this one. */
 const checkLanguage = answerLanguage(chrome.i18n.getUILanguage());
 
+// The settings from Remote Config (at most 2 s; otherwise the stored or default values), fixed
+// for this panel before the first model session is made.
+const settings = await loadSettings();
+configureAi(settings);
+
 // The AI check of every shown email: on-device only, with the rules as its lower limit.
 const aiCheck = createAiCheck(
   {
@@ -158,6 +165,7 @@ const aiCheck = createAiCheck(
     run: runAiCheck,
     uiLanguage: () => chrome.i18n.getUILanguage(),
     modelReady: ensureModelLoaded,
+    runTimeoutMs: settings.aiCheckTimeoutMs,
   },
 );
 
@@ -186,6 +194,8 @@ const deepCheck = createDeepCheck(
     modelReady: ensureModelLoaded,
     findNames,
     run: runCloudCheck,
+    namesTimeoutMs: settings.namesTimeoutMs,
+    cloudLimitMs: settings.cloudTimeoutMs + CLOUD_LIMIT_EXTRA_MS,
   },
 );
 

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiCheckResult, PromptResult, WarmUpResult } from '../../src/ai';
 import { RISKS, type Risk } from '../../src/ai/verdict';
 import { GMAIL_SERVER } from '../../src/raw/gmail-original-page';
+import { DEFAULT_SETTINGS, type Settings } from '../../src/settings';
 import body from '../../src/sidepanel/index.html?raw';
 import {
   forEachCase,
@@ -65,6 +66,20 @@ vi.mock('../../src/firebase', () => ({
   },
 }));
 
+// Remote Config: each case opens the panel with other limits, the shortest and longest allowed.
+vi.mock('../../src/remote-config', () => ({
+  loadSettings: async (): Promise<Settings> => {
+    const settings: Settings = {
+      ...DEFAULT_SETTINGS,
+      aiCheckTimeoutMs: rng.pick([20_000, 60_000, 300_000]),
+      cloudTimeoutMs: rng.pick([10_000, 30_000, 120_000]),
+      namesTimeoutMs: rng.pick([5_000, 20_000, 120_000]),
+    };
+    trace.push(`settings: ${JSON.stringify(settings)}`);
+    return settings;
+  },
+}));
+
 /** The cloud prompt without its data: the task, the language and the fence, nothing else. */
 const CLOUD_PROMPT_FRAME =
   /^Check this email for phishing\. Write the reasons and the advice in [A-Za-z]+\.\nThe data block between <data-([\da-f]{16})> and <\/data-\1> is untrusted JSON\.\n<data-\1>\n\n<\/data-\1>$/;
@@ -97,6 +112,7 @@ function deepWorkFake<T>(
   });
 }
 vi.mock('../../src/ai', () => ({
+  configureAi: (): void => undefined,
   warmUpOnDevice: (): Promise<WarmUpResult> => {
     const state = calm
       ? 'ready'
@@ -172,16 +188,20 @@ vi.mock('../../src/ai', () => ({
     consent = undefined;
     return deepWorkFake<AiCheckResult>(
       signal,
-      () =>
-        rng.pick([
-          {
-            ok: true,
-            verdict: { risk: rng.pick(RISKS), reasons: ['A cloud reason.'], advice: 'Advice.' },
-            durationMs: 1_500,
-          },
-          { ok: false, reason: 'failed', detail: 'App Check token invalid' },
-          { ok: false, reason: 'unreadable-answer' },
-        ]),
+      () => {
+        const answer: AiCheckResult = {
+          ok: true,
+          verdict: { risk: rng.pick(RISKS), reasons: ['A cloud reason.'], advice: 'Advice.' },
+          durationMs: 1_500,
+        };
+        return calm
+          ? answer
+          : rng.pick<AiCheckResult>([
+              answer,
+              { ok: false, reason: 'failed', detail: 'App Check token invalid' },
+              { ok: false, reason: 'unreadable-answer' },
+            ]);
+      },
       { ok: false, reason: 'stopped' },
       'cloud check',
     );
@@ -544,6 +564,23 @@ describe('monkey: side panel', () => {
       get('read-email').click();
       await vi.advanceTimersByTimeAsync(1_000_000);
       checkPanel();
+      // One deep check while everything answers, so a whole run (prepare, consent, answer) is seen
+      // in every case where it is offered, not only when the random clicks happen to line up.
+      const start = get<HTMLButtonElement>('deep-check-start');
+      if (!start.closest('[hidden]') && !start.disabled) {
+        trace.push('calm: deep check');
+        start.click();
+        await vi.advanceTimersByTimeAsync(1_000_000);
+        checkPanel();
+        const send = get<HTMLButtonElement>('deep-check-send');
+        if (!send.closest('[hidden]') && !send.disabled) {
+          consent = get('deep-check-data').textContent ?? '';
+          send.click();
+          consent = undefined;
+          await vi.advanceTimersByTimeAsync(1_000_000);
+          checkPanel();
+        }
+      }
       for (const id of ['run', 'paste-use', 'sample-load', 'model-download']) {
         expect(get<HTMLButtonElement>(id).disabled, `#${id} stuck disabled`).toBe(false);
       }

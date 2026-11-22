@@ -125,6 +125,11 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Automatic reading via the Gmail API was ruled out: `gmail.metadata` and `gmail.readonly` are
   restricted scopes, so every user would see Google's "unverified app" warning until a weeks-long
   verification.
+- Remote Config (22 Nov 2026, `src/settings.ts`, `src/remote-config.ts`): cloud model
+  (allow-list), three time limits and `extra_instructions` (added after the fixed system messages,
+  never replacing them). Every value is checked by `readSettings()` and falls back to its default.
+  The panel loads them once when it opens (at most 2 s) and calls `configureAi()` before any
+  model session. The prompt's security rules must never become a Remote Config value.
 - The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow

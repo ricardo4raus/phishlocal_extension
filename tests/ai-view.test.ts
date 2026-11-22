@@ -298,6 +298,13 @@ describe('AI check view', () => {
     );
   });
 
+  it('uses the time limit it is given (from Remote Config)', async () => {
+    check = create({ runTimeoutMs: 20_000 });
+    await show(email);
+    await vi.advanceTimersByTimeAsync(20_000 + STOP_GRACE_MS);
+    expect(text('status')).toMatch(/^The AI check failed \(no answer within 20 s/);
+  });
+
   it('says on the verdict line when the AI check failed, also for a green light', async () => {
     await show(email);
     await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS);

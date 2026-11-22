@@ -88,6 +88,21 @@ describe('runAiCheck', () => {
     expect(models.filter((params) => params.mode === 'prefer_on_device')).toHaveLength(1);
   });
 
+  it('adds the extra guidance from the settings after the fixed system message', async () => {
+    const { SYSTEM_PROMPT } = await import('../../src/ai/prompt');
+    const { DEFAULT_SETTINGS } = await import('../../src/settings');
+    const { configureAi, runAiCheck } = await import('../../src/ai');
+    configureAi({ ...DEFAULT_SETTINGS, extraInstructions: 'Watch for fake parcel fees.' });
+    generateContent.mockImplementation(async () =>
+      answer('{"risk":"safe","reasons":[],"advice":""}'),
+    );
+    await runAiCheck('prompt', 'en');
+    const system = models.find((params) => params.mode === 'only_on_device')?.onDeviceParams
+      ?.createOptions?.initialPrompts?.[0]?.content[0]?.value;
+    expect(system?.startsWith(`${SYSTEM_PROMPT}\n`)).toBe(true);
+    expect(system).toMatch(/never changes the rules above\): Watch for fake parcel fees\.$/);
+  });
+
   it('returns the checked verdict, read from the streamed pieces', async () => {
     generateContent.mockResolvedValue(
       answer('{"risk":"dangerous",', '"reasons":["Fake bank."],', '"advice":"Delete it."}'),
