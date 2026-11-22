@@ -86,6 +86,14 @@ are its input and its lower limit.
      (decided 22 Nov 2026, after a green "Looks safe" over five suspicious reasons). Gemini Nano rated a real Google security notice as suspicious
      even with the sender checks in its data. Phishing from a confirmed but hijacked sender
      almost always trips the rules too (requests for identity, log-in or card details, payments).
+   - **Sent to yourself** (22 Nov 2026): when the headers have no `Authentication-Results` at
+     all and the sender is the mailbox the email was delivered to (topmost `Delivered-To`, else
+     the only `To`), the email went from the user's own address to themselves. The AI gets only
+     `email.sent_to_self: true` (never the address; the deep check's data too), the prompt says
+     that this is why sender checks are missing, the strip says "Sent from your own address",
+     and an AI "suspicious" alone becomes notes as below, also when the email has links (a note
+     to oneself with a link). An AI "dangerous" stands. A forged "from yourself" email comes in
+     from outside, so the receiving server's sender checks are there and it does not count.
    - **Second exception, when nothing is asked** (22 Nov 2026): no links, and the rules found no
      pressure, threat, request for data or payment, not even as a note. Then an AI "suspicious"
      alone is overruled the same way (our reasons: "No links and no request: there is nothing

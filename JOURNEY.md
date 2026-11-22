@@ -1047,3 +1047,12 @@ _To fill in near the submission._
   caution, weighs surface features (empty subject, missing checks, technical text) and does not
   reliably follow rules such as "missing checks alone are no sign", so the code decides what a
   sentence in the prompt cannot guarantee.
+- The local AI never saw that the error log went from the user to themselves: it gets the
+  sender, subject, links, the first 3,000 characters of the body and the sender-check result,
+  but not the recipient (data minimisation; the recipient is nearly always the user's own
+  address). Now the header parser marks an email "sent to yourself" when there are no sender
+  checks at all and the sender is the mailbox it was delivered to (topmost `Delivered-To`, else
+  the only `To`). The AI gets only a yes/no (`sent_to_self`), never the address; the strip says
+  "Sent from your own address" instead of "Sender not confirmed"; and an AI "suspicious" alone
+  becomes notes, also for a note to oneself with a link. Not yet measured on Gmail's "Show
+  original" page of a self-sent email which of the two headers it has.
