@@ -6,41 +6,85 @@
  * - A Gmail email first appears without headers; the AI waits for them, but at most a few seconds.
  * - The overall verdict is the higher of AI and rules. When the rules are stricter, our own advice
  *   replaces the AI's, so an injected "this is safe, log in here" cannot reach the user.
+ * - What is shown follows docs/ui-design.md: tier 1 is the verdict word, one line and the advice;
+ *   the footer says where the check ran; how the AI and the rules were combined, errors and timing
+ *   are tier 3 (`detail`, inside "Email details").
  */
 import type { AiCheckResult } from '../ai';
 import { answerLanguage, buildUserPrompt, EXPERIMENTAL_LANGUAGES, promptData } from '../ai/prompt';
 import { type AiVerdict, overallRisk, type Risk, RISKS, ruleRisk } from '../ai/verdict';
 import type { Email } from '../email';
 import type { Finding } from '../rules';
+import { clock, seconds } from './ui';
 
 /** How long the AI waits for a Gmail email's headers before it runs without them. */
 export const HEADERS_WAIT_MS = 3_000;
 
+/** The band's states: the three risks, plus "still checking" and "the AI did not run". */
+export type BandState = Risk | 'pending' | 'unchecked';
+
 export interface AiElements {
-  /** The verdict block; its `data-risk` sets the traffic light's colour and symbol. */
+  /** The verdict band; its `data-risk` sets the colour and symbol. */
   verdict: HTMLElement;
+  /** The verdict word (a live region). */
   overall: HTMLElement;
+  /** One line under the word: what it means, or what the check is doing right now. */
   status: HTMLElement;
   reasons: HTMLUListElement;
+  /** What to do. */
   advice: HTMLElement;
+  /** Footer: where the email was checked. */
+  source: HTMLElement;
+  /** Footer: how long the check took. */
+  time: HTMLElement;
+  /** Stops the running check of the shown email. */
+  stop: HTMLButtonElement;
+  /** Tier 3, in "Email details": how the AI and the basic checks were combined, errors, timing. */
+  detail: HTMLElement;
 }
 
-export const LABEL: Record<Risk, string> = {
-  safe: 'No signs of phishing',
+/** The verdict words (tier 1). */
+export const WORD: Record<BandState, string> = {
+  pending: 'Checking…',
+  safe: 'Looks safe',
   suspicious: 'Suspicious',
   dangerous: 'Dangerous',
+  unchecked: 'No red flags found',
 };
 
-/** Our own advice, used whenever the rules are stricter than the AI. */
-export const ADVICE: Record<Risk, string> = {
-  safe: 'No signs of phishing found. Stay careful with unexpected requests.',
+/** The line under the verdict word: hedged, never "this is phishing" or "this is safe". */
+export const LINE: Record<Exclude<BandState, 'pending'>, string> = {
+  safe: 'No signs of phishing found.',
+  suspicious: 'Be careful: some signs of phishing.',
+  dangerous: 'This looks like phishing.',
+  unchecked: 'Not checked by AI. The basic checks alone can miss a well-written scam.',
+};
+
+/** How the AI's own level is named in tier 3 ("The AI said: …"). */
+const AI_SAID: Record<Risk, string> = {
+  safe: 'no signs of phishing',
+  suspicious: 'suspicious',
+  dangerous: 'dangerous',
+};
+
+/** Our own advice, used whenever the rules are stricter than the AI, or the AI did not run. */
+export const ADVICE: Record<Exclude<BandState, 'pending'>, string> = {
+  safe: 'Stay careful with unexpected requests: if an email asks you to log in or pay, open the site yourself instead of using its links.',
   suspicious:
-    'Be careful: do not enter passwords or card details and do not pay. Check with the sender through a way you already know.',
+    "Don't enter passwords or card details and don't pay. Check with the sender through a way you already know.",
   dangerous:
-    'Do not click links, open attachments or reply. Delete the email or report it as phishing.',
+    "Don't click links, open attachments or reply. Delete the email or report it as phishing.",
+  unchecked:
+    'Stay careful with unexpected requests: if an email asks you to log in or pay, open the site yourself instead of using its links.',
 };
 
-const AI_NOTE = 'On-device (Gemini Nano). AI can be wrong.';
+/** The footer's source line. */
+export const SOURCE = {
+  device: 'Checked on this device',
+  rulesOnly: 'Basic checks only',
+} as const;
+
+const AI_NOTE = 'On-device AI (Gemini Nano). AI can be wrong.';
 
 /** Percent-decoding that never throws: a link like `mailto:%E0` is attacker-written. */
 const decode = (text: string): string => {
@@ -79,27 +123,34 @@ const rulesRisk = (findings: Finding[] | undefined): Risk =>
 
 /**
  * How an AI verdict (on the device or from the cloud) combines with the rules: the risk shown,
- * the verdict line and the advice. `ai` names the AI in the line ("the AI", "the cloud AI").
+ * the advice, and how to explain the combination. `ai` names the AI ("the AI", "the cloud AI").
+ * `line` is the old one-line form, still used by the deep check's result.
  */
 export function judge(
   verdict: AiVerdict,
   findings: Finding[] | undefined,
   email: Email,
   ai: string,
-): { overall: Risk; line: string; advice: string } {
+): { overall: Risk; line: string; advice: string; detail: string } {
   const confirmed = senderConfirmed(email);
   const overall = overallRisk(verdict.risk, rulesRisk(findings), { senderConfirmed: confirmed });
   const stricter = overall !== verdict.risk;
   // The AI was more worried, but the sender is confirmed and the rules found nothing.
   const onlyNotes = confirmed && RISKS.indexOf(verdict.risk) > RISKS.indexOf(overall);
+  const said = `${ai[0]?.toUpperCase() ?? ''}${ai.slice(1)} said: ${AI_SAID[verdict.risk]}`;
   return {
     overall,
     line: onlyNotes
-      ? `${LABEL[overall]} (sender confirmed, rule checks found nothing; AI notes below)`
+      ? `${WORD[overall]} (sender confirmed, basic checks found nothing; AI notes below)`
       : stricter
-        ? `${LABEL[overall]} (rule checks; ${ai} said: ${LABEL[verdict.risk].toLowerCase()})`
-        : LABEL[overall],
+        ? `${WORD[overall]} (basic checks; ${ai} said: ${AI_SAID[verdict.risk]})`
+        : WORD[overall],
     advice: stricter || !verdict.advice ? ADVICE[overall] : verdict.advice,
+    detail: onlyNotes
+      ? `${said}, but the sender is confirmed and the basic checks found nothing, so its points are notes only.`
+      : stricter
+        ? `${said}; the basic checks found more, so their verdict stands.`
+        : '',
   };
 }
 
@@ -153,6 +204,8 @@ interface Request {
   phase?: 'model' | 'run';
   /** Stops the run while it asks the model. */
   stop?: AbortController;
+  /** The user stopped the check while it waited for the model. */
+  cancelled?: boolean;
   /** 2 while the check runs a second time after a failure. */
   attempt?: number;
 }
@@ -196,7 +249,23 @@ const retryable = (result: AiCheckResult): boolean =>
   (result.reason === 'unreadable-answer' ||
     (result.reason === 'failed' && !LASTING_ERROR.test(result.detail ?? '')));
 
-const seconds = (ms: number): string => `${Math.round(ms / 1000)} s`;
+const wholeSeconds = (ms: number): string => `${Math.round(ms / 1000)} s`;
+
+/** Why the AI gave no answer, in one tier-3 sentence. */
+function failureDetail(result: AiCheckResult & { ok: false }, attempt: number | undefined): string {
+  // The two tries may have failed differently: name only the last reason.
+  const again = attempt === 2 ? ' after a second try' : '';
+  switch (result.reason) {
+    case 'no-model':
+      return 'The on-device AI is not ready, so only the basic checks ran.';
+    case 'stopped':
+      return 'The AI check was stopped. The basic checks still apply.';
+    case 'failed':
+      return `The AI check failed${again} (${result.detail ?? 'unknown error'}). The basic checks still apply.`;
+    default:
+      return `The AI answer could not be read${again}. The basic checks still apply.`;
+  }
+}
 
 export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck {
   const waitMs = deps.headersWaitMs ?? HEADERS_WAIT_MS;
@@ -229,20 +298,19 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     if (current?.id === shownId) {
       const elapsed = now - current.since;
       const second = current.attempt === 2 ? ' (second try)' : '';
-      // The rules failed (no findings): their result above says so; do not call them done.
-      const rulesDone = current.findings ? 'Rule checks done. ' : '';
       set(
         elements.status,
         current.phase === 'model' && elapsed >= LOADING_HINT_MS
-          ? `On-device model still loading${second}… ${seconds(elapsed)}. ${rulesDone}The AI ` +
-              'result appears here by itself; the first load after Chrome starts can take several minutes.'
-          : `AI check running on this device${second}… ${seconds(elapsed)}`,
+          ? `On-device AI loading${second}… ${clock(elapsed)}. The first load after Chrome restarts can take a few minutes; the result appears here by itself.`
+          : `AI check running${second}… ${wholeSeconds(elapsed)}`,
       );
+      elements.stop.hidden = false;
     } else if (waiting?.id === shownId && current) {
       set(
         elements.status,
-        `AI check waits for the previous email's check to finish… ${seconds(now - waiting.since)}`,
+        `Waiting for the previous email's check… ${wholeSeconds(now - waiting.since)}`,
       );
+      elements.stop.hidden = false;
     }
     if (!current && !waiting) {
       clearInterval(ticker);
@@ -255,63 +323,59 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     ticker ??= setInterval(tick, 1_000);
   };
 
-  /** `pending`: grey, while the AI answer is still to come. */
-  const setRisk = (risk: Risk | 'pending'): void => {
-    elements.verdict.dataset.risk = risk;
+  const setState = (state: BandState): void => {
+    elements.verdict.dataset.risk = state;
   };
 
   /**
-   * The rules' verdict alone. While the AI check is still to come (`pending`), "no red flags" is
-   * not shown as green: the AI may still raise it, and the user should not act on it yet.
+   * The band before the AI has answered. While the AI check is still to come, "no red flags" is
+   * grey ("Checking…"): the AI may still raise it, and the user should not act on it yet.
    */
-  /**
-   * `aiFailed`: the AI check was meant to run and did not give an answer. The light still shows
-   * the rules' verdict, but the verdict line says that only the rules checked the email.
-   */
-  function showRulesOnly(request: Request, note: string, pending = false, aiFailed = false): void {
+  function showPending(request: Request, line: string): void {
     const risk = rulesRisk(request.findings);
-    const notYet = pending && risk === 'safe';
     elements.verdict.hidden = false;
-    setRisk(notYet ? 'pending' : risk);
-    set(
-      elements.overall,
-      notYet
-        ? 'Checking… (the rule checks found no red flags)'
-        : aiFailed
-          ? `${LABEL[risk]} (rule checks only: the AI check failed)`
-          : `${LABEL[risk]} (rule checks)`,
-    );
-    set(elements.status, note);
-    elements.status.classList.toggle('ai-failed', aiFailed);
+    setState(risk === 'safe' ? 'pending' : risk);
+    set(elements.overall, WORD[risk === 'safe' ? 'pending' : risk]);
+    set(elements.status, line);
     elements.reasons.replaceChildren();
-    set(elements.advice, notYet ? '' : ADVICE[risk]);
+    set(elements.advice, risk === 'safe' ? '' : ADVICE[risk]);
+    set(elements.source, '');
+    set(elements.time, '');
+    elements.stop.hidden = false;
+    set(elements.detail, '');
+  }
+
+  /**
+   * The AI gave no answer (failed, stopped, not available): the rules' verdict stands, but a
+   * green light is not shown. "No red flags" becomes the grey "unchecked" state, and the footer
+   * says that only the basic checks ran.
+   */
+  function showUnchecked(request: Request, detail: string): void {
+    const risk = rulesRisk(request.findings);
+    const state: BandState = risk === 'safe' ? 'unchecked' : risk;
+    elements.verdict.hidden = false;
+    setState(state);
+    set(elements.overall, WORD[state]);
+    set(elements.status, LINE[state]);
+    elements.reasons.replaceChildren();
+    set(elements.advice, ADVICE[state]);
+    set(elements.source, SOURCE.rulesOnly);
+    set(elements.time, '');
+    elements.stop.hidden = true;
+    set(elements.detail, detail);
   }
 
   function showResult(request: Request, result: AiCheckResult): void {
-    elements.status.classList.remove('ai-failed');
     if (!result.ok) {
-      // The two tries may have failed differently: name only the last reason.
-      const again = request.attempt === 2 ? ' after a second try' : '';
-      const note =
-        result.reason === 'no-model'
-          ? 'AI check not available: the on-device model is not ready. Rule checks only.'
-          : result.reason === 'failed'
-            ? `The AI check failed${again} (${result.detail ?? 'unknown error'}). The rule checks still apply.`
-            : result.reason === 'stopped'
-              ? 'The AI check was stopped. The rule checks still apply.'
-              : `The AI answer could not be read${again}. The rule checks still apply.`;
-      showRulesOnly(request, note, false, result.reason !== 'no-model');
+      showUnchecked(request, failureDetail(result, request.attempt));
       return;
     }
     const { verdict } = result;
     const judged = judge(verdict, request.findings, request.email, 'the AI');
     elements.verdict.hidden = false;
-    setRisk(judged.overall);
-    set(elements.overall, judged.line);
-    const note = EXPERIMENTAL_LANGUAGES.has(request.language)
-      ? `${AI_NOTE} Answers in this language are experimental.`
-      : AI_NOTE;
-    set(elements.status, `${note} ${(result.durationMs / 1000).toFixed(1)} s.`);
+    setState(judged.overall);
+    set(elements.overall, WORD[judged.overall]);
+    set(elements.status, LINE[judged.overall]);
     elements.reasons.replaceChildren(
       ...verdict.reasons.map((reason) => {
         const item = document.createElement('li');
@@ -320,6 +384,18 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       }),
     );
     set(elements.advice, judged.advice);
+    set(elements.source, SOURCE.device);
+    set(elements.time, `Done in ${seconds(result.durationMs)}`);
+    elements.stop.hidden = true;
+    const experimental = EXPERIMENTAL_LANGUAGES.has(request.language)
+      ? ' Answers in this language are experimental.'
+      : '';
+    set(
+      elements.detail,
+      [judged.detail, `${AI_NOTE} ${seconds(result.durationMs)}.${experimental}`]
+        .filter((part) => part !== '')
+        .join(' '),
+    );
   }
 
   /**
@@ -354,7 +430,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
         return {
           ok: false,
           reason: 'failed',
-          detail: `no answer within ${seconds(runTimeoutMs)}${progress}`,
+          detail: `no answer within ${wholeSeconds(runTimeoutMs)}${progress}`,
         };
       }
       return result;
@@ -368,7 +444,10 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
 
   /** Stops the running check unless it is the one for `key` (its email is still wanted). */
   const stopRunning = (key?: string): void => {
-    if (current && current.key !== key) current.stop?.abort();
+    if (current && current.key !== key) {
+      current.cancelled = true;
+      current.stop?.abort();
+    }
   };
 
   /**
@@ -382,8 +461,9 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     request.since = performance.now();
     startTicker();
     const ready = await deps.modelReady(request.language).catch(() => false);
-    // Another email was opened while the model loaded: do not spend the model on this one.
-    if (request.id !== shownId) return { ok: false, reason: 'stopped' };
+    // Another email was opened while the model loaded, or the user stopped the check: do not
+    // spend the model on this one.
+    if (request.id !== shownId || request.cancelled) return { ok: false, reason: 'stopped' };
     if (!ready) return { ok: false, reason: 'no-model' };
     request.phase = 'run';
     request.since = performance.now();
@@ -399,7 +479,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       current = { ...request, attempt: 1 };
       let result = await tryOnce(current);
       // One more try for a run that failed (e.g. Chrome's model crashed) while its email is shown.
-      if (retryable(result) && current.id === shownId) {
+      if (retryable(result) && current.id === shownId && !current.cancelled) {
         current.attempt = 2;
         const second = await tryOnce(current);
         if (!second.ok && second.reason === 'no-model') {
@@ -423,7 +503,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
    * ended) only says "stopped", so the email needs a fresh run.
    */
   const adoptable = (request: Request): boolean =>
-    current?.key === request.key && !current.stop?.signal.aborted;
+    current?.key === request.key && !current.cancelled && !current.stop?.signal.aborted;
 
   /**
    * The same check is already running (e.g. Gmail showed the email again): its answer serves
@@ -476,15 +556,37 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       showResult(request, known);
       return;
     }
-    showRulesOnly(
-      request,
-      final ? 'AI check waiting…' : 'AI check waits for the sender checks…',
-      true,
-    );
+    showPending(request, final ? 'AI check starting…' : 'Waiting for the sender checks…');
     // The same email is already being checked: use that run's answer.
     if (adopt(request)) return;
     timer = setTimeout(() => enqueue(request), final ? STABLE_MS : waitMs);
   }
+
+  /** The user stops the check of the shown email: the rules' verdict stands, as "unchecked". */
+  elements.stop.addEventListener('click', () => {
+    clearTimeout(timer);
+    if (waiting?.id === shownId) {
+      const stopped = waiting;
+      waiting = undefined;
+      showUnchecked(stopped, failureDetail({ ok: false, reason: 'stopped' }, undefined));
+      return;
+    }
+    if (current?.id === shownId) {
+      current.cancelled = true;
+      current.stop?.abort();
+    } else if (last) {
+      // Nothing is running yet (the stable delay): show the rules' verdict instead.
+      const request: Request = {
+        id: shownId,
+        email: last.email,
+        findings: last.findings,
+        language: '',
+        key: '',
+        since: 0,
+      };
+      showUnchecked(request, failureDetail({ ok: false, reason: 'stopped' }, undefined));
+    }
+  });
 
   return {
     shown,
@@ -499,10 +601,18 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       stopRunning();
       elements.verdict.hidden = true;
       delete elements.verdict.dataset.risk;
-      set(elements.overall, '');
-      set(elements.status, '');
+      for (const element of [
+        elements.overall,
+        elements.status,
+        elements.advice,
+        elements.source,
+        elements.time,
+        elements.detail,
+      ]) {
+        set(element, '');
+      }
       elements.reasons.replaceChildren();
-      set(elements.advice, '');
+      elements.stop.hidden = true;
     },
   };
 }

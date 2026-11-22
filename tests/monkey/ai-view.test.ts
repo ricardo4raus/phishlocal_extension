@@ -100,6 +100,10 @@ function create(rng: Rng): AiCheck {
       status: get('status'),
       reasons: get('reasons') as HTMLUListElement,
       advice: get('advice'),
+      source: get('source'),
+      time: get('time'),
+      stop: get('stop') as HTMLButtonElement,
+      detail: get('detail'),
     },
     {
       run: (prompt, _language, known, signal) => {
@@ -203,10 +207,11 @@ function checkPanelOnce(): void {
   const rules: Risk = shown.findings ? ruleRisk(shown.findings) : 'suspicious';
   // A confirmed sender whose rules found nothing: the AI may add notes, never raise the light.
   const confirmedClean = shown.email.headers?.auth?.dmarc === 'pass' && rules === 'safe';
-  expect(confirmedClean && risk !== 'pending' && risk !== 'safe', 'raised a confirmed sender').toBe(
-    false,
-  );
-  if (risk === 'pending') {
+  expect(
+    confirmedClean && !['pending', 'safe', 'unchecked'].includes(risk),
+    'raised a confirmed sender',
+  ).toBe(false);
+  if (risk === 'pending' || risk === 'unchecked') {
     // Grey only while the rules found nothing.
     expect(rules).toBe('safe');
   } else {
@@ -223,6 +228,13 @@ function checkPanelOnce(): void {
   }
   const advice = get('advice').textContent ?? '';
   if (advice.startsWith('Advice for')) expect(advice).toBe(`Advice for ${token}`);
+  // A green light only with an AI answer.
+  if (risk === 'safe') expect(get('source').textContent).toBe('Checked on this device');
+  // Stop is offered exactly while a check runs or waits for the shown email.
+  const running = /running|loading|starting|waiting/i.test(get('status').textContent ?? '');
+  expect(get('stop').hidden, 'Stop shown while nothing runs, or hidden while it does').toBe(
+    !running,
+  );
   expect(document.body.textContent).not.toMatch(/undefined|NaN|\[object /);
 }
 
@@ -245,7 +257,8 @@ describe('monkey: AI check view', () => {
       calm = false;
       document.body.innerHTML =
         '<div id="verdict" hidden><p id="overall"></p><p id="status"></p>' +
-        '<ul id="reasons"></ul><p id="advice"></p></div>';
+        '<ul id="reasons"></ul><p id="advice"></p><span id="source"></span><span id="time"></span>' +
+        '<button id="stop" hidden></button></div><dd id="detail"></dd>';
       check = create(rng);
 
       for (let step = 0; step < 40; step++) {
@@ -255,6 +268,7 @@ describe('monkey: AI check view', () => {
           'show',
           'hide',
           'recheck',
+          'stop',
           'wait',
           'wait',
           'wait',
@@ -273,6 +287,12 @@ describe('monkey: AI check view', () => {
         } else if (action === 'recheck') {
           trace.push('recheck');
           check.recheck();
+        } else if (action === 'stop') {
+          // A user can click only what is on screen.
+          if (!get('stop').hidden) {
+            trace.push('stop');
+            get('stop').click();
+          }
         }
         const ms =
           action === 'wait' ? rng.pick([0, 100, 499, 500, 1_000, 3_000, 61_000, 63_000]) : 0;

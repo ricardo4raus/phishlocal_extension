@@ -61,6 +61,10 @@ function create(deps: Partial<AiCheckDeps> = {}): AiCheck {
       status: get('status'),
       reasons: get('reasons') as HTMLUListElement,
       advice: get('advice'),
+      source: get('source'),
+      time: get('time'),
+      stop: get('stop') as HTMLButtonElement,
+      detail: get('detail'),
     },
     {
       // Like runAiCheck: a stop ends the run at once.
@@ -104,7 +108,8 @@ beforeEach(() => {
   modelReady = async () => true;
   document.body.innerHTML =
     '<div id="verdict" hidden><p id="overall"></p><p id="status"></p><ul id="reasons"></ul>' +
-    '<p id="advice"></p></div>';
+    '<p id="advice"></p><span id="source"></span><span id="time"></span>' +
+    '<button id="stop" hidden></button></div><dd id="detail"></dd>';
   check = create();
 });
 
@@ -115,21 +120,30 @@ afterEach(() => {
 describe('AI check view', () => {
   it('shows the rules at once, then the AI verdict in the user language', async () => {
     check.shown(email, [finding('warning')], true);
-    expect(text('overall')).toBe('Suspicious (rule checks)');
+    expect(text('overall')).toBe('Suspicious');
+    expect(text('status')).toBe('AI check starting…');
     await vi.advanceTimersByTimeAsync(STABLE_MS);
     expect(prompts[0]).toMatch(/advice in German/);
     await answer(verdict('suspicious'));
     expect(text('overall')).toBe('Suspicious');
+    expect(text('status')).toBe('Be careful: some signs of phishing.');
     expect(reasons()).toEqual(['AI reason (suspicious)']);
     expect(text('advice')).toBe('AI advice.');
-    expect(text('status')).toBe('On-device (Gemini Nano). AI can be wrong. 1.2 s.');
+    expect(text('source')).toBe('Checked on this device');
+    expect(text('time')).toBe('Done in 1.2 s');
+    expect(text('detail')).toBe('On-device AI (Gemini Nano). AI can be wrong. 1.2 s.');
+    expect(get('stop').hidden).toBe(true);
   });
 
   it('never lets the AI lower the rules, and then uses our own advice', async () => {
     await show(email, [finding('danger')]);
     await answer(verdict('safe', 'Log in to confirm, all is fine.'));
-    expect(text('overall')).toBe('Dangerous (rule checks; the AI said: no signs of phishing)');
-    expect(text('advice')).toMatch(/^Do not click links/);
+    expect(text('overall')).toBe('Dangerous');
+    expect(text('status')).toBe('This looks like phishing.');
+    expect(text('detail')).toBe(
+      'The AI said: no signs of phishing; the basic checks found more, so their verdict stands. On-device AI (Gemini Nano). AI can be wrong. 1.2 s.',
+    );
+    expect(text('advice')).toMatch(/^Don't click links/);
   });
 
   it('lets the AI raise the risk', async () => {
@@ -170,7 +184,7 @@ describe('AI check view', () => {
     expect(signals[0]?.aborted).toBe(true);
     expect(prompts).toHaveLength(2);
     expect(prompts[1]).toMatch(/Second/);
-    expect(text('status')).toBe('AI check running on this device… 0 s');
+    expect(text('status')).toBe('AI check running… 0 s');
     await answer(verdict('suspicious'));
     expect(text('overall')).toBe('Suspicious');
   });
@@ -184,20 +198,18 @@ describe('AI check view', () => {
     });
     await show({ ...email, subject: 'First' });
     await vi.advanceTimersByTimeAsync(3_000);
-    expect(text('status')).toBe('AI check running on this device… 3 s');
+    expect(text('status')).toBe('AI check running… 3 s');
     await show({ ...email, subject: 'Second' });
     await vi.advanceTimersByTimeAsync(1_000);
     // The status is updated once a second.
-    expect(text('status')).toMatch(
-      /^AI check waits for the previous email's check to finish… [01] s$/,
-    );
+    expect(text('status')).toMatch(/^Waiting for the previous email's check… [01] s$/);
     await vi.advanceTimersByTimeAsync(STOP_GRACE_MS);
     expect(prompts).toHaveLength(2);
     expect(prompts[1]).toMatch(/Second/);
     // The first run answers late: it belongs to an email that is no longer shown.
     pending.shift()?.(verdict('dangerous'));
     await vi.advanceTimersByTimeAsync(0);
-    expect(text('overall')).toBe('Checking… (the rule checks found no red flags)');
+    expect(text('overall')).toBe('Checking…');
     await answer(verdict('suspicious'));
     expect(text('overall')).toBe('Suspicious');
   });
@@ -225,7 +237,7 @@ describe('AI check view', () => {
   it('checks the shown email again on request, e.g. after the model download', async () => {
     modelReady = async () => false;
     await show(email);
-    expect(text('status')).toMatch(/on-device model is not ready/);
+    expect(text('detail')).toMatch(/on-device AI is not ready/);
     modelReady = async () => true;
     check.recheck();
     await vi.advanceTimersByTimeAsync(STABLE_MS);
@@ -262,22 +274,23 @@ describe('AI check view', () => {
     await show(email);
     await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS + 5_000);
     expect(text('status')).toMatch(
-      /^On-device model still loading… 65 s\. Rule checks done\. The AI result appears here by itself; /,
+      /^On-device AI loading… 1:05\. The first load after Chrome restarts can take a few minutes; /,
     );
     expect(prompts).toHaveLength(0);
     loaded?.(true);
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(text('status')).toBe('AI check running on this device… 2 s');
+    expect(text('status')).toBe('AI check running… 2 s');
     await answer(verdict('safe'));
-    expect(text('overall')).toBe('No signs of phishing');
+    expect(text('overall')).toBe('Looks safe');
+    expect(text('status')).toBe('No signs of phishing found.');
   });
 
   it('falls back to the rules without a model or a readable answer', async () => {
     modelReady = async () => false;
     await show(email, [finding('warning')]);
-    expect(text('overall')).toBe('Suspicious (rule checks)');
-    expect(text('status')).toMatch(/on-device model is not ready/);
-    expect(get('status').classList.contains('ai-failed')).toBe(false);
+    expect(text('overall')).toBe('Suspicious');
+    expect(text('detail')).toMatch(/on-device AI is not ready/);
+    expect(text('source')).toBe('Basic checks only');
     expect(prompts).toHaveLength(0);
 
     modelReady = async () => true;
@@ -287,17 +300,18 @@ describe('AI check view', () => {
     // Each failure is tried once more.
     await answer({ ok: false, reason: 'unreadable-answer' });
     await answer({ ok: false, reason: 'unreadable-answer' });
-    expect(text('overall')).toBe('Suspicious (rule checks only: the AI check failed)');
-    expect(text('status')).toBe(
-      'The AI answer could not be read after a second try. The rule checks still apply.',
+    expect(text('overall')).toBe('Suspicious');
+    expect(text('source')).toBe('Basic checks only');
+    expect(text('detail')).toBe(
+      'The AI answer could not be read after a second try. The basic checks still apply.',
     );
     // An error that would come back the same is not tried again.
     const before = prompts.length;
     await show({ ...email, subject: 'Too long' });
     await answer({ ok: false, reason: 'failed', detail: 'The input is too large.' });
     expect(prompts).toHaveLength(before + 1);
-    expect(text('status')).toBe(
-      'The AI check failed (The input is too large.). The rule checks still apply.',
+    expect(text('detail')).toBe(
+      'The AI check failed (The input is too large.). The basic checks still apply.',
     );
   });
 
@@ -305,20 +319,60 @@ describe('AI check view', () => {
     check = create({ runTimeoutMs: 20_000 });
     await show(email);
     await vi.advanceTimersByTimeAsync(20_000 + STOP_GRACE_MS);
-    expect(text('status')).toMatch(/^The AI check failed \(no answer within 20 s/);
+    expect(text('detail')).toMatch(/^The AI check failed \(no answer within 20 s/);
   });
 
-  it('says on the verdict line when the AI check failed, also for a green light', async () => {
+  it('shows "unchecked" instead of green when the AI check failed', async () => {
     await show(email);
     await vi.advanceTimersByTimeAsync(RUN_TIMEOUT_MS);
-    expect(get('verdict').dataset.risk).toBe('safe');
-    expect(text('overall')).toBe('No signs of phishing (rule checks only: the AI check failed)');
-    expect(get('status').classList.contains('ai-failed')).toBe(true);
+    expect(get('verdict').dataset.risk).toBe('unchecked');
+    expect(text('overall')).toBe('No red flags found');
+    expect(text('status')).toMatch(/^Not checked by AI\./);
+    expect(text('source')).toBe('Basic checks only');
+    expect(text('advice')).toMatch(/^Stay careful/);
     // The next answer clears the mark.
     await show({ ...email, subject: 'Next' });
-    expect(get('status').classList.contains('ai-failed')).toBe(false);
+    expect(text('source')).toBe('');
     await answer(verdict('safe'));
-    expect(get('status').classList.contains('ai-failed')).toBe(false);
+    expect(get('verdict').dataset.risk).toBe('safe');
+    expect(text('source')).toBe('Checked on this device');
+  });
+
+  it('lets the user stop the check, and then shows the rules only', async () => {
+    await show(email);
+    expect(get('stop').hidden).toBe(false);
+    get('stop').click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(get('verdict').dataset.risk).toBe('unchecked');
+    expect(text('detail')).toBe('The AI check was stopped. The basic checks still apply.');
+    expect(get('stop').hidden).toBe(true);
+    // A stopped run is not tried again, and the next email is checked as usual.
+    expect(prompts).toHaveLength(1);
+    await show({ ...email, subject: 'Next' });
+    expect(prompts).toHaveLength(2);
+
+    // Stop while the model loads: the model is not spent on this email.
+    let loaded: ((ready: boolean) => void) | undefined;
+    modelReady = () =>
+      new Promise((resolve) => {
+        loaded = resolve;
+      });
+    await show({ ...email, subject: 'Loading' });
+    get('stop').click();
+    loaded?.(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(prompts).toHaveLength(2);
+    expect(get('verdict').dataset.risk).toBe('unchecked');
+
+    // Stop before the check has started (the stable delay): the rules' verdict shows at once.
+    modelReady = async () => true;
+    check.shown({ ...email, subject: 'Early' }, [finding('warning')], true);
+    get('stop').click();
+    expect(get('verdict').dataset.risk).toBe('suspicious');
+    expect(text('source')).toBe('Basic checks only');
+    await vi.advanceTimersByTimeAsync(STABLE_MS);
+    expect(prompts).toHaveLength(2);
   });
 
   it('clears the view and drops a late result when the email is hidden', async () => {
@@ -336,7 +390,7 @@ describe('AI check view', () => {
     check.shown(email, [], true);
     expect(get('verdict').hidden).toBe(false);
     expect(risk()).toBe('pending');
-    expect(text('overall')).toBe('Checking… (the rule checks found no red flags)');
+    expect(text('overall')).toBe('Checking…');
     expect(text('advice')).toBe('');
     await vi.advanceTimersByTimeAsync(STABLE_MS);
     await answer(verdict('safe'));
@@ -345,16 +399,16 @@ describe('AI check view', () => {
     // Rule warnings show their colour at once: the AI can only raise them.
     check.shown({ ...email, subject: 'Warned' }, [finding('warning')], true);
     expect(risk()).toBe('suspicious');
-    expect(text('advice')).toMatch(/^Be careful/);
+    expect(text('advice')).toMatch(/^Don't enter passwords/);
     await vi.advanceTimersByTimeAsync(STABLE_MS);
     await answer(verdict('dangerous', 'Delete it.'));
     expect(risk()).toBe('dangerous');
 
-    // Without a model, the rules' verdict stands, green included.
+    // Without a model, the rules' verdict stands, but "no red flags" is grey, not green.
     modelReady = async () => false;
     await show({ ...email, subject: 'No model' });
-    expect(risk()).toBe('safe');
-    expect(text('overall')).toBe('No signs of phishing (rule checks)');
+    expect(risk()).toBe('unchecked');
+    expect(text('overall')).toBe('No red flags found');
   });
 
   it('shows a recent answer again at once when the same email comes back', async () => {
@@ -441,7 +495,7 @@ describe('AI check view', () => {
       'news@lumorabank.example',
       'support.me@gmail.example',
     ]);
-    expect(text('status')).toMatch(/Answers in this language are experimental/);
+    expect(text('detail')).toMatch(/Answers in this language are experimental/);
   });
 
   it('shows AI concerns only as notes for a confirmed sender without rule warnings', async () => {
@@ -454,11 +508,12 @@ describe('AI check view', () => {
     };
     await show(confirmed);
     await answer(verdict('suspicious', 'Check the URL carefully.'));
-    expect(text('overall')).toBe(
-      'No signs of phishing (sender confirmed, rule checks found nothing; AI notes below)',
+    expect(text('overall')).toBe('Looks safe');
+    expect(text('detail')).toMatch(
+      /^The AI said: suspicious, but the sender is confirmed and the basic checks found nothing, so its points are notes only\./,
     );
     expect(reasons()).toEqual(['AI reason (suspicious)']);
-    expect(text('advice')).toMatch(/^No signs of phishing found/);
+    expect(text('advice')).toMatch(/^Stay careful/);
 
     // A rule warning lets the AI raise the verdict again.
     await show(confirmed, [finding('warning')]);
@@ -472,8 +527,8 @@ describe('AI check view', () => {
     expect(signals[0]?.aborted).toBe(true);
     // A hung model would most likely hang again: no second try after the time limit.
     expect(prompts).toHaveLength(1);
-    expect(text('status')).toBe(
-      'The AI check failed (no answer within 60 s; the model had written 0 characters). The rule checks still apply.',
+    expect(text('detail')).toBe(
+      'The AI check failed (no answer within 60 s; the model had written 0 characters). The basic checks still apply.',
     );
     await show({ ...email, subject: 'Next' });
     expect(prompts).toHaveLength(2);
@@ -490,8 +545,8 @@ describe('AI check view', () => {
       uiLanguage: () => 'en',
     });
     await show({ ...email, subject: 'Broken' });
-    expect(text('status')).toBe(
-      'The AI check failed after a second try (boom). The rule checks still apply.',
+    expect(text('detail')).toBe(
+      'The AI check failed after a second try (boom). The basic checks still apply.',
     );
     await show(email);
     expect(text('overall')).toBe('Suspicious');
@@ -507,11 +562,11 @@ describe('AI check view', () => {
     await answer({ ok: false, reason: 'failed', detail: 'Session crashed' });
     expect(loads).toBe(2);
     expect(prompts).toHaveLength(2);
-    expect(text('status')).toBe('AI check running on this device (second try)… 0 s');
-    expect(text('overall')).toBe('Checking… (the rule checks found no red flags)');
+    expect(text('status')).toBe('AI check running (second try)… 0 s');
+    expect(text('overall')).toBe('Checking…');
     await answer(verdict('suspicious'));
     expect(text('overall')).toBe('Suspicious');
-    expect(get('status').classList.contains('ai-failed')).toBe(false);
+    expect(text('source')).toBe('Checked on this device');
   });
 
   it('does not try again without a model, after a stop, or for an email that is gone', async () => {
@@ -521,8 +576,8 @@ describe('AI check view', () => {
     await show(email);
     await answer({ ok: false, reason: 'failed', detail: 'Session crashed' });
     expect(prompts).toHaveLength(1);
-    expect(text('status')).toBe(
-      'The AI check failed (Session crashed). The rule checks still apply.',
+    expect(text('detail')).toBe(
+      'The AI check failed (Session crashed). The basic checks still apply.',
     );
 
     // A stopped run (its email was left) is not tried again.
@@ -546,12 +601,12 @@ describe('AI check view', () => {
     });
     modelReady = () => ready;
     await show(email);
-    expect(text('status')).toBe('AI check running on this device… 0 s');
+    expect(text('status')).toBe('AI check running… 0 s');
     await vi.advanceTimersByTimeAsync(LOADING_HINT_MS);
-    expect(text('status')).toMatch(/^On-device model still loading… 1 s\. Rule checks done\. /);
+    expect(text('status')).toMatch(/^On-device AI loading… 0:01\. The first load/);
     loaded?.(true);
     await vi.advanceTimersByTimeAsync(0);
-    expect(text('status')).toBe('AI check running on this device… 0 s');
+    expect(text('status')).toBe('AI check running… 0 s');
   });
 
   it('uses the check that waits for the model for an email shown again', async () => {
@@ -583,7 +638,10 @@ describe('AI check view', () => {
     await answer(verdict('safe'));
     expect(prompts).toHaveLength(1);
     expect(get('verdict').dataset.risk).toBe('suspicious');
-    expect(text('overall')).toBe('Suspicious (rule checks; the AI said: no signs of phishing)');
+    expect(text('overall')).toBe('Suspicious');
+    expect(text('detail')).toMatch(
+      /^The AI said: no signs of phishing; the basic checks found more/,
+    );
   });
 
   it('does not try again when there is no model', async () => {
@@ -594,15 +652,15 @@ describe('AI check view', () => {
     };
     await show(email);
     expect(loads).toBe(1);
-    expect(text('status')).toMatch(/on-device model is not ready/);
+    expect(text('detail')).toMatch(/on-device AI is not ready/);
   });
 
   it('names only the last reason when the two tries fail differently', async () => {
     await show(email);
     await answer({ ok: false, reason: 'failed', detail: 'Session crashed' });
     await answer({ ok: false, reason: 'unreadable-answer' });
-    expect(text('status')).toBe(
-      'The AI answer could not be read after a second try. The rule checks still apply.',
+    expect(text('detail')).toBe(
+      'The AI answer could not be read after a second try. The basic checks still apply.',
     );
   });
 
@@ -622,9 +680,7 @@ describe('AI check view', () => {
     await answer({ ok: false, reason: 'failed', detail: 'Session crashed' });
     // The second try waits for the model to load again.
     await vi.advanceTimersByTimeAsync(LOADING_HINT_MS);
-    expect(text('status')).toMatch(
-      /^On-device model still loading \(second try\)… 1 s\. The AI result appears here by itself; /,
-    );
+    expect(text('status')).toMatch(/^On-device AI loading \(second try\)… 0:01\. The first load/);
     loaded?.(true);
     await vi.advanceTimersByTimeAsync(0);
     expect(prompts).toHaveLength(2);
@@ -645,7 +701,7 @@ describe('AI check view', () => {
     await vi.advanceTimersByTimeAsync(STOP_GRACE_MS);
     expect(prompts).toHaveLength(2);
     expect(prompts[1]).toMatch(/"subject":"A"/);
-    expect(text('status')).toMatch(/^AI check running on this device… [01] s$/);
+    expect(text('status')).toMatch(/^AI check running… [01] s$/);
     await answer(verdict('dangerous'));
     await answer(verdict('suspicious'));
     expect(text('overall')).toBe('Suspicious');
