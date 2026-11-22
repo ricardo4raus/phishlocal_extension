@@ -38,6 +38,8 @@ export interface EmailElements {
 export interface LinksElements {
   /** The section, hidden when the email has no links. */
   section: HTMLElement;
+  /** The heading "Links (N)", hidden when no link is flagged: the fold then says it. */
+  heading: HTMLElement;
   /** The count in the heading. */
   count: HTMLElement;
   /** Rows for the links a finding names. */
@@ -156,7 +158,10 @@ function linkItem(link: EmailLink, severity: Severity | undefined): HTMLLIElemen
   return item;
 }
 
-/** Fills the "Links" section: flagged links as rows, the others under "N more links". */
+/**
+ * Fills the "Links" section: flagged links as rows, the others under "N more links". Without
+ * flagged links the fold alone is the section, titled "Links (N)", so the count is said once.
+ */
 function showLinks(email: Email, links: LinksElements, findings: readonly Finding[]): void {
   const severities = linkSeverities(findings);
   const flagged: HTMLLIElement[] = [];
@@ -166,6 +171,7 @@ function showLinks(email: Email, links: LinksElements, findings: readonly Findin
     (severity ? flagged : rest).push(linkItem(link, severity));
   });
   links.section.hidden = email.links.length === 0;
+  links.heading.hidden = flagged.length === 0;
   links.count.textContent = String(email.links.length);
   links.flagged.replaceChildren(...flagged);
   links.moreList.replaceChildren(...rest);
@@ -178,7 +184,7 @@ function showLinks(email: Email, links: LinksElements, findings: readonly Findin
   }
   const noun = rest.length === 1 ? 'link' : 'links';
   links.moreSummary.textContent =
-    flagged.length > 0 ? `${rest.length} more ${noun}` : `Show the ${rest.length} ${noun}`;
+    flagged.length > 0 ? `${rest.length} more ${noun}` : `Links (${rest.length})`;
 }
 
 function showStrip(email: Email, strip: StripElements, loading: boolean, fromGmail: boolean): void {

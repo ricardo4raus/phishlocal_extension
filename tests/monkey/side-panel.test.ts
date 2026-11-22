@@ -530,6 +530,11 @@ function checkPanelOnce(): void {
     expect(get('links').hidden, 'links section').toBe(flagged + rest === 0);
     expect(get('links-count').textContent).toBe(String(flagged + rest));
     expect(get('links-more').hidden, 'links fold').toBe(rest === 0);
+    // The count is said once: by the heading with flagged links, by the fold without.
+    expect(get('links-heading').hidden, 'links heading').toBe(flagged === 0);
+    if (flagged === 0 && rest > 0) {
+      expect(get('links-more-summary').textContent).toBe(`Links (${rest})`);
+    }
     if (flagged > 0) reached.add('flagged links');
     if (rest > 0) reached.add('more links');
   } else {

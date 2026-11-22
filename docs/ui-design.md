@@ -114,8 +114,9 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    findings only. Hidden when there are none.
 7. **Links** (heading "Links (2)"): one list in one card, one row per flagged link (its badge,
    the real domain bold, "forwards to" when it does, the shortened URL in monospace), then a fold
-   "N more links" with the unflagged ones in the same form. Link texts appear only in the
-   red-flag rows ("Says"), never twice.
+   "N more links" with the unflagged ones in the same form. Without a flagged link the heading
+   gives way and the fold itself is titled "Links (3)", so the count is said once. Link texts
+   appear only in the red-flag rows ("Says"), never twice.
 8. **Deep check:** one outlined button "Deep check in the cloud…" under the links. Filled (blue)
    only when recommended: the AI did not run, or the UI language is one where its answers are
    experimental (it, pt). Disabled with the line "Not available in this build" when the build has
