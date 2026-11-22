@@ -302,6 +302,10 @@ export const pt: Messages = {
     lineStricter: (word, ai, level) => `${word} (verificações básicas; ${ai} respondeu: ${level})`,
     detailOnlyNotes: (said) =>
       `${said}, mas o remetente está confirmado e as verificações básicas não encontraram nada, por isso os seus pontos são apenas notas.`,
+    lineNoLinks: (word) =>
+      `${word} (sem ligações, as verificações básicas não encontraram nada; notas da IA abaixo)`,
+    detailNoLinks: (said) =>
+      `${said}, mas o e-mail não tem ligações e as verificações básicas não encontraram nada, por isso os seus pontos são apenas notas.`,
     detailStricter: (said) =>
       `${said}; as verificações básicas encontraram mais, por isso vale o veredicto delas.`,
   },

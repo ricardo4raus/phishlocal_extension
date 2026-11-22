@@ -305,6 +305,10 @@ export const fr: Messages = {
       `${word} (vérifications de base ; ${ai} a répondu : ${level})`,
     detailOnlyNotes: (said) =>
       `${said}, mais l’expéditeur est confirmé et les vérifications de base n’ont rien trouvé : ses points ne sont que des remarques.`,
+    lineNoLinks: (word) =>
+      `${word} (aucun lien, les vérifications de base n’ont rien trouvé ; remarques de l’IA ci-dessous)`,
+    detailNoLinks: (said) =>
+      `${said}, mais l’e-mail ne contient aucun lien et les vérifications de base n’ont rien trouvé : ses points ne sont que des remarques.`,
     detailStricter: (said) =>
       `${said} ; les vérifications de base ont trouvé davantage, leur verdict prévaut donc.`,
   },

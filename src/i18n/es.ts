@@ -303,6 +303,10 @@ export const es: Messages = {
     lineStricter: (word, ai, level) => `${word} (revisiones básicas; ${ai} dijo: ${level})`,
     detailOnlyNotes: (said) =>
       `${said}, pero el remitente está confirmado y las revisiones básicas no encontraron nada, así que sus puntos son solo notas.`,
+    lineNoLinks: (word) =>
+      `${word} (sin enlaces, las revisiones básicas no encontraron nada; notas de la IA abajo)`,
+    detailNoLinks: (said) =>
+      `${said}, pero el correo no tiene enlaces y las revisiones básicas no encontraron nada, así que sus puntos son solo notas.`,
     detailStricter: (said) =>
       `${said}; las revisiones básicas encontraron más, así que su veredicto se mantiene.`,
   },

@@ -309,6 +309,10 @@ export const de: Messages = {
     lineStricter: (word, ai, level) => `${word} (Grundprüfungen; ${ai} sagte: ${level})`,
     detailOnlyNotes: (said) =>
       `${said}, aber der Absender ist bestätigt und die Grundprüfungen fanden nichts, also sind ihre Punkte nur Hinweise.`,
+    lineNoLinks: (word) =>
+      `${word} (keine Links, Grundprüfungen fanden nichts; Hinweise der KI unten)`,
+    detailNoLinks: (said) =>
+      `${said}, aber die E-Mail enthält keine Links und die Grundprüfungen fanden nichts, also sind ihre Punkte nur Hinweise.`,
     detailStricter: (said) => `${said}; die Grundprüfungen fanden mehr, also gilt ihr Ergebnis.`,
   },
 

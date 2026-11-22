@@ -302,6 +302,10 @@ export const it: Messages = {
     lineStricter: (word, ai, level) => `${word} (controlli di base; ${ai} ha risposto: ${level})`,
     detailOnlyNotes: (said) =>
       `${said}, ma il mittente è confermato e i controlli di base non hanno trovato nulla, quindi i suoi punti sono solo note.`,
+    lineNoLinks: (word) =>
+      `${word} (nessun link, i controlli di base non hanno trovato nulla; note dell’IA sotto)`,
+    detailNoLinks: (said) =>
+      `${said}, ma l’email non contiene link e i controlli di base non hanno trovato nulla, quindi i suoi punti sono solo note.`,
     detailStricter: (said) =>
       `${said}; i controlli di base hanno trovato di più, quindi vale il loro verdetto.`,
   },

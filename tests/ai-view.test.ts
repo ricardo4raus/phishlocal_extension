@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiCheckResult } from '../src/ai';
 import type { Email } from '../src/email';
-import type { Finding } from '../src/rules';
+import { checkEmail, type Finding } from '../src/rules';
 import {
   type AiCheck,
   type AiCheckDeps,
@@ -18,11 +18,12 @@ import { DEFAULT_SETTINGS } from '../src/settings';
 
 const RUN_TIMEOUT_MS = DEFAULT_SETTINGS.aiCheckTimeoutMs;
 
+// One ordinary link: an email without links gets its own rule (see "an email without links").
 const email: Email = {
   sender: { name: 'Lumora Bank', address: 'news@lumorabank.example' },
   subject: 'Statement',
   bodyText: 'Hello',
-  links: [],
+  links: [{ text: 'Your statement', href: 'https://lumorabank.example/statement' }],
   truncated: false,
 };
 
@@ -724,5 +725,87 @@ describe('AI check view', () => {
     await answer(verdict('dangerous'));
     await answer(verdict('suspicious'));
     expect(text('overall')).toBe('Suspicious');
+  });
+
+  describe('an email without links', () => {
+    // A note to oneself: a developer's error log, sent from one's own Gmail address. Gmail adds no
+    // sender checks to it, so the strip says "Sender not confirmed" (seen in Chrome, 22 Nov 2026).
+    const errorLog: Email = {
+      sender: { name: 'Dev', address: 'dev@mail.example' },
+      subject: '',
+      bodyText: [
+        'Console Error',
+        '',
+        'Encountered two children with the same key, `#E8564B`. Keys should be unique so that ' +
+          'components maintain their identity across updates.',
+        '',
+        'Source:',
+        String.raw`C:\project\node_modules\react-reconciler\cjs\react-reconciler.development.js (3178:27)`,
+      ].join('\n'),
+      links: [],
+      truncated: false,
+      headers: { replyTo: [] },
+    };
+
+    it('shows an AI "suspicious" as notes when nothing is asked, with our own advice', async () => {
+      const findings = checkEmail(errorLog);
+      expect(findings.map((found) => found.severity)).not.toContain('warning');
+      await show(errorLog, findings);
+      await answer(verdict('suspicious', 'Be careful.'));
+      expect(text('overall')).toBe('Looks safe');
+      expect(get('verdict').dataset.risk).toBe('safe');
+      expect(text('detail')).toMatch(
+        /^The AI said: suspicious, but the email has no links and the basic checks found nothing, so its points are notes only\./,
+      );
+      expect(reasons()).toEqual(['AI reason (suspicious)']);
+      expect(text('advice')).toMatch(/^Stay careful/);
+    });
+
+    it('keeps an AI "dangerous": a scam by reply has no links either', async () => {
+      const giftCards: Email = {
+        ...errorLog,
+        sender: { name: 'Anna (CEO)', address: 'anna.ceo@mail.example' },
+        subject: 'Quick favour',
+        bodyText:
+          'Are you at your desk? I need four gift cards for a client today. Send me the codes; I am in a meeting.',
+      };
+      await show(giftCards, checkEmail(giftCards));
+      await answer(verdict('dangerous', 'Do not buy anything.'));
+      expect(text('overall')).toBe('Dangerous');
+    });
+
+    it('keeps an AI "suspicious" when the email asks for something, even only as a note', async () => {
+      for (const bodyText of [
+        'Your account will be closed within 24 hours. Reply with your password and date of birth to keep it.',
+        'Bitte überweisen Sie heute noch 4.800 EUR auf das neue Konto unseres Lieferanten. Die Rechnung ist dringend.',
+      ]) {
+        const asking: Email = { ...errorLog, subject: 'Account', bodyText };
+        const findings = checkEmail(asking);
+        // The rules see the pressure only as a note: the AI's concern must stand.
+        expect(findings.some((found) => found.severity === 'info')).toBe(true);
+        expect(findings.some((found) => found.severity !== 'info')).toBe(false);
+        await show(asking, findings);
+        await answer(verdict('suspicious'));
+        expect(text('overall'), bodyText).toBe('Suspicious');
+      }
+    });
+
+    it('keeps an AI "suspicious" for an email with a link', async () => {
+      const withLink: Email = {
+        ...errorLog,
+        links: [{ text: 'Open the log', href: 'https://logs.example/view' }],
+      };
+      await show(withLink, checkEmail(withLink));
+      await answer(verdict('suspicious'));
+      expect(text('overall')).toBe('Suspicious');
+    });
+
+    it('keeps an AI "suspicious" when the rules could not run', async () => {
+      // Not through show(): its default turns `undefined` into "no findings".
+      check.shown(errorLog, undefined, true);
+      await vi.advanceTimersByTimeAsync(STABLE_MS);
+      await answer(verdict('suspicious'));
+      expect(text('overall')).toBe('Suspicious');
+    });
   });
 });

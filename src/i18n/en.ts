@@ -297,6 +297,9 @@ export const en = {
       `${word} (basic checks; ${ai} said: ${level})`,
     detailOnlyNotes: (said: string) =>
       `${said}, but the sender is confirmed and the basic checks found nothing, so its points are notes only.`,
+    lineNoLinks: (word: string) => `${word} (no links, basic checks found nothing; AI notes below)`,
+    detailNoLinks: (said: string) =>
+      `${said}, but the email has no links and the basic checks found nothing, so its points are notes only.`,
     detailStricter: (said: string) =>
       `${said}; the basic checks found more, so their verdict stands.`,
   },

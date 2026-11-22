@@ -245,6 +245,16 @@ describe('rules as the lower limit', () => {
     expect(overallRisk('safe', 'dangerous', confirmed)).toBe('dangerous');
   });
 
+  it('makes an AI "suspicious" a note when nothing is asked and the rules found nothing', () => {
+    const nothingAsked = { nothingAsked: true };
+    expect(overallRisk('suspicious', 'safe', nothingAsked)).toBe('safe');
+    // An AI that is sure it is dangerous still stands: a scam by reply has no links either.
+    expect(overallRisk('dangerous', 'safe', nothingAsked)).toBe('dangerous');
+    // A rule warning lets the AI raise the verdict as always.
+    expect(overallRisk('dangerous', 'suspicious', nothingAsked)).toBe('dangerous');
+    expect(overallRisk('suspicious', 'safe')).toBe('suspicious');
+  });
+
   it('has a schema with only the basic keywords Chrome supports', () => {
     expect(VERDICT_SCHEMA.required).toEqual(['risk', 'reasons', 'advice']);
     expect(VERDICT_SCHEMA.properties.risk.enum).toEqual(['safe', 'suspicious', 'dangerous']);

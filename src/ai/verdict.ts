@@ -154,17 +154,30 @@ export function ruleRisk(findings: readonly Finding[]): Risk {
 const LEVEL: Record<Risk, number> = { safe: 0, suspicious: 1, dangerous: 2 };
 
 /**
- * The overall risk: the higher of AI and rules. The AI can raise it, never lower it, with one
- * exception for false alarms: if the sender is confirmed (DMARC pass) and the rules found no
- * warning, the AI alone cannot raise it. Gemini Nano flags real security notices from Google and
- * others as suspicious (measured in Chrome); phishing from a confirmed but hijacked sender almost
- * always trips the rules too (requests for identity, log-in or card details, payments).
+ * The overall risk: the higher of AI and rules. The AI can raise it, never lower it, with two
+ * exceptions for false alarms, both only when the rules found no warning:
+ * - the sender is confirmed (DMARC pass): the AI alone cannot raise it. Gemini Nano flags real
+ *   security notices from Google and others as suspicious (measured in Chrome); phishing from a
+ *   confirmed but hijacked sender almost always trips the rules too (requests for identity,
+ *   log-in or card details, payments);
+ * - nothing is asked: the email has no links and the rules found no pressure, threat, request
+ *   for data or payment, not even as a note. Then an AI "suspicious" alone is a note; its
+ *   "dangerous" still stands. Nano called a developer's error log sent to oneself suspicious
+ *   (measured 22 Nov 2026). Scams that work by reply mostly use such words (a password request,
+ *   a transfer under time pressure: then the AI's verdict stands); one the rules miss entirely
+ *   (a gift-card request in other words) shows as safe with the AI's points as notes, unless
+ *   Nano is sure it is dangerous.
  */
 export function overallRisk(
   ai: Risk | undefined,
   rules: Risk,
-  { senderConfirmed = false }: { senderConfirmed?: boolean } = {},
+  {
+    senderConfirmed = false,
+    nothingAsked = false,
+  }: { senderConfirmed?: boolean; nothingAsked?: boolean } = {},
 ): Risk {
-  if (ai === undefined || (senderConfirmed && rules === 'safe')) return rules;
+  if (ai === undefined) return rules;
+  if (rules === 'safe' && senderConfirmed) return rules;
+  if (rules === 'safe' && nothingAsked && ai === 'suspicious') return rules;
   return LEVEL[ai] > LEVEL[rules] ? ai : rules;
 }
