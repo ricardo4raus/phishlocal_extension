@@ -8,7 +8,8 @@ import {
 } from 'firebase/ai';
 import { CLOUD_SYSTEM_PROMPT, SYSTEM_PROMPT, withExtraInstructions } from './ai/prompt';
 import { type AiVerdict, parseVerdict, VERDICT_SCHEMA } from './ai/verdict';
-import { ai } from './firebase';
+import { ai, cloudPass } from './firebase';
+import { TokenServerError } from './token-server';
 import { DEFAULT_SETTINGS, type Settings } from './settings';
 
 let settings: Readonly<Settings> = DEFAULT_SETTINGS;
@@ -328,9 +329,21 @@ function deepCheckModel(): ReturnType<typeof getGenerativeModel> {
  * cloud and reads the answer as strictly as the on-device one. Call it only after the user's
  * consent. `signal` stops the request.
  */
-export async function runCloudCheck(prompt: string, signal?: AbortSignal): Promise<AiCheckResult> {
+/**
+ * A deep check result. `limit`: the token server's daily limit is reached, so nothing was sent.
+ */
+export type CloudCheckResult = AiCheckResult | { ok: false; reason: 'limit' };
+
+export async function runCloudCheck(
+  prompt: string,
+  signal?: AbortSignal,
+): Promise<CloudCheckResult> {
   const start = performance.now();
   try {
+    // The App Check token first: without it the request below cannot pass, and its own error
+    // ("HTTP 401") would hide the reason.
+    await cloudPass();
+    if (signal?.aborted) return { ok: false, reason: 'stopped' };
     const { response } = await deepCheckModel().generateContent(prompt, {
       timeout: currentSettings().cloudTimeoutMs,
       ...(signal ? { signal } : {}),
@@ -342,6 +355,9 @@ export async function runCloudCheck(prompt: string, signal?: AbortSignal): Promi
     return { ok: true, verdict, durationMs: performance.now() - start };
   } catch (error) {
     if (signal?.aborted) return { ok: false, reason: 'stopped' };
+    if (error instanceof TokenServerError && error.kind === 'limit') {
+      return { ok: false, reason: 'limit' };
+    }
     return { ok: false, reason: 'failed', detail: cloudError(error) };
   }
 }
@@ -351,6 +367,8 @@ export async function runCloudCheck(prompt: string, signal?: AbortSignal): Promi
  * with the project ID ("Error fetching from https://...: [403 ] ...").
  */
 export function cloudError(error: unknown): string {
+  // Our own messages hold no URLs: "no answer from the token server (TimeoutError)".
+  if (error instanceof TokenServerError) return error.message;
   const message = error instanceof Error ? error.message : String(error);
   if (/timeout|timed out/i.test(message)) {
     return `no answer within ${currentSettings().cloudTimeoutMs / 1000} s`;

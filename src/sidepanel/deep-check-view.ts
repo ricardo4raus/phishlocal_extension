@@ -14,7 +14,7 @@
  * The cloud's answer is read as strictly as the on-device one, and the rules stay its lower limit.
  * What is shown follows docs/ui-design.md ("The consent section").
  */
-import type { AiCheckResult } from '../ai';
+import type { CloudCheckResult } from '../ai';
 import {
   AI_LANGUAGES,
   answerLanguage,
@@ -94,7 +94,7 @@ export interface DeepCheckDeps {
   /** Gemini Nano, on the device: the names of people in `text`, or undefined if it could not look. */
   findNames: (text: string, language: string, signal: AbortSignal) => Promise<string[] | undefined>;
   /** Sends one prompt to the cloud. Called only after the user agreed to the data in it. */
-  run: (prompt: string, signal: AbortSignal) => Promise<AiCheckResult>;
+  run: (prompt: string, signal: AbortSignal) => Promise<CloudCheckResult>;
   /**
    * How long Gemini Nano may look for names before the data is built without its list (settings'
    * `namesTimeoutMs`). It starts after the model is loaded: a load is not the search's fault.
@@ -421,7 +421,11 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     }
   }
 
-  function showResult(result: AiCheckResult, findings: Finding[] | undefined, email: Email): void {
+  function showResult(
+    result: CloudCheckResult,
+    findings: Finding[] | undefined,
+    email: Email,
+  ): void {
     phase = 'done';
     clearCounter();
     elements.stop.hidden = true;
@@ -432,9 +436,11 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
         elements.status,
         result.reason === 'stopped'
           ? 'The deep check was stopped. The data shown may already have reached the cloud; you can send it again.'
-          : result.reason === 'unreadable-answer'
-            ? 'The cloud answer could not be read. The result above still applies; you can send the data again.'
-            : 'The deep check did not work. The result above still applies; you can send the data again.',
+          : result.reason === 'limit'
+            ? 'Deep checks are used up for today. Nothing was sent; the result above still applies.'
+            : result.reason === 'unreadable-answer'
+              ? 'The cloud answer could not be read. The result above still applies; you can send the data again.'
+              : 'The deep check did not work. The result above still applies; you can send the data again.',
       );
       elements.status.classList.add('status--error');
       // What went wrong, in the cloud's or the network's words: tier 3.
@@ -502,7 +508,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
       () => deps.run(buildCloudPrompt(data.json, answerIn), controller.signal),
       controller,
       cloudLimitMs,
-      (error): AiCheckResult =>
+      (error): CloudCheckResult =>
         controller.signal.aborted
           ? { ok: false, reason: 'stopped' }
           : {
@@ -513,7 +519,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     );
     if (mine !== generation) return;
     stop = undefined;
-    const result: AiCheckResult =
+    const result: CloudCheckResult =
       controller.signal.reason === TIME_LIMIT && !answer.ok
         ? { ok: false, reason: 'failed', detail: `no answer within ${cloudLimitMs / 1000} s` }
         : answer;

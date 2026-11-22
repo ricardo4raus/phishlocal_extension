@@ -216,11 +216,11 @@ async function run(): Promise<void> {
     output.textContent = result.text;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    // Without App Check every cloud request is rejected. The SDK can also choose the cloud on its
-    // own (model not ready), so the hint is shown whenever the prompt may have gone there.
+    // Without a Firebase project every cloud request fails. The SDK can also choose the cloud on
+    // its own (model not ready), so the hint is shown whenever the prompt may have gone there.
     const hint =
       !appCheckEnabled && expectedRoute(forceCloud) !== 'on-device'
-        ? ' (App Check is off: set VITE_APPCHECK_DEBUG_TOKEN in .env.local and use `npm run dev`.)'
+        ? ' (No Firebase project: fill in the VITE_FIREBASE_* values in .env.local.)'
         : '';
     setStatus(`Error: ${message}${hint}`, true);
   } finally {

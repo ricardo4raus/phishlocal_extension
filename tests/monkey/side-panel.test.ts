@@ -4,7 +4,7 @@
 // plays the Gmail tab (emails, "Show original" pages, failures, junk, disconnects), in random
 // order and timing. After every step the panel must still keep its promises.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AiCheckResult, PromptResult, WarmUpResult } from '../../src/ai';
+import type { AiCheckResult, CloudCheckResult, PromptResult, WarmUpResult } from '../../src/ai';
 import { RISKS, type Risk } from '../../src/ai/verdict';
 import { GMAIL_SERVER } from '../../src/raw/gmail-original-page';
 import { DEFAULT_SETTINGS, type Settings } from '../../src/settings';
@@ -190,7 +190,7 @@ vi.mock('../../src/ai', () => ({
       'name search',
     );
   },
-  runCloudCheck: (prompt: string, signal: AbortSignal): Promise<AiCheckResult> => {
+  runCloudCheck: (prompt: string, signal: AbortSignal): Promise<CloudCheckResult> => {
     afterConfigure('cloud check');
     // Only during a click on "Send to the cloud", once, with exactly the data the preview showed
     // and nothing else: without it, only the fixed instruction lines are left.
@@ -200,20 +200,21 @@ vi.mock('../../src/ai', () => ({
       violations.push('cloud request with more than the data shown');
     }
     consent = undefined;
-    return deepWorkFake<AiCheckResult>(
+    return deepWorkFake<CloudCheckResult>(
       signal,
       () => {
-        const answer: AiCheckResult = {
+        const answer: CloudCheckResult = {
           ok: true,
           verdict: { risk: rng.pick(RISKS), reasons: ['A cloud reason.'], advice: 'Advice.' },
           durationMs: 1_500,
         };
         return calm
           ? answer
-          : rng.pick<AiCheckResult>([
+          : rng.pick<CloudCheckResult>([
               answer,
               { ok: false, reason: 'failed', detail: 'App Check token invalid' },
               { ok: false, reason: 'unreadable-answer' },
+              { ok: false, reason: 'limit' },
             ]);
       },
       { ok: false, reason: 'stopped' },
