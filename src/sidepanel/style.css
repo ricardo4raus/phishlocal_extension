@@ -1116,7 +1116,7 @@
     border-block-start: 1px solid var(--color-border);
   }
 
-  .link-list > .link:first-child {
+  .link-list:not(.link-list--folded) > .link:first-child {
     border-block-start: 0;
   }
 
@@ -1157,7 +1157,8 @@
     padding: 0;
   }
 
-  .fold--inner > .fold__body > .link:first-child {
+  /* A link list inside a fold starts under the summary's hairline: its first row keeps its own. */
+  .link-list--folded > .link:first-child {
     border-block-start: 1px solid var(--color-border);
   }
 

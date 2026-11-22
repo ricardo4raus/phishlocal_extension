@@ -111,10 +111,11 @@ const MARK: Record<Severity, string> = { danger: 'Danger', warning: 'Warning', i
 const STRENGTH: Record<Severity, number> = { danger: 2, warning: 1, info: 0 };
 const MARK_ICON: Record<Severity, IconName> = { danger: 'cross', warning: 'alert', info: 'info' };
 
-/** Per link position: the most severe finding that names it. */
+/** Per link position: the most severe finding that names it. Notes (`info`) flag nothing. */
 function linkSeverities(findings: readonly Finding[]): Map<number, Severity> {
   const severities = new Map<number, Severity>();
   for (const { severity, links = [] } of findings) {
+    if (severity === 'info') continue;
     for (const index of links) {
       const known = severities.get(index);
       if (!known || STRENGTH[severity] > STRENGTH[known]) severities.set(index, severity);
@@ -169,7 +170,12 @@ function showLinks(email: Email, links: LinksElements, findings: readonly Findin
   links.flagged.replaceChildren(...flagged);
   links.moreList.replaceChildren(...rest);
   links.more.hidden = rest.length === 0;
-  links.more.open = false;
+  // The fold closes for another email, not when the same email is shown again (with headers).
+  const key = JSON.stringify(email.links);
+  if (links.more.dataset.email !== key) {
+    links.more.open = false;
+    links.more.dataset.email = key;
+  }
   const noun = rest.length === 1 ? 'link' : 'links';
   links.moreSummary.textContent =
     flagged.length > 0 ? `${rest.length} more ${noun}` : `Show the ${rest.length} ${noun}`;

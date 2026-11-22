@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import type { Email } from '../src/email';
+import type { Finding } from '../src/rules';
 import { HEADERS_HINT, senderDomain, senderStatus, showEmail } from '../src/sidepanel/email-view';
 
 const email: Email = {
@@ -95,6 +96,31 @@ describe('showEmail', () => {
     // The link text appears only in the red-flag row, never here.
     expect(els.links.section.textContent).not.toContain('<b>x</b>');
     expect(document.querySelector('b')).toBeNull();
+  });
+
+  it('does not flag a link for a note, and keeps the fold open for the same email', () => {
+    const els = emailElements();
+    const links = [
+      { text: 'Help', href: 'https://www.google.com/url?q=https://evil.example/' },
+      { text: 'Home', href: 'https://news.example/' },
+    ];
+    const note = {
+      rule: 'redirect-link',
+      severity: 'info',
+      message: 'x',
+      evidence: [],
+      links: [0],
+    };
+    showEmail({ ...email, links }, els, { findings: [note as Finding] });
+    expect(els.links.flagged.children).toHaveLength(0);
+    expect(els.links.moreList.children).toHaveLength(2);
+    // The user opens the fold; Gmail shows the same email again with its headers.
+    els.links.more.open = true;
+    showEmail({ ...email, links, headers: { replyTo: [] } }, els, { findings: [] });
+    expect(els.links.more.open).toBe(true);
+    // Another email closes it.
+    showEmail({ ...email, links: [links[1]!] }, els);
+    expect(els.links.more.open).toBe(false);
   });
 
   it('reveals direction overrides in URLs and the tooltip', () => {

@@ -64,6 +64,24 @@ const SENTENCE_RULES: ReadonlySet<RuleId> = new Set([
   'international-domain',
 ]);
 
+/**
+ * Plain-word sentences for rules whose own message names protocols (SPF, DKIM, DMARC): tier 2
+ * never does. The rule's sentence stays in tier 3 (the notes) and in the prompt.
+ */
+const PLAIN_SENTENCES: Partial<Record<RuleId, string>> = {
+  'dmarc-fail':
+    "The sender's own mail service says this email did not come from them. That is the surest sign of a forged sender.",
+  'auth-fail':
+    'The checks that confirm a sender did not pass. Legitimate senders sometimes fail them too, so treat this as a warning, not proof.',
+};
+
+/** A paragraph of email-derived text, with direction overrides revealed. */
+function sentence(text: string): HTMLElement {
+  const paragraph = el('p', 'flag__sentence');
+  setText(paragraph, text);
+  return paragraph;
+}
+
 export interface FindingsElements {
   /** The "Red flags" section, hidden when there is none. */
   section: HTMLElement;
@@ -102,7 +120,7 @@ function evidence(finding: Finding, email: Email | undefined): HTMLElement[] {
     rows.append(...row('Name says', name), ...row('Address is', address, true));
     return [rows];
   }
-  if (SENTENCE_RULES.has(rule)) return [el('p', 'flag__sentence', finding.message)];
+  if (SENTENCE_RULES.has(rule)) return [sentence(PLAIN_SENTENCES[rule] ?? finding.message)];
   // Link rules: what the link says, and where it really goes.
   const index = finding.links?.[0];
   const link = index === undefined ? undefined : email?.links[index];
@@ -117,7 +135,7 @@ function evidence(finding: Finding, email: Email | undefined): HTMLElement[] {
     const target = display.forwardsTo ?? display.domain;
     rows.append(...row('Opens', target || link.href, true));
   } else {
-    return [el('p', 'flag__sentence', finding.message)];
+    return [sentence(finding.message)];
   }
   const more = finding.links && finding.links.length > 1 ? finding.links.length - 1 : 0;
   const parts: HTMLElement[] = [rows];
@@ -147,7 +165,9 @@ function flagRow(finding: Finding, email: Email | undefined): HTMLLIElement {
 function noteRow(finding: Finding): HTMLLIElement {
   const item = el('li', 'note-row');
   const label = el('strong', '', `${TITLES[finding.rule]}: `);
-  item.append(label, finding.message);
+  const message = el('span');
+  setText(message, finding.message);
+  item.append(label, message);
   return item;
 }
 
@@ -183,13 +203,14 @@ export function showRuleCheck(
   try {
     findings = check();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    // The error text could hold email content: the console gets it, the panel a fixed sentence.
+    console.error('PhishLocal: the rule check failed', error);
     showFindings(
       [
         {
           rule: 'incomplete-check',
           severity: 'warning',
-          message: `The basic checks could not finish (${message}). Treat this email with care.`,
+          message: 'The basic checks could not finish. Treat this email with care.',
           evidence: [],
         },
       ],

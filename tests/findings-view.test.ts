@@ -147,11 +147,45 @@ describe('showFindings', () => {
     expect(rows(els.notes).map((row) => row.textContent)).toEqual(['None.']);
   });
 
-  it('has a title for every rule', () => {
+  it('has a title for every rule, and names no protocol in a red-flag row', () => {
     for (const title of Object.values(TITLES)) {
       expect(title).toMatch(/^[A-Z]/);
       expect(title).not.toMatch(/rule|DKIM|DMARC|SPF/);
     }
+    const els = elements();
+    showFindings(
+      [
+        finding('dmarc-fail', 'danger', { message: 'DMARC failed (mx.google.com).' }),
+        finding('auth-fail', 'warning', { message: 'SPF fail, DKIM none (mx.google.com).' }),
+      ],
+      els,
+      email,
+    );
+    expect(els.list.textContent).not.toMatch(/DKIM|DMARC|SPF/);
+    expect(text(rows(els.list)[0]?.querySelector('.flag__sentence'))).toMatch(/forged sender/);
+  });
+
+  it('reveals direction overrides in sentences and notes, and survives odd links', () => {
+    const els = elements();
+    const rlo = String.fromCodePoint(0x202e);
+    showFindings(
+      [
+        finding('incomplete-check', 'warning', { message: `See ${rlo}moc.lapyap` }),
+        finding('redirect-link', 'info', { message: `Via ${rlo}elpmaxe.live` }),
+        // A link index past the email's links, and a link rule without an email at all.
+        finding('link-text-mismatch', 'warning', { links: [9] }),
+      ],
+      els,
+      email,
+    );
+    const [sentenceRow, pastEnd] = rows(els.list);
+    expect(text(sentenceRow?.querySelector('.flag__sentence'))).toBe('See <U+202E>moc.lapyap');
+    expect(text(pastEnd?.querySelector('.flag__sentence'))).toBe('The sentence.');
+    expect(rows(els.notes)[0]?.textContent).toBe(
+      'A link goes through a forwarding service: Via <U+202E>elpmaxe.live',
+    );
+    showFindings([finding('link-text-mismatch', 'warning', { links: [0] })], els);
+    expect(text(rows(els.list)[0]?.querySelector('.flag__sentence'))).toBe('The sentence.');
   });
 });
 
@@ -168,8 +202,10 @@ describe('showRuleCheck', () => {
     expect(showRuleCheck(failingCheck, els, email)).toBeUndefined();
     const [row] = rows(els.list);
     expect(row?.className).toBe('flag finding warning');
+    // The error text never reaches the panel (it could hold email content).
     expect(text(row?.querySelector('.flag__sentence'))).toBe(
-      'The basic checks could not finish (boom). Treat this email with care.',
+      'The basic checks could not finish. Treat this email with care.',
     );
+    expect(els.section.textContent).not.toContain('boom');
   });
 });
