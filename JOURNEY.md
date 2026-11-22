@@ -1008,3 +1008,14 @@ _To fill in near the submission._
   prompt says to answer in it also when the email is in another language. The side panel monkey
   now picks Chrome's language at random and fails if the AI is asked in any other language than
   English; with the old code it failed at once ("AI check in de").
+- The whole panel now comes in six languages (en, de, fr, es, it, pt), not only the AI's
+  answers. "Automatic" follows Chrome's language until the user picks one under Settings; the
+  choice is kept in the panel's local storage, and switching reloads the panel, so no part has
+  to redraw itself. About 250 texts moved from eight files into one dictionary per language
+  (`src/i18n/`); English is the master copy, TypeScript refuses a translation with a missing
+  text or a function with other parameters, and a test checks that every `data-t` key in
+  `index.html` exists and that no tier-1 or tier-2 text names SPF, DKIM or DMARC in any language.
+  German was checked in headless-Chrome renders (longer words, same layout); the other four are
+  my translations, not checked by a native speaker. The monkey test first lost a coverage state:
+  the language menu read Chrome's language from the fake Chrome, which drew it from the shared
+  random sequence and shifted every later move.

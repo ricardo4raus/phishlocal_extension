@@ -143,14 +143,13 @@ are its input and its lower limit.
    - a Gmail email waits for its headers, but at most 3 s;
    - without a ready on-device model there is no AI check; the panel says so and the rules stand
      alone.
-7. **Language:** the panel's language (`PANEL_LANGUAGE`, English), whatever the language of
-   Chrome or the email: the prompt says "Write the reasons and the advice in English, also when
-   the email is in another language." Until 22 Nov 2026 it followed Chrome's UI language, so a
-   German Chrome got German reasons in an English panel. The code still supports the other
-   `AI_LANGUAGES` (de, fr, es, it, pt) for a translated panel: each answer language gets its own
-   on-device model with exactly that output language, and Gemini Nano marks Italian and
-   Portuguese experimental (measured 17 Nov 2026; supported are de, en, es, fr, ja), which the
-   panel would then say.
+7. **Language:** the panel's language (`language` in `src/i18n`: the user's choice under
+   Settings, else Chrome's language, else English), whatever the language of the email: the
+   prompt says, for example, "Write the reasons and the advice in German, also when the email is
+   in another language." So a result reads in one language. Each answer language gets its own
+   on-device model with exactly that output language. Gemini Nano marks Italian and Portuguese
+   experimental (measured 17 Nov 2026; supported are de, en, es, fr, ja), so the panel says so
+   and recommends the deep check. The rules' own messages and the system prompt stay English.
 
 ## Deep check in the cloud
 

@@ -132,7 +132,11 @@ Every part is its own component (see "How to build it"); the page sets the spaci
 10. **"Check another email"** (a `<details>` fold): the paste form (From, Subject, Email text,
     "Use pasted email", "Clear") and, in dev and judges builds only, the sample row. "Paste an
     email" on the empty card opens this fold and focuses the text field.
-11. **Developer tools** (dev builds only): the test prompt, "Force cloud", "Run prompt".
+11. **Settings** (a `<details>` fold): "Language", a menu with "Automatic (Deutsch)" first
+    (Chrome's language, else English) and then each language in its own name (English, Deutsch,
+    Français, Español, Italiano, Português). A choice is saved in this browser and the panel
+    reloads in it; the AI answers in the same language.
+12. **Developer tools** (dev builds only): the test prompt, "Force cloud", "Run prompt".
 
 The page is one column, 16 px side padding, 12 px between parts. It must work from 320 px wide
 without sideways scrolling.
@@ -172,7 +176,8 @@ without sideways scrolling.
 
 ## Wording
 
-Tier-1 texts. The same thing has the same name everywhere.
+Tier-1 texts. The same thing has the same name everywhere. These are the English words; the
+other languages live in `src/i18n/` and follow the same tiers (no protocol names in tiers 1 and 2) and the same names for the same things.
 
 | Thing                       | Words                                                                                                              |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -327,6 +332,9 @@ measurements live as comments in `style.css`.
    question for the tuning task.
 9. **No sample emails and no "How it works" link as `<a>`:** the monkey test keeps its promise
    that the panel's DOM holds no `a`, `svg`, `img` or `template`.
+10. **The panel in six languages** (en, de, fr, es, it, pt), chosen under Settings, "Automatic"
+    by default. The language is fixed per page load and a change reloads the panel, so no part
+    needs to redraw itself and every text switches at once.
 
 ## Mockup review
 

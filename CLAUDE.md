@@ -24,12 +24,16 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Firebase config comes from `.env.local` (`VITE_FIREBASE_*` variables). `.env.local` is
   git-ignored; `.env.example` with empty values is committed.
 - License: **Apache-2.0** (hackathon requirement: public repo with visible open-source license).
-- Supported email languages: the rule checks cover en, de, fr, es, it, pt. The AI answers in the
-  panel's language (`PANEL_LANGUAGE` in `src/sidepanel/ui.ts`, English; decided 22 Nov 2026),
-  whatever the language of Chrome or the email, so a result reads in one language. The code can
-  still answer in de, fr, es, it, pt (it and pt experimental on-device: Chrome says "output
-  quality cannot be guaranteed"; supported are de, en, es, fr, ja; measured 17 Nov 2026) for a
-  translated panel.
+- Languages: the rule checks cover emails in en, de, fr, es, it, pt. The panel and the AI's
+  answers come in en, de, fr, es, it, pt (decided 22 Nov 2026): "Automatic" (Chrome's language,
+  else English) until the user picks one under Settings; the choice is kept in the panel's
+  local storage and switching reloads the panel. Whatever the email's language, the AI answers
+  in the panel's language. Text lives in `src/i18n/` (`en.ts` is the master copy; TypeScript and
+  `tests/i18n.test.ts` keep the others complete); `index.html` marks its text with `data-t`.
+  On-device answers in it and pt are experimental (Chrome: "output quality cannot be
+  guaranteed"; supported are de, en, es, fr, ja; measured 17 Nov 2026), and the panel says so.
+  Only German was checked by a native speaker; dev-only parts (developer tools, samples) and the
+  rules' own messages (prompt, tier-3 notes in English) stay English.
 - Privacy is the core selling point: never send email content anywhere without explicit user
   consent.
 - Keep it simple. No frameworks (React etc.) unless I ask. Plain TypeScript + HTML + CSS.

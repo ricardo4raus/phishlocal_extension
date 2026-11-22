@@ -12,6 +12,9 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 ## What it does today
 
 - **Side panel** (Chrome Manifest V3): click the toolbar icon to open it.
+- **Six languages:** the panel and the AI's answers in English, German, French, Spanish, Italian
+  or Portuguese. "Automatic" follows Chrome's language; Settings at the bottom of the panel picks
+  another one, which is remembered in this browser.
 - **Automatic check in Gmail:** while the side panel is open, every email you open in Gmail is
   read and checked at once: sender, subject, visible text, and every link with its text and real
   target. Its headers (SPF, DKIM, DMARC, Reply-To) are loaded in the background from Gmail's own
@@ -30,7 +33,7 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   Italian and Portuguese.
   All rules: [`docs/rules.md`](docs/rules.md).
 - **AI verdict, on the device:** Gemini Nano rates every shown email (safe, suspicious,
-  dangerous) with up to five reasons and one piece of advice, in your language. The rule checks
+  dangerous) with up to five reasons and one piece of advice, in the panel's language. The rule checks
   are its lower limit, so an email that talks the AI into "safe" still shows as dangerous. How it
   works and how it resists prompt injection: [`docs/ai-check.md`](docs/ai-check.md).
 - **Traffic light at the top:** green, yellow or red, each with its own symbol and word. It stays
