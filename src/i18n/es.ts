@@ -176,6 +176,7 @@ export const es: Messages = {
     confirmedByServer: 'Remitente confirmado por tu servidor de correo',
     checkingSender: 'Comprobando el remitente…',
     unconfirmed: 'Remitente no confirmado',
+    fromOwnAddress: 'Enviado desde tu propia dirección',
     headersHint:
       'No disponible. Para la revisión completa con SPF, DKIM y DMARC: en Gmail, abre ⋮ → Mostrar original → Copiar al portapapeles, y pégalo en «Revisar otro correo».',
     noAuth: 'Ninguna en los encabezados: no se puede confirmar el remitente.',
@@ -296,6 +297,7 @@ export const es: Messages = {
       confirmed: 'El remitente está confirmado: el correo viene de verdad del dominio que muestra.',
       nothingAsked: 'Sin enlaces ni peticiones: no hay nada en lo que caer.',
       nothingFound: 'Las revisiones básicas no encontraron señales de alerta.',
+      sentToSelf: 'Enviado desde tu propia dirección a ti, no recibido desde fuera.',
     },
   },
 
@@ -313,6 +315,10 @@ export const es: Messages = {
     detailNoLinks: (said) =>
       `${said}, pero el correo no tiene enlaces y las revisiones básicas no encontraron nada, así que sus puntos son solo notas.`,
     aiPoints: (points) => `Sus puntos: ${points}`,
+    lineSentToSelf: (word) =>
+      `${word} (desde tu propia dirección, las revisiones básicas no encontraron nada; notas de la IA abajo)`,
+    detailSentToSelf: (said) =>
+      `${said}, pero el correo vino de tu propia dirección y las revisiones básicas no encontraron nada, así que sus puntos son solo notas.`,
     detailStricter: (said) =>
       `${said}; las revisiones básicas encontraron más, así que su veredicto se mantiene.`,
   },

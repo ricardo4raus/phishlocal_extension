@@ -657,6 +657,7 @@ export function cloudData(
       })),
       body: clean(fields.body),
       body_cut: email.truncated || fields.body.length < normalizeText(email.bodyText).trim().length,
+      sent_to_self: email.headers?.sentToSelf === true,
     },
   };
   return {

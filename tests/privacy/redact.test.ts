@@ -455,6 +455,7 @@ describe('cloudData', () => {
         links: [{ text: 'Log in', goes_to: 'evil.example' }],
         body: 'Dear [name], call [number].',
         body_cut: false,
+        sent_to_self: false,
       },
     });
     expect(data.json).not.toMatch(/anna|bounce|mx\.google|raw text/i);

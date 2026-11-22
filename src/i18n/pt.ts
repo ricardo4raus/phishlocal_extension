@@ -175,6 +175,7 @@ export const pt: Messages = {
     confirmedByServer: 'Remetente confirmado pelo seu servidor de correio',
     checkingSender: 'A verificar o remetente…',
     unconfirmed: 'Remetente não confirmado',
+    fromOwnAddress: 'Enviado do seu próprio endereço',
     headersHint:
       'Não disponível. Para a verificação completa com SPF, DKIM e DMARC: no Gmail, abra ⋮ → Mostrar original → Copiar para a área de transferência, e cole-o em «Verificar outro e-mail».',
     noAuth: 'Nenhuma nos cabeçalhos: o remetente não pode ser confirmado.',
@@ -295,6 +296,7 @@ export const pt: Messages = {
       confirmed: 'O remetente está confirmado: o e-mail vem mesmo do domínio indicado.',
       nothingAsked: 'Sem ligações nem pedidos: não há nada em que cair.',
       nothingFound: 'As verificações básicas não encontraram sinais de alerta.',
+      sentToSelf: 'Enviado do seu próprio endereço para si, não recebido do exterior.',
     },
   },
 
@@ -312,6 +314,10 @@ export const pt: Messages = {
     detailNoLinks: (said) =>
       `${said}, mas o e-mail não tem ligações e as verificações básicas não encontraram nada, por isso os seus pontos são apenas notas.`,
     aiPoints: (points) => `Os seus pontos: ${points}`,
+    lineSentToSelf: (word) =>
+      `${word} (do seu próprio endereço, as verificações básicas não encontraram nada; notas da IA abaixo)`,
+    detailSentToSelf: (said) =>
+      `${said}, mas o e-mail veio do seu próprio endereço e as verificações básicas não encontraram nada, por isso os seus pontos são apenas notas.`,
     detailStricter: (said) =>
       `${said}; as verificações básicas encontraram mais, por isso vale o veredicto delas.`,
   },

@@ -47,7 +47,9 @@ const CHECK_INSTRUCTIONS = [
     'or DMARC.',
   'sender_checks show what the receiving mail server verified. "not available" means they could ' +
     'not be read, for example in an email the user sent to themselves: that alone is not a sign ' +
-    'of phishing. If the sender domain is ' +
+    'of phishing. email.sent_to_self true means the user sent it from their own address to ' +
+    'themselves and it did not come in from outside, which is why sender checks are missing; ' +
+    'judge its content as usual. If the sender domain is ' +
     'confirmed (DMARC pass), the email really comes from that domain: then judge whether the ' +
     'domain belongs to the company the email speaks for, and do not call it suspicious only ' +
     'because it is about the account or its security. Normal notices from a confirmed sender ' +
@@ -135,6 +137,7 @@ export function promptData(email: Email, findings: readonly Finding[]): unknown 
       })),
       body: cut(email.bodyText, PROMPT_LIMITS.body),
       body_cut: email.truncated || email.bodyText.length > PROMPT_LIMITS.body,
+      sent_to_self: email.headers?.sentToSelf === true,
     },
   };
 }

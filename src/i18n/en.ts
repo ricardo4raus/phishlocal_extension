@@ -187,6 +187,7 @@ export const en = {
     confirmedByServer: 'Sender confirmed by your mail server',
     checkingSender: 'Checking the sender…',
     unconfirmed: 'Sender not confirmed',
+    fromOwnAddress: 'Sent from your own address',
     headersHint:
       'Not available. For the full check with SPF, DKIM and DMARC: in Gmail, open ⋮ → Show original → Copy to clipboard, then paste it under "Check another email".',
     noAuth: 'None in the headers: the sender cannot be verified.',
@@ -288,6 +289,7 @@ export const en = {
       confirmed: 'The sender is confirmed: the email really comes from the domain it shows.',
       nothingAsked: 'No links and no request: there is nothing to fall for.',
       nothingFound: 'The basic checks found no warning signs.',
+      sentToSelf: 'Sent from your own address to yourself, not received from outside.',
     },
   },
 
@@ -307,6 +309,10 @@ export const en = {
     detailNoLinks: (said: string) =>
       `${said}, but the email has no links and the basic checks found nothing, so its points are notes only.`,
     aiPoints: (points: string) => `Its points: ${points}`,
+    lineSentToSelf: (word: string) =>
+      `${word} (sent from your own address, basic checks found nothing; AI notes below)`,
+    detailSentToSelf: (said: string) =>
+      `${said}, but the email was sent from your own address and the basic checks found nothing, so its points are notes only.`,
     detailStricter: (said: string) =>
       `${said}; the basic checks found more, so their verdict stands.`,
   },

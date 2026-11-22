@@ -40,6 +40,13 @@ export interface EmailHeaders {
    * Headers further down can be written by the sender and are never trusted.
    */
   auth?: AuthResults;
+  /**
+   * The email went from the user's own address to themselves and never came in from outside:
+   * no `Authentication-Results` at all, and the sender is the mailbox it was delivered to (the
+   * topmost `Delivered-To`, else the only `To`). It explains missing sender checks; it is not a
+   * sign of safety (a forged "from yourself" email comes from outside and has sender checks).
+   */
+  sentToSelf?: true;
 }
 
 export interface Email {

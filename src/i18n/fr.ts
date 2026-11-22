@@ -176,6 +176,7 @@ export const fr: Messages = {
     confirmedByServer: 'Expéditeur confirmé par votre serveur de messagerie',
     checkingSender: 'Vérification de l’expéditeur…',
     unconfirmed: 'Expéditeur non confirmé',
+    fromOwnAddress: 'Envoyé depuis votre propre adresse',
     headersHint:
       'Non disponible. Pour la vérification complète avec SPF, DKIM et DMARC : dans Gmail, ouvrez ⋮ → Afficher l’original → Copier dans le presse-papiers, puis collez-le sous « Vérifier un autre e-mail ».',
     noAuth: 'Aucune dans les en-têtes : l’expéditeur ne peut pas être confirmé.',
@@ -297,6 +298,7 @@ export const fr: Messages = {
       confirmed: 'L’expéditeur est confirmé : l’e-mail vient vraiment du domaine affiché.',
       nothingAsked: 'Aucun lien et aucune demande : il n’y a rien qui puisse vous piéger.',
       nothingFound: 'Les vérifications de base n’ont trouvé aucun signal d’alerte.',
+      sentToSelf: 'Envoyé depuis votre propre adresse à vous-même, pas reçu de l’extérieur.',
     },
   },
 
@@ -315,6 +317,10 @@ export const fr: Messages = {
     detailNoLinks: (said) =>
       `${said}, mais l’e-mail ne contient aucun lien et les vérifications de base n’ont rien trouvé : ses points ne sont que des remarques.`,
     aiPoints: (points) => `Ses points : ${points}`,
+    lineSentToSelf: (word) =>
+      `${word} (depuis votre propre adresse, les vérifications de base n’ont rien trouvé ; remarques de l’IA ci-dessous)`,
+    detailSentToSelf: (said) =>
+      `${said}, mais l’e-mail vient de votre propre adresse et les vérifications de base n’ont rien trouvé : ses points ne sont que des remarques.`,
     detailStricter: (said) =>
       `${said} ; les vérifications de base ont trouvé davantage, leur verdict prévaut donc.`,
   },

@@ -174,6 +174,7 @@ export const de: Messages = {
     confirmedByServer: 'Absender von deinem Mailserver bestätigt',
     checkingSender: 'Absender wird geprüft…',
     unconfirmed: 'Absender nicht bestätigt',
+    fromOwnAddress: 'Von deiner eigenen Adresse gesendet',
     headersHint:
       'Nicht verfügbar. Für die volle Prüfung mit SPF, DKIM und DMARC: in Gmail ⋮ → Original anzeigen → In die Zwischenablage kopieren, dann unter «Andere E-Mail prüfen» einfügen.',
     noAuth: 'Keine in den Headern: Der Absender kann nicht bestätigt werden.',
@@ -304,6 +305,7 @@ export const de: Messages = {
       nothingAsked:
         'Keine Links und keine Aufforderung: Es gibt nichts, worauf man hereinfallen könnte.',
       nothingFound: 'Die Grundprüfungen fanden keine Warnzeichen.',
+      sentToSelf: 'Von deiner eigenen Adresse an dich gesendet, nicht von außen empfangen.',
     },
   },
 
@@ -321,6 +323,10 @@ export const de: Messages = {
     detailNoLinks: (said) =>
       `${said}, aber die E-Mail enthält keine Links und die Grundprüfungen fanden nichts, also sind ihre Punkte nur Hinweise.`,
     aiPoints: (points) => `Ihre Punkte: ${points}`,
+    lineSentToSelf: (word) =>
+      `${word} (von deiner eigenen Adresse, Grundprüfungen fanden nichts; Hinweise der KI unten)`,
+    detailSentToSelf: (said) =>
+      `${said}, aber die E-Mail kam von deiner eigenen Adresse und die Grundprüfungen fanden nichts, also sind ihre Punkte nur Hinweise.`,
     detailStricter: (said) => `${said}; die Grundprüfungen fanden mehr, also gilt ihr Ergebnis.`,
   },
 
