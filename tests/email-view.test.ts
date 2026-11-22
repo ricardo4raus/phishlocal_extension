@@ -20,7 +20,7 @@ function emailElements() {
     <dl id="details" hidden><dd id="sender"></dd><dd id="subject"></dd><dd id="auth"></dd>
     <div id="rows" hidden><dd id="reply-to"></dd><dd id="return-path"></dd></div>
     <dd id="body"></dd></dl>
-    <section id="links-section" hidden><span id="links-count"></span><ol id="links"></ol>
+    <section id="links-section" hidden><h2 id="links-heading">Links (<span id="links-count"></span>)</h2><ol id="links"></ol>
     <details id="more"><summary id="more-summary"></summary><ol id="more-list"></ol></details></section>`;
   return {
     details: get('details'),
@@ -33,6 +33,7 @@ function emailElements() {
     body: get('body'),
     links: {
       section: get('links-section'),
+      heading: get('links-heading'),
       count: get('links-count'),
       flagged: get('links') as HTMLOListElement,
       more: get('more') as HTMLDetailsElement,
@@ -59,7 +60,9 @@ describe('showEmail', () => {
     expect(els.links.section.hidden).toBe(false);
     expect(els.links.count.textContent).toBe('1');
     expect(els.links.flagged.children).toHaveLength(0);
-    expect(els.links.moreSummary.textContent).toBe('Show the 1 link');
+    // Without a flagged link the fold is the whole section: its summary says "Links (1)" once.
+    expect(els.links.heading.hidden).toBe(true);
+    expect(els.links.moreSummary.textContent).toBe('Links (1)');
     expect(els.links.moreList.textContent).toBe('paypa1-secure.examplepaypa1-secure.example/login');
     expect(els.links.moreList.querySelector('.link__domain')?.textContent).toBe(
       'paypa1-secure.example',
@@ -91,6 +94,7 @@ describe('showEmail', () => {
     );
     const rest = [...els.links.moreList.children] as HTMLElement[];
     expect(rest.map((item) => item.className)).toEqual(['link', 'link']);
+    expect(els.links.heading.hidden).toBe(false);
     expect(els.links.moreSummary.textContent).toBe('2 more links');
     expect(rest[1]?.textContent).toBe('Not a valid web addressnot a link');
     // The link text appears only in the red-flag row, never here.

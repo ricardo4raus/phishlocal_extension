@@ -48,6 +48,8 @@
     --color-safe-tint: #eaf6ee;
     --color-safe-border: #bfe3cb;
     --color-on-safe: #ffffff;
+    /* The advice bulb: a symbol, 4.4:1 on surface-2. */
+    --color-tip: #a16207;
     /* Pending (grey): white on fill 4.8, fill on surface 4.8. */
     --color-pending: #6b737d;
     --color-pending-text: #4a525c;
@@ -120,6 +122,8 @@
       --color-safe-tint: #17321f;
       --color-safe-border: #2a5236;
       --color-on-safe: #111418;
+      /* The advice bulb: 9.1:1 on surface-2. */
+      --color-tip: #f5c542;
       --color-pending: #8a939d;
       --color-pending-text: #b0b8c1;
       --color-pending-tint: #232930;
@@ -346,6 +350,28 @@
     }
   }
 
+  @keyframes bulb-glow {
+    0%,
+    100% {
+      filter: drop-shadow(0 0 0 color-mix(in srgb, var(--color-tip) 0%, transparent));
+    }
+
+    50% {
+      filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-tip) 80%, transparent));
+    }
+  }
+
+  @keyframes glow {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-safe) 0%, transparent);
+    }
+
+    50% {
+      box-shadow: 0 0 4px 2px color-mix(in srgb, var(--color-safe) 60%, transparent);
+    }
+  }
+
   /* ---- Top bar: logo, name, model pill. ---- */
   .topbar {
     display: flex;
@@ -375,7 +401,8 @@
     color: var(--color-on-accent);
   }
 
-  /* The model pill: neutral in every state; the word says it, the mark repeats it. */
+  /* The model pill: grey, the word says the state and the mark repeats it; only the ready dot is
+     green (safe on surface-2: 4.8:1 light, 6.5:1 dark). */
   .pill {
     display: inline-flex;
     align-items: center;
@@ -406,12 +433,18 @@
     background: var(--color-text-2);
   }
 
+  /* The ready dot glows: a soft green halo swells and fades, the dot itself keeps its colour. */
+  .pill[data-state='ready'] .pill__mark {
+    background: var(--color-safe);
+    animation: glow 2.4s ease-in-out infinite;
+  }
+
   .pill[data-state='loading'] .pill__mark,
   .pill[data-state='downloading'] .pill__mark {
     inline-size: 12px;
     block-size: 12px;
     border: 2px solid var(--color-border-strong);
-    border-block-start-color: var(--color-accent);
+    border-block-start-color: var(--color-text-2);
     background: transparent;
     animation: spin 1s linear infinite;
   }
@@ -906,6 +939,15 @@
     background: var(--color-surface-2);
   }
 
+  /* The bulb glows like the ready dot: a warm halo swells and fades, the bulb keeps its colour.
+     The halo sits on a wrapper because a mask would cut a shadow on the icon itself. */
+  .band__bulb {
+    display: flex;
+    flex: none;
+    color: var(--color-tip);
+    animation: bulb-glow 2.4s ease-in-out infinite;
+  }
+
   .band__advice:has(> p:empty) {
     display: none;
   }
@@ -1175,6 +1217,11 @@
 
   .fold--inner > .fold__body {
     padding: 0;
+  }
+
+  /* Without flagged links the heading is hidden and the fold is the card's first row: no hairline. */
+  .link-list:empty + .fold--inner {
+    border-block-start: 0;
   }
 
   /* A link list inside a fold starts under the summary's hairline: its first row keeps its own. */

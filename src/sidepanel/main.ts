@@ -252,6 +252,7 @@ const emailElements = {
   body: byId<HTMLElement>('email-body'),
   links: {
     section: byId<HTMLElement>('links'),
+    heading: byId<HTMLElement>('links-heading'),
     count: byId<HTMLElement>('links-count'),
     flagged: byId<HTMLOListElement>('email-links'),
     more: byId<HTMLDetailsElement>('links-more'),

@@ -32,9 +32,9 @@ from this file are listed under "Mockup review" at the end.
 - **Honest progress.** A percentage only where Chrome reports one (the model download). Waits
   without a known end show elapsed time and a moving bar, never a made-up percentage. One moving
   indicator per wait, not three.
-- **Never colour alone.** Every state has a colour, a symbol and a word. Green is reserved for
-  the verdict "Looks safe"; a ready model, a confirmed sender and other good news use neutral
-  colours and words.
+- **Never colour alone.** Every state has a colour, a symbol and a word. Green fills only the
+  verdict "Looks safe"; elsewhere it is at most the small dot of a ready model. A confirmed sender
+  and other good news use neutral colours and words.
 - **True claims only.** Every sentence in the panel must hold in every build: no "nothing is
   saved" while a setting is saved, no "Looks safe" when only the rules looked.
 - **Own emails only.** Users check the emails they receive. Sample emails exist only in dev and
@@ -79,8 +79,10 @@ model; "Gemini Nano" appears only in the empty, loading and download texts and i
 Every part is its own component (see "How to build it"); the page sets the spacing between them.
 
 1. **Top bar** (always): logo, "PhishLocal", and the model pill on the right. The pill is
-   neutral (grey) in every state: a dot when ready, a spinner while loading or downloading, a
-   small "!" when the AI is missing. Words: "On-device AI ready", "On-device AI loading" (with
+   grey in every state, with a green dot when ready (decided 22 Nov 2026: users read a grey dot
+   as "not ready"; a soft green halo swells and fades around it every 2.4 s, the dot keeps its
+   colour, and it stands still with reduced motion), a grey spinner while loading or downloading, a small "!" when the AI is
+   missing. Words: "On-device AI ready", "On-device AI loading" (with
    the elapsed time, which gives way on panels under 360 px), "On-device AI 42%", "AI not set
    up" (not downloaded), "AI not available", "AI not loaded".
 2. **Model banner** (only when the model needs the user): not downloaded (text and the
@@ -101,7 +103,8 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    Under the strip one muted line for the source status ("Checked automatically", "Pasted
    email", "Sample loaded: …") and errors.
 5. **Verdict band:** a tinted head with a round symbol, the verdict word and one status line;
-   then the reasons (up to five, as the AI gives them), the "What to do" box, and the footer
+   then the reasons (up to five, as the AI gives them), the "What to do" box (a gold bulb that
+   glows like the ready dot), and the footer
    "Checked on this device · Done in 1.4 s". While the AI check runs, the footer shows the
    elapsed time and the Stop button instead.
 6. **Red flags** (heading "Red flags (3)", the count as text): one list in one card, one row per
@@ -113,8 +116,9 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    findings only. Hidden when there are none.
 7. **Links** (heading "Links (2)"): one list in one card, one row per flagged link (its badge,
    the real domain bold, "forwards to" when it does, the shortened URL in monospace), then a fold
-   "N more links" with the unflagged ones in the same form. Link texts appear only in the
-   red-flag rows ("Says"), never twice.
+   "N more links" with the unflagged ones in the same form. Without a flagged link the heading
+   gives way and the fold itself is titled "Links (3)", so the count is said once. Link texts
+   appear only in the red-flag rows ("Says"), never twice.
 8. **Deep check:** one outlined button "Deep check in the cloud…" under the links. Filled (blue)
    only when recommended: the AI did not run, or the UI language is one where its answers are
    experimental (it, pt). Disabled with the line "Not available in this build" when the build has
@@ -266,12 +270,13 @@ one.
 | warning-text   | `#7A4A00` | `#FFD58A` | badge text                            |
 | warning-tint   | `#FFF4DE` | `#3A2E14` | badge                                 |
 | warning-border | `#EBCB8B` | `#5A4720` | cards                                 |
-| safe           | `#1E7A3C` | `#4CC27A` | symbols                               |
+| safe           | `#1E7A3C` | `#4CC27A` | symbols, ready dot                    |
 | safe-text      | `#155C2C` | `#8FD6A5` | verdict word                          |
 | safe-tint      | `#EAF6EE` | `#17321F` | verdict band                          |
 | safe-border    | `#BFE3CB` | `#2A5236` | verdict card                          |
 | pending        | `#6B737D` | `#8A939D` | "Checking…" and "unchecked" symbol    |
 | pending-tint   | `#F0F2F5` | `#232930` | "Checking…" band, loading pill, chips |
+| tip            | `#A16207` | `#F5C542` | advice bulb                           |
 
 Every pair is measured before use (text 4.5:1, symbols and meaningful borders 3:1); the
 measurements live as comments in `style.css`.
@@ -335,7 +340,7 @@ What the mockup shows and this file changes, so that nobody builds from the mock
   outlined block; here one outlined button.
 - `Consent` shows the data at once and has no preparing, sending or result state; it also drops
   the email strip.
-- The header pill is green; here neutral.
+- The header pill is green; here grey with a green dot when ready.
 - `Main` says "Nothing is saved"; here "No email is saved".
 - Missing in the mockup: Suspicious, "No red flags found (not checked by AI)", model unavailable,
   model not downloaded, the paste form, the cloud result.

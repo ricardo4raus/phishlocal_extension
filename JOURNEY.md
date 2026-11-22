@@ -964,3 +964,9 @@ _To fill in near the submission._
 - The same random run (`MONKEY_SEED=2809363716 MONKEY_CASE=8753`) also failed the AI answer
   reader's phone filter with "55512345call": an older gap, not touched by the UI work, left for
   its own fix.
+- First look at the merged panel in Chrome, on a real Gmail email: "On-device AI ready" with a
+  grey dot read as not ready, and the links card said "Links (3)" and then "Show the 3 links".
+  The ready dot is now green and glows softly (a halo that swells and fades, the dot keeps its
+  colour), the loading spinner is grey, the advice bulb is gold and glows the same way, and
+  without flagged links the fold itself is titled "Links (3)". A glow on a masked icon needs a
+  wrapper: the mask cuts the icon's own shadow.
