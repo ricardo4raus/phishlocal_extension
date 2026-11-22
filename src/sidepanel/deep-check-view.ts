@@ -1,13 +1,18 @@
 /*
  * The cloud "deep check" in the side panel. Nothing goes to the cloud on its own:
  *
- * 1. The user asks for it ("Prepare a deep check").
- * 2. On the device, Gemini Nano looks for names, and the privacy filter builds the data
- *    (`cloudData()`): no full links, addresses, numbers, IBANs or names, no raw headers.
- * 3. The panel shows exactly that data and what was removed.
- * 4. Only "Send to the cloud" sends it, once. Another email, closing the panel or "Stop" ends it.
+ * 1. The user opens it ("Deep check in the cloud…"): the consent card appears in place of the
+ *    red flags and links; the strip and the verdict stay.
+ * 2. On the device, the privacy filter builds the data (`cloudData()`) at the chosen privacy
+ *    level: no full links, addresses, numbers or IBANs, no raw headers; at level High, Gemini
+ *    Nano first looks for names, and they go too. Changing the level builds the data again.
+ * 3. The card shows what was removed (chips), what is never sent, and, one click away, exactly
+ *    the data that goes.
+ * 4. Only "Send to the cloud" sends it, once. Another email, closing the panel, Cancel, Back or
+ *    Stop end it.
  *
  * The cloud's answer is read as strictly as the on-device one, and the rules stay its lower limit.
+ * What is shown follows docs/ui-design.md ("The consent section").
  */
 import type { AiCheckResult } from '../ai';
 import {
@@ -27,7 +32,8 @@ import {
   type Removed,
 } from '../privacy/redact';
 import type { Finding } from '../rules';
-import { HEADERS_WAIT_MS, judge, STOP_GRACE_MS } from './ai-view';
+import { HEADERS_WAIT_MS, judge, LINE, STOP_GRACE_MS, WORD } from './ai-view';
+import { countElapsed, el, seconds } from './ui';
 
 /**
  * How much longer than the cloud request's own limit the panel waits for it: the request's limit
@@ -43,23 +49,39 @@ const TIME_LIMIT = 'time limit';
 
 export interface DeepCheckElements {
   section: HTMLElement;
-  intro: HTMLElement;
+  /** The offer: the button and, under it, one line only when recommended or unavailable. */
   start: HTMLButtonElement;
-  /** The privacy level: its options' values are the PrivacyLevel names. */
-  level: HTMLSelectElement;
-  /** Stops the name search or the cloud request. */
-  stop: HTMLButtonElement;
+  intro: HTMLElement;
+  /** The consent card. */
+  consent: HTMLElement;
+  back: HTMLButtonElement;
+  /** The privacy level: radio buttons named `deep-check-level`, one per PrivacyLevel. */
+  levels: HTMLFieldSetElement;
   preview: HTMLElement;
+  /** What was removed, as chips. */
   removed: HTMLElement;
+  /** "Some names may still be in the text" (shown when the name search could not finish). */
+  warning: HTMLElement;
+  /** Opens the exact data ("Show what will be sent"). */
+  show: HTMLButtonElement;
+  dataPanel: HTMLElement;
   data: HTMLElement;
   send: HTMLButtonElement;
   cancel: HTMLButtonElement;
+  /** The status line (a live region), the elapsed time next to it, and Stop. */
   status: HTMLElement;
+  elapsed: HTMLElement;
+  stop: HTMLButtonElement;
+  /** The cloud's result: a band like the on-device one. */
   result: HTMLElement;
   overall: HTMLElement;
-  note: HTMLElement;
+  line: HTMLElement;
   reasons: HTMLUListElement;
   advice: HTMLElement;
+  source: HTMLElement;
+  time: HTMLElement;
+  /** Tier 3, in "Email details": how the cloud and the basic checks were combined, timing. */
+  detail: HTMLElement;
 }
 
 export interface DeepCheckDeps {
@@ -85,6 +107,10 @@ export interface DeepCheckDeps {
   savedLevel?: () => string | undefined;
   /** Remembers the chosen level for the next time. */
   saveLevel?: (level: PrivacyLevel) => void;
+  /** The consent card opened or closed: the panel hides the red flags and links meanwhile. */
+  onConsent?: (open: boolean) => void;
+  /** The AI did not run for the shown email: the deep check is then recommended. */
+  aiUnchecked?: () => boolean;
 }
 
 export interface DeepCheck {
@@ -97,16 +123,7 @@ export interface DeepCheck {
   hidden(): void;
 }
 
-const CLOUD_NOTE = 'Cloud (Gemini via Firebase AI Logic). AI can be wrong.';
-
-const NAMES_MAY_REMAIN =
-  'Not every name could be checked on this device, so names may remain: read the data before you send it.';
-
-const PREVIEW_STATUS: Record<PrivacyLevel, string> = {
-  standard:
-    'This is everything that will be sent, besides our fixed instructions. Names are kept (privacy level Standard).',
-  high: 'This is everything that will be sent, besides our fixed instructions.',
-};
+const NOT_AVAILABLE = 'Not available in this build.';
 
 const isPrivacyLevel = (value: string | undefined): value is PrivacyLevel =>
   PRIVACY_LEVELS.some((level) => level === value);
@@ -114,20 +131,18 @@ const isPrivacyLevel = (value: string | undefined): value is PrivacyLevel =>
 const plural = (count: number, one: string, many: string): string =>
   `${count} ${count === 1 ? one : many}`;
 
-/** "2 names, 1 email address (domain kept), …", or a note that nothing was found. */
-export function removedSummary(removed: Removed): string {
-  const parts = [
+/** The chips: what was removed on this device, and what was kept on purpose. */
+export function removedChips(removed: Removed, level: PrivacyLevel): string[] {
+  const chips = [
     removed.names > 0 && plural(removed.names, 'name', 'names'),
-    removed.emails > 0 &&
-      `${plural(removed.emails, 'email address', 'email addresses')} (domain kept)`,
-    removed.numbers > 0 &&
-      plural(removed.numbers, 'phone or other long number', 'phone or other long numbers'),
+    removed.emails > 0 && plural(removed.emails, 'email address', 'email addresses'),
+    removed.numbers > 0 && plural(removed.numbers, 'number', 'numbers'),
     removed.ibans > 0 && plural(removed.ibans, 'IBAN', 'IBANs'),
-    removed.links > 0 && `${plural(removed.links, 'link', 'links')} in the text (host kept)`,
-  ].filter((part) => part !== false);
-  return parts.length > 0
-    ? `Removed on this device: ${parts.join(', ')}. Links are sent as their domain only.`
-    : 'No personal data found to remove. Links are sent as their domain only.';
+    removed.links > 0 && plural(removed.links, 'link path', 'link paths'),
+  ].filter((chip) => chip !== false);
+  if (chips.length === 0) chips.push('No personal data found');
+  if (level === 'standard') chips.push('Names kept');
+  return chips;
 }
 
 /** Runs `work` and never throws, also when it throws before returning a promise. */
@@ -202,67 +217,132 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
   const cloudLimitMs = deps.cloudTimeoutMs + CLOUD_LIMIT_EXTRA_MS;
   let shown: Shown | undefined;
   let phase: Phase = 'idle';
+  /** The consent card is open (preparing, preview or sending; also kept open after a failure). */
+  let consentOpen = false;
   /** The data shown for consent; only this is ever sent. */
   let prepared: { data: CloudData; language: string } | undefined;
   /** Stops the name search or the cloud request in progress. */
   let stop: AbortController | undefined;
+  /** Clears the elapsed-time counter. */
+  let stopCounting: (() => void) | undefined;
   /** Changes whenever the email changes or the user cancels: late results are dropped. */
   let generation = 0;
   // The status can take the focus from a button that disappears (not by Tab).
   elements.status.tabIndex = -1;
 
+  const radios = (): HTMLInputElement[] => [
+    ...elements.levels.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
+  ];
   const saved = deps.savedLevel?.();
-  elements.level.value = isPrivacyLevel(saved) ? saved : DEFAULT_PRIVACY_LEVEL;
+  const initial = isPrivacyLevel(saved) ? saved : DEFAULT_PRIVACY_LEVEL;
+  for (const radio of radios()) radio.checked = radio.value === initial;
   /** The chosen level; an unknown value (a changed page) counts as the stricter one. */
-  const level = (): PrivacyLevel =>
-    isPrivacyLevel(elements.level.value) ? elements.level.value : 'high';
+  const level = (): PrivacyLevel => {
+    const checked = radios().find((radio) => radio.checked)?.value;
+    return isPrivacyLevel(checked) ? checked : 'high';
+  };
+  const setLevelsDisabled = (disabled: boolean): void => {
+    elements.levels.disabled = disabled;
+  };
 
   const language = (): string => answerLanguage(deps.uiLanguage());
 
+  /** The line under the offer button: only when the deep check is recommended or unavailable. */
   function intro(): string {
-    if (!deps.available) {
-      return 'Not available in this build: the cloud needs App Check, which only the development build and the judges build have.';
+    if (!deps.available) return NOT_AVAILABLE;
+    if (shown && !shown.final) return 'Waiting for the sender checks…';
+    if (EXPERIMENTAL_LANGUAGES.has(language())) {
+      return `Recommended: on-device answers in ${AI_LANGUAGES[language()] ?? 'English'} are experimental.`;
     }
-    if (shown && !shown.final) return 'Waiting for the sender checks of this email…';
-    const lead = EXPERIMENTAL_LANGUAGES.has(language())
-      ? `Recommended: on-device answers in ${AI_LANGUAGES[language()] ?? 'English'} are experimental.`
-      : 'Optional:';
-    return `${lead} A larger AI model in the cloud checks this email again. Nothing is sent before you have seen the data and agreed.`;
+    if (deps.aiUnchecked?.()) return 'Recommended: the on-device AI did not check this email.';
+    return '';
+  }
+
+  /** The offer button: filled when recommended, disabled when the cloud cannot be reached. */
+  function showOffer(): void {
+    const text = intro();
+    set(elements.intro, text);
+    elements.start.disabled = !deps.available || !shown?.final;
+    elements.start.classList.toggle(
+      'btn--primary',
+      deps.available && text.startsWith('Recommended'),
+    );
+  }
+
+  function setConsent(open: boolean): void {
+    const changed = consentOpen !== open;
+    consentOpen = open;
+    elements.consent.hidden = !open;
+    elements.start.hidden = open;
+    elements.intro.hidden = open;
+    if (changed) deps.onConsent?.(open);
+  }
+
+  function clearCounter(): void {
+    stopCounting?.();
+    stopCounting = undefined;
+  }
+
+  function clearResult(): void {
+    elements.result.hidden = true;
+    delete elements.result.dataset.risk;
+    for (const element of [
+      elements.overall,
+      elements.line,
+      elements.advice,
+      elements.source,
+      elements.time,
+      elements.detail,
+    ]) {
+      set(element, '');
+    }
+    elements.reasons.replaceChildren();
+  }
+
+  function clearPreview(): void {
+    prepared = undefined;
+    elements.preview.hidden = true;
+    elements.removed.replaceChildren();
+    set(elements.data, '');
+    elements.warning.hidden = true;
+    elements.dataPanel.hidden = true;
+    elements.show.setAttribute('aria-expanded', 'false');
+    elements.send.hidden = false;
+    elements.cancel.hidden = false;
   }
 
   /** Back to the start for the shown email: no preview, no result, nothing running. */
-  function reset(status = ''): void {
+  function reset(status = '', { keepResult = false, close = true } = {}): void {
     generation++;
     stop?.abort();
     stop = undefined;
-    prepared = undefined;
+    clearCounter();
     phase = 'idle';
-    elements.preview.hidden = true;
-    elements.result.hidden = true;
-    delete elements.result.dataset.risk;
-    for (const element of [elements.removed, elements.data, elements.overall, elements.note]) {
-      set(element, '');
-    }
-    set(elements.advice, '');
-    elements.reasons.replaceChildren();
+    clearPreview();
+    if (!keepResult) clearResult();
     set(elements.status, status);
-    elements.start.hidden = false;
-    elements.start.disabled = !deps.available || !shown?.final;
-    elements.level.disabled = !deps.available;
+    elements.status.classList.remove('status--error');
     elements.stop.hidden = true;
-    elements.send.hidden = false;
-    elements.cancel.hidden = false;
-    elements.send.disabled = false;
-    elements.cancel.disabled = false;
-    set(elements.intro, intro());
+    setLevelsDisabled(!deps.available);
+    if (close) setConsent(false);
+    showOffer();
     // Focus on a button that was just hidden (Stop, Send) would be lost: move it to the start, or
     // to the status while the start waits (found in review round 3).
     const focused = document.activeElement;
     if (focused && elements.section.contains(focused) && focused.closest('[hidden]')) {
-      (elements.start.disabled ? elements.status : elements.start).focus();
-    } else if (focused === elements.status && !elements.start.disabled) {
+      (elements.start.disabled || elements.start.hidden ? elements.status : elements.start).focus();
+    } else if (focused === elements.status && !elements.start.disabled && !elements.start.hidden) {
       elements.start.focus();
     }
+  }
+
+  /** Shows the status line with the elapsed time and Stop while something runs. */
+  function running(status: string): void {
+    set(elements.status, status);
+    elements.status.classList.remove('status--error');
+    clearCounter();
+    stopCounting = countElapsed(elements.elapsed);
+    elements.stop.hidden = false;
   }
 
   /**
@@ -277,11 +357,9 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     phase = 'preparing';
     const controller = new AbortController();
     stop = controller;
-    elements.start.hidden = true;
-    elements.level.disabled = true;
-    elements.stop.hidden = false;
+    setLevelsDisabled(true);
+    running('Waiting for the on-device AI…');
     elements.stop.focus();
-    set(elements.status, 'Waiting for the on-device model…');
     // Not inside the search's time limit: a load can take minutes ("Stop" ends the wait).
     const ready = await settle(
       () => deps.modelReady(answerIn),
@@ -290,7 +368,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     if (mine !== generation) return STOPPED;
     let names: string[] | undefined;
     if (ready) {
-      set(elements.status, 'Looking for names on this device (Gemini Nano)…');
+      running('Looking for names on this device…');
       names = await bounded(
         () => deps.findNames(nameSearchText(email), answerIn, controller.signal),
         controller,
@@ -304,51 +382,65 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     return controller.signal.aborted ? undefined : names;
   }
 
+  /** Builds the data at the chosen level and shows the preview. */
   async function prepare(): Promise<void> {
     if (!shown?.final || !deps.available || phase === 'preparing' || phase === 'sending') return;
     const { email, findings } = shown;
     const answerIn = language();
-    // Fixed for this preview: changing it discards the preview (see the listener below).
+    // Fixed for this preview: changing it builds the data again (see the listener below).
     const chosen = level();
-    reset();
+    reset('', { close: false });
+    setConsent(true);
     // "standard" keeps names: no model, no name search, nothing to wait for or stop.
     const found = chosen === 'high' ? await searchNames(email, answerIn) : [];
     if (found === STOPPED) return;
     const data = cloudData(email, findings ?? [], found, chosen);
     prepared = { data, language: answerIn };
     phase = 'preview';
-    set(elements.removed, removedSummary(data.removed));
-    set(elements.data, data.json);
+    clearCounter();
     elements.stop.hidden = true;
-    elements.level.disabled = false;
+    setLevelsDisabled(false);
+    elements.removed.replaceChildren(
+      ...removedChips(data.removed, chosen).map((chip) => el('span', 'chip chip--plain', chip)),
+    );
+    set(elements.data, data.json);
+    elements.warning.hidden = data.namesChecked;
     elements.preview.hidden = false;
-    set(elements.status, data.namesChecked ? PREVIEW_STATUS[chosen] : NAMES_MAY_REMAIN);
-    elements.data.focus();
+    set(elements.status, '');
+    elements.send.focus();
   }
 
   function showResult(result: AiCheckResult, findings: Finding[] | undefined, email: Email): void {
     phase = 'done';
+    clearCounter();
     elements.stop.hidden = true;
-    elements.start.hidden = false;
-    elements.level.disabled = false;
+    setLevelsDisabled(false);
     if (!result.ok) {
       set(
         elements.status,
         result.reason === 'stopped'
           ? 'The deep check was stopped. The data shown may already have reached the cloud.'
           : result.reason === 'unreadable-answer'
-            ? 'The cloud answer could not be read. The on-device and rule checks still apply.'
-            : `The deep check failed (${result.detail ?? 'unknown error'}). The on-device and rule checks still apply.`,
+            ? 'The cloud answer could not be read. The result above still applies.'
+            : `The deep check did not work (${result.detail ?? 'unknown error'}). The result above still applies.`,
       );
-      elements.start.focus();
+      elements.status.classList.add('status--error');
+      // The card stays open with the data as the record; the user can send the same data again
+      // (the same consent) or go back.
+      elements.send.hidden = false;
+      elements.cancel.hidden = false;
+      phase = 'preview';
+      elements.status.focus();
       return;
     }
+    // Sent and answered: this consent is used up.
+    prepared = undefined;
     const { verdict } = result;
     const judged = judge(verdict, findings, email, 'the cloud AI');
     elements.result.dataset.risk = judged.overall;
     elements.result.hidden = false;
-    set(elements.overall, `Deep check: ${judged.line}`);
-    set(elements.note, `${CLOUD_NOTE} ${(result.durationMs / 1000).toFixed(1)} s.`);
+    set(elements.overall, `Deep check: ${WORD[judged.overall]}`);
+    set(elements.line, LINE[judged.overall]);
     elements.reasons.replaceChildren(
       ...verdict.reasons.map((reason) => {
         const item = document.createElement('li');
@@ -357,7 +449,18 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
       }),
     );
     set(elements.advice, judged.advice);
-    set(elements.status, 'Sent: the data shown above, once.');
+    set(elements.source, 'Checked in the cloud');
+    set(elements.time, `Done in ${seconds(result.durationMs)}`);
+    set(
+      elements.detail,
+      [
+        judged.detail,
+        `Cloud (Gemini via Firebase AI Logic). AI can be wrong. ${seconds(result.durationMs)}.`,
+      ]
+        .filter((part) => part !== '')
+        .join(' '),
+    );
+    set(elements.status, 'Sent once, for this check only.');
     elements.result.focus();
   }
 
@@ -367,14 +470,12 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     const { data, language: answerIn } = prepared;
     const mine = generation;
     phase = 'sending';
-    prepared = undefined;
-    elements.level.disabled = true;
+    setLevelsDisabled(true);
     // The data stays visible as the record of what was sent; it is sent only once.
     elements.send.hidden = true;
     elements.cancel.hidden = true;
-    elements.stop.hidden = false;
+    running('Checking in the cloud…');
     elements.stop.focus();
-    set(elements.status, 'Deep check running in the cloud…');
     const controller = new AbortController();
     stop = controller;
     const answer = await bounded(
@@ -401,11 +502,17 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
 
   elements.start.addEventListener('click', () => void prepare());
   elements.send.addEventListener('click', () => void send());
-  elements.level.addEventListener('change', () => {
+  elements.show.addEventListener('click', () => {
+    const open = elements.dataPanel.hidden;
+    elements.dataPanel.hidden = !open;
+    elements.show.setAttribute('aria-expanded', String(open));
+    if (open) elements.data.focus();
+  });
+  elements.levels.addEventListener('change', () => {
     deps.saveLevel?.(level());
-    // The preview must show exactly what goes: data prepared at the other level is discarded.
+    // The preview must show exactly what goes: the data is built again at the new level.
     if (phase === 'preview') {
-      reset('The privacy level changed, so the prepared data was discarded. Nothing was sent.');
+      void prepare();
     } else if (phase === 'done') {
       // The result stays readable; the data above was sent at the level chosen before.
       set(
@@ -414,10 +521,32 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
       );
     }
   });
-  elements.cancel.addEventListener('click', () => {
-    if (phase !== 'preview') return;
-    reset('Nothing was sent.');
-    elements.start.focus();
+  // A click anywhere on a level card chooses it (the list is not inside the label).
+  elements.levels.addEventListener('click', (event) => {
+    if (elements.levels.disabled) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('input, label')) return;
+    const card = target.closest<HTMLElement>('[data-level]');
+    const radio = card?.querySelector<HTMLInputElement>('input[type="radio"]');
+    if (radio && !radio.checked) radio.click();
+  });
+  const cancel = (): void => {
+    if (phase === 'preview' || phase === 'preparing') {
+      reset('Nothing was sent.');
+      elements.start.focus();
+    }
+  };
+  elements.cancel.addEventListener('click', cancel);
+  elements.back.addEventListener('click', () => {
+    if (phase === 'preview' || phase === 'preparing') {
+      cancel();
+    } else {
+      // Done, or nothing prepared: close the card and keep the result.
+      setConsent(false);
+      showOffer();
+      elements.start.focus();
+    }
   });
   elements.stop.addEventListener('click', () => {
     if (phase === 'preparing') {

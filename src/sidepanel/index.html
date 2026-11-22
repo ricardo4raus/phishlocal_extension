@@ -161,14 +161,14 @@
             </div>
           </section>
 
-          <section id="flags" class="card" aria-labelledby="flags-heading" hidden>
+          <section id="flags" class="card consent-hides" aria-labelledby="flags-heading" hidden>
             <h2 id="flags-heading" class="list-heading">
               Red flags (<span id="flags-count">0</span>)
             </h2>
             <ul id="email-findings" class="flags"></ul>
           </section>
 
-          <section id="links" class="card" aria-labelledby="links-heading" hidden>
+          <section id="links" class="card consent-hides" aria-labelledby="links-heading" hidden>
             <h2 id="links-heading" class="list-heading">Links (<span id="links-count">0</span>)</h2>
             <ol id="email-links" class="link-list"></ol>
             <details id="links-more" class="fold fold--inner">
@@ -177,60 +177,143 @@
             </details>
           </section>
 
-          <section
-            id="deep-check"
-            class="card card--pad stack"
-            aria-labelledby="deep-check-heading"
-            hidden
-          >
-            <h2 id="deep-check-heading" class="deep-check__title">Deep check in the cloud</h2>
-            <p id="deep-check-intro" class="text-small text-secondary"></p>
-            <div class="field">
-              <label for="deep-check-level" class="field__label">Privacy level</label>
-              <select
-                id="deep-check-level"
-                class="field__select"
-                aria-describedby="deep-check-level-hint"
-              >
-                <option value="standard">Standard</option>
-                <option value="high">High</option>
-              </select>
-              <p id="deep-check-level-hint" class="text-muted">
-                Standard removes email addresses, phone and other long numbers, IBANs and link
-                paths, and keeps names. High also removes the names of people, found on this device.
-              </p>
-            </div>
-            <div class="row">
+          <section id="deep-check" class="stack" aria-label="Deep check in the cloud" hidden>
+            <div class="stack stack--tight">
               <button id="deep-check-start" type="button" class="btn">
+                <span class="icon" data-icon="cloud" aria-hidden="true"></span>
                 Deep check in the cloud…
               </button>
-              <button id="deep-check-stop" type="button" class="btn" hidden>Stop</button>
+              <p id="deep-check-intro" class="text-muted"></p>
             </div>
-            <div id="deep-check-preview" class="stack" hidden>
-              <p id="deep-check-removed" class="text-small"></p>
-              <pre
-                id="deep-check-data"
-                class="data"
-                tabindex="0"
-                aria-label="Data that will be sent to the cloud"
-              ></pre>
+
+            <div id="deep-check-consent" class="card card--pad stack" hidden>
               <div class="row">
-                <button id="deep-check-send" type="button" class="btn btn--primary">
-                  Send to the cloud
+                <button id="deep-check-back" type="button" class="btn btn--plain">
+                  <span class="icon" data-icon="arrow-left" aria-hidden="true"></span>
+                  Back to the result
                 </button>
-                <button id="deep-check-cancel" type="button" class="btn">Cancel</button>
+              </div>
+              <div class="stack stack--tight">
+                <h3 id="deep-check-heading" class="deep-check__title">Deep check in the cloud</h3>
+                <p class="text-secondary">
+                  A larger model in the cloud checks again. Personal data is removed on this device
+                  first.
+                </p>
+                <p class="text-secondary">Nothing has been sent yet.</p>
+              </div>
+              <fieldset id="deep-check-levels" class="levels">
+                <legend class="field__label">Privacy level</legend>
+                <div class="level" data-level="standard">
+                  <input
+                    id="deep-check-level-standard"
+                    class="level__radio"
+                    type="radio"
+                    name="deep-check-level"
+                    value="standard"
+                    aria-describedby="deep-check-level-standard-list"
+                  />
+                  <div class="level__body">
+                    <label for="deep-check-level-standard" class="level__title">Standard</label>
+                    <p class="level__lead">Removes:</p>
+                    <ul id="deep-check-level-standard-list" class="level__list">
+                      <li>Email addresses</li>
+                      <li>Phone, card, account and customer numbers</li>
+                      <li>IBANs</li>
+                      <li>Link paths (the website's name stays)</li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="level" data-level="high">
+                  <input
+                    id="deep-check-level-high"
+                    class="level__radio"
+                    type="radio"
+                    name="deep-check-level"
+                    value="high"
+                    aria-describedby="deep-check-level-high-list"
+                  />
+                  <div class="level__body">
+                    <label for="deep-check-level-high" class="level__title">High</label>
+                    <p class="level__lead">Removes:</p>
+                    <ul id="deep-check-level-high-list" class="level__list">
+                      <li>Everything from Standard</li>
+                      <li class="level__item--strong">Names of people</li>
+                    </ul>
+                  </div>
+                </div>
+              </fieldset>
+
+              <div id="deep-check-preview" class="stack" hidden>
+                <div class="stack stack--tight">
+                  <p class="field__label">Removed on this device</p>
+                  <div id="deep-check-removed" class="cluster"></div>
+                  <p class="text-muted">
+                    Never sent: your address, the raw headers, server IP addresses.
+                  </p>
+                </div>
+                <p id="deep-check-warning" class="note" hidden>
+                  <span class="icon" data-icon="alert" aria-hidden="true"></span>
+                  <span
+                    >Some names may still be in the text: read what will be sent before you send
+                    it.</span
+                  >
+                </p>
+                <div class="stack stack--tight">
+                  <button
+                    id="deep-check-show"
+                    type="button"
+                    class="btn btn--plain deep-check__show"
+                    aria-expanded="false"
+                    aria-controls="deep-check-data-panel"
+                  >
+                    Show what will be sent
+                    <span class="icon icon--s" data-icon="chevron-down" aria-hidden="true"></span>
+                  </button>
+                  <div id="deep-check-data-panel" class="stack stack--tight" hidden>
+                    <pre
+                      id="deep-check-data"
+                      class="data"
+                      tabindex="0"
+                      aria-label="Data that will be sent to the cloud"
+                    ></pre>
+                    <p class="text-muted">
+                      Exactly this text goes to the cloud, with PhishLocal's fixed instructions and
+                      nothing else.
+                    </p>
+                  </div>
+                </div>
+                <div class="stack stack--tight">
+                  <button id="deep-check-send" type="button" class="btn btn--primary btn--tall">
+                    <span class="icon" data-icon="cloud-up" aria-hidden="true"></span>
+                    Send to the cloud
+                  </button>
+                  <button id="deep-check-cancel" type="button" class="btn btn--tall">Cancel</button>
+                  <p class="text-muted deep-check__fine">
+                    Sent once, for this check only, to Gemini through Firebase AI Logic.
+                  </p>
+                </div>
               </div>
             </div>
-            <p id="deep-check-status" class="status" role="status"></p>
+
+            <p class="row">
+              <span id="deep-check-status" class="status grow" role="status"></span>
+              <span id="deep-check-elapsed" class="text-muted tabular"></span>
+              <button id="deep-check-stop" type="button" class="btn btn--plain" hidden>Stop</button>
+            </p>
+
             <div id="deep-check-result" class="band" tabindex="-1" hidden>
               <div class="band__head"><p id="deep-check-overall" class="band__word"></p></div>
               <div class="band__body">
-                <p id="deep-check-note" class="band__line"></p>
+                <p id="deep-check-line" class="band__line"></p>
                 <ul id="deep-check-reasons" class="band__reasons"></ul>
                 <div class="band__advice">
                   <span class="icon" data-icon="bulb" aria-hidden="true"></span>
                   <p id="deep-check-advice"></p>
                 </div>
+                <p class="band__foot">
+                  <span id="deep-check-source" class="band__source"></span>
+                  <span id="deep-check-time" class="band__time"></span>
+                </p>
               </div>
             </div>
           </section>
@@ -246,6 +329,8 @@
               <dd id="email-auth" class="details__value"></dd>
               <dt class="details__term">AI and basic checks</dt>
               <dd id="ai-detail" class="details__value"></dd>
+              <dt class="details__term">Deep check</dt>
+              <dd id="deep-check-detail" class="details__value"></dd>
               <dt class="details__term">Notes</dt>
               <dd class="details__value"><ul id="email-notes" class="notes"></ul></dd>
               <div id="email-header-rows" class="details" hidden>

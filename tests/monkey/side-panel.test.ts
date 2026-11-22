@@ -371,11 +371,11 @@ const MOVES: Record<string, () => void> = {
     get(id).click();
   },
   level: () => {
-    const select = get<HTMLSelectElement>('deep-check-level');
-    if (select.closest('[hidden]') || select.disabled) return;
-    select.value = rng.pick(['standard', 'high']);
-    trace.push(`choose privacy level ${select.value}`);
-    select.dispatchEvent(new Event('change'));
+    const radio = get<HTMLInputElement>(`deep-check-level-${rng.pick(['standard', 'high'])}`);
+    // A user can click only what is on screen and enabled.
+    if (radio.closest('[hidden]') || get<HTMLFieldSetElement>('deep-check-levels').disabled) return;
+    trace.push(`choose privacy level ${radio.value}`);
+    radio.click();
   },
   deep: () => {
     const id = rng.pick([
@@ -383,6 +383,8 @@ const MOVES: Record<string, () => void> = {
       'deep-check-send',
       'deep-check-cancel',
       'deep-check-stop',
+      'deep-check-back',
+      'deep-check-show',
     ]);
     const button = get(id);
     // A user can click only what is on screen.
@@ -483,10 +485,14 @@ const STATUS_IDS = [
   'deep-check-intro',
   'deep-check-removed',
   'deep-check-status',
+  'deep-check-elapsed',
   'deep-check-overall',
-  'deep-check-note',
+  'deep-check-line',
   'deep-check-reasons',
   'deep-check-advice',
+  'deep-check-source',
+  'deep-check-time',
+  'deep-check-detail',
 ];
 
 function checkPanelOnce(): void {
@@ -561,19 +567,29 @@ function checkPanelOnce(): void {
   const deep = get('deep-check');
   expect(deep.hidden, 'deep check and verdict shown together').toBe(verdict.hidden);
   if (!deep.hidden) {
-    if (!get('deep-check-preview').hidden) reached.add('deep: preview');
+    const preview = !get('deep-check-preview').hidden;
+    if (preview) reached.add('deep: preview');
     const status = get('deep-check-status').textContent ?? '';
-    // A preview waiting for consent says which level made it, and that is the level on screen.
-    if (!get('deep-check-preview').hidden && !get('deep-check-send').hidden) {
-      const standard = get<HTMLSelectElement>('deep-check-level').value === 'standard';
-      expect(status.includes('privacy level Standard'), 'preview matches the level').toBe(standard);
+    // The consent card and the offer button alternate; the preview lives inside the card.
+    const cardOpen = !get('deep-check-consent').hidden;
+    expect(get('deep-check-start').hidden, 'offer and consent card both shown').toBe(cardOpen);
+    expect(!preview || cardOpen, 'preview outside the consent card').toBe(true);
+    // The tier-2 lists step aside exactly while the consent card is open.
+    expect(get('app').dataset.consent === 'open', 'red flags hidden out of step').toBe(cardOpen);
+    // A preview waiting for consent says whether names were kept, and that matches the level.
+    if (preview && !get('deep-check-send').hidden) {
+      const standard = get<HTMLInputElement>('deep-check-level-standard').checked;
+      const chips = get('deep-check-removed').textContent ?? '';
+      expect(chips.includes('Names kept'), 'preview matches the level').toBe(standard);
+      // The exact data is there whenever Send is: never a Send without data to see.
+      expect(get('deep-check-data').textContent, 'Send without data').not.toBe('');
+      reached.add(`deep: level ${standard ? 'standard' : 'high'}`);
     }
-    // "Looking for names" or "running" only while that work really runs.
-    expect(!/running|looking/i.test(status) || deepWork > 0, `stale "${status}"`).toBe(true);
+    // "Looking for names" or "Checking in the cloud" only while that work really runs.
+    expect(!/looking|checking in/i.test(status) || deepWork > 0, `stale "${status}"`).toBe(true);
     if (status) reached.add(`deep: ${status.slice(0, 25)}`);
-    if (/names may remain/.test(get('deep-check-status').textContent ?? '')) {
-      reached.add('deep: names may remain');
-    }
+    if (preview && !get('deep-check-warning').hidden) reached.add('deep: names may remain');
+    if (!get('deep-check-data-panel').hidden) reached.add('deep: data shown');
     const result = get('deep-check-result');
     if (!result.hidden) {
       const risk = result.dataset.risk as Risk;
@@ -671,6 +687,10 @@ describe('monkey: side panel', () => {
       onActivated?.({ tabId: 7, windowId: 1 });
       await vi.advanceTimersByTimeAsync(0);
       const port = ports.at(-1);
+      // An unreadable Gmail page first, so that empty state is seen in every case too.
+      port?.receive({ type: 'unreadable' });
+      await vi.advanceTimersByTimeAsync(0);
+      checkPanel();
       port?.receive({ type: 'email', key: 'msg-f:calm', email: randomEmail(rng) });
       port?.receive({
         type: 'original',
@@ -713,7 +733,10 @@ x</pre>`,
           false,
         );
       }
-      expect(get('deep-check-status').textContent ?? '').not.toMatch(/running|looking|waiting/i);
+      expect(get('deep-check-status').textContent ?? '').not.toMatch(
+        /running|looking|waiting|checking in/i,
+      );
+      expect(get('deep-check-elapsed').textContent, 'elapsed time left running').toBe('');
       // Nothing keeps running: no ticker, no counter, no forgotten timeout.
       expect(vi.getTimerCount(), 'timers left running').toBe(0);
     });
@@ -736,11 +759,13 @@ x</pre>`,
           'email: Raw email read',
           'email: Sample loaded',
           'deep: preview',
+          'deep: level standard',
+          'deep: level high',
           'deep: names may remain',
+          'deep: data shown',
           'deep: Nothing was sent',
-          'deep: The privacy level changed',
-          'deep: Sent: the data shown',
-          'deep: The deep check failed',
+          'deep: Sent once',
+          'deep: The deep check did not',
           'deep light',
           'flags shown',
           'flagged links',
