@@ -457,7 +457,8 @@ const STATUS_IDS = [
 function checkPanelOnce(): void {
   expect(violations).toEqual([]);
   // Inert only while the settings load, before anything else happens.
-  expect(document.body.hasAttribute('inert'), 'panel left inert').toBe(false);
+  expect(document.querySelector('#app')?.hasAttribute('inert'), 'panel left inert').toBe(false);
+  expect(document.querySelector('#panel-starting'), 'start note left').toBeNull();
   // Email content never becomes markup: nothing that loads, runs or links.
   expect(
     document.body.querySelectorAll(

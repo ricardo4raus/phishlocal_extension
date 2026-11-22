@@ -58,27 +58,19 @@ export const MAX_EXTRA_INSTRUCTIONS = 500;
 const FORBIDDEN_CATEGORIES = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Cs}\p{Zl}\p{Zp}]/u;
 
 /**
- * Characters that show nothing although they are letters, marks or symbols: the combining
- * grapheme joiner, Hangul and Khmer fillers, Mongolian and other variation selectors (they can
- * hide data in text), and the blank Braille pattern. Code point ranges, first to last.
+ * Characters Unicode itself marks as "default ignorable" (they show nothing: the combining
+ * grapheme joiner, Hangul fillers, variation selectors, which can hide data in text, and more),
+ * and spaces other than the plain one, which can hide data the same way.
  */
-const BLANK_RANGES: readonly (readonly [number, number])[] = [
-  [0x034f, 0x034f],
-  [0x115f, 0x1160],
-  [0x17b4, 0x17b5],
-  [0x180b, 0x180f],
-  [0x2800, 0x2800],
-  [0x3164, 0x3164],
-  [0xfe00, 0xfe0f],
-  [0xffa0, 0xffa0],
-  [0xe0100, 0xe01ef],
-];
+const IGNORABLE_OR_ODD_SPACE = /\p{Default_Ignorable_Code_Point}|(?! )\p{Zs}/u;
+
+/** Blank characters that are not "default ignorable": blank Braille, Khitan filler, null notehead. */
+const BLANK_CODE_POINTS: ReadonlySet<number> = new Set([0x2800, 0x16fe4, 0x1d159]);
 
 function hasHiddenCharacters(text: string): boolean {
-  if (FORBIDDEN_CATEGORIES.test(text)) return true;
+  if (FORBIDDEN_CATEGORIES.test(text) || IGNORABLE_OR_ODD_SPACE.test(text)) return true;
   for (const character of text) {
-    const code = character.codePointAt(0) ?? 0;
-    if (BLANK_RANGES.some(([first, last]) => code >= first && code <= last)) return true;
+    if (BLANK_CODE_POINTS.has(character.codePointAt(0) ?? 0)) return true;
   }
   return false;
 }

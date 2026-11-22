@@ -6,9 +6,8 @@
  * shipped extension. `npm run check` and CI run build before test, so dist is fresh there.
  * To run only the fast source tests locally: `npx vitest run tests/manifest.test.ts tests/source-structure.test.ts`.
  */
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { basename, extname, join, posix } from 'node:path';
-import { parseEnv as parseDotenv } from 'node:util';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   type Manifest,
@@ -18,6 +17,7 @@ import {
   fromRoot,
   htmlResources,
   isNonLocalUrl,
+  localEnvValues,
   normalizeInside,
   readJson,
   readText,
@@ -36,23 +36,9 @@ const distManifestPath = join(distDir, 'manifest.json');
  */
 const BUILD_INPUTS = ['manifest.json', 'vite.config.ts', 'tsconfig.json', 'package-lock.json'];
 
-/** The developer's token (dev builds) and the judges' token (judges build only). */
-const DEBUG_TOKEN_KEYS = ['VITE_APPCHECK_DEBUG_TOKEN', 'VITE_APPCHECK_JUDGES_TOKEN'];
-
-/**
- * Every debug token value a build could see: any `.env*` file in the repo root (whatever the
- * build mode) except the template, plus the OS environment, which Vite also reads. Files are
- * parsed with `node:util` `parseEnv`, the same parser Vite uses (`export KEY=…`, multi-line values).
- */
-function localDebugTokens(): string[] {
-  const envFiles = readdirSync(fromRoot(), { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.startsWith('.env'))
-    .filter((entry) => entry.name !== '.env.example')
-    .map((entry) => parseDotenv(readText(fromRoot(entry.name))));
-  return DEBUG_TOKEN_KEYS.flatMap((key) => [...envFiles.map((env) => env[key]), process.env[key]])
-    .map((value) => value?.trim() ?? '')
-    .filter((value) => value !== '');
-}
+/** Every debug token a build could see: the developer's (dev builds) and the judges' (judges build). */
+const localDebugTokens = (): string[] =>
+  localEnvValues(['VITE_APPCHECK_DEBUG_TOKEN', 'VITE_APPCHECK_JUDGES_TOKEN']);
 
 let manifest: Manifest;
 let sourceManifest: Manifest;

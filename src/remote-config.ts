@@ -1,10 +1,9 @@
 /*
  * Loads the settings (`src/settings.ts`) from Firebase Remote Config when the side panel opens.
  *
- * Privacy: the request goes to Google (firebaseinstallations.googleapis.com and
- * firebaseremoteconfig.googleapis.com) and holds the Firebase installation ID, the app ID, the
- * SDK version and the browser language; never email content. It is made at most once per
- * FETCH_INTERVAL_MS; in between, the values stored by the last request are used.
+ * Privacy: the requests go to Google and never hold email content; what they do hold is listed in
+ * docs/ai-check.md ("Settings from Remote Config"). After a successful one, the next goes out
+ * FETCH_INTERVAL_MS later at the earliest; in between, the values stored by the last are used.
  *
  * The values are read once per panel: a running check never changes its settings.
  */

@@ -3,10 +3,9 @@
  * use the cloud deep check without any setup. These tests keep it apart from the normal build.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, extname, join } from 'node:path';
-import { parseEnv } from 'node:util';
 import type { UserConfig, UserConfigFnObject } from 'vite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import viteConfig, { JUDGES_MODE, JUDGES_OUT_DIR } from '../vite.config';
@@ -14,6 +13,7 @@ import {
   findDeniedRemoteHosts,
   findRemoteCodeInFile,
   fromRoot,
+  localEnvValues,
   readText,
   toPosixRelative,
   walkFiles,
@@ -90,18 +90,8 @@ describe('judges build', () => {
 
 const judgesDir = fromRoot(JUDGES_OUT_DIR);
 
-/** The developer's tokens in the local .env files and the environment (never printed). */
-function developerTokens(): string[] {
-  const files = readdirSync(fromRoot(), { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.startsWith('.env'))
-    .filter((entry) => entry.name !== '.env.example');
-  return [
-    ...files.map((entry) => parseEnv(readText(fromRoot(entry.name))).VITE_APPCHECK_DEBUG_TOKEN),
-    process.env.VITE_APPCHECK_DEBUG_TOKEN,
-  ]
-    .map((value) => value?.trim() ?? '')
-    .filter((value) => value !== '');
-}
+/** The developer's own tokens in the local .env files and the environment (never printed). */
+const developerTokens = (): string[] => localEnvValues(['VITE_APPCHECK_DEBUG_TOKEN']);
 
 // The build the judges install, checked like dist/ when it exists (it is built only locally).
 describe.runIf(existsSync(join(judgesDir, 'manifest.json')))('dist-judges/ build output', () => {

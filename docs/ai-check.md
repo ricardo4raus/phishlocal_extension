@@ -132,8 +132,8 @@ are its input and its lower limit.
      model; the rules stand alone then;
    - only the verdict line is a live region for screen readers; counters (seconds, download
      percentage) sit next to live regions, never in them, so they are not announced every second;
-     the run's limit (60 s by default, Remote Config `ai_check_timeout_s`) starts when it asks the model; the status shows the seconds; after the
-     limit the run is stopped, and the message says how far the model had come ("the model had
+     the run's limit (60 s by default, Remote Config `ai_check_timeout_s`) starts when it asks
+     the model; the status shows the seconds; after the limit the run is stopped, and the message says how far the model had come ("the model had
      written N characters"): 0 means it hung, many means it did not stop writing;
    - without the model, the panel offers "Download the on-device model": Chrome starts the
      download (about 4 GB, once) only after a user action; when it is done, the shown email is
@@ -164,8 +164,8 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
    - Nano only points: the code removes only strings that appear in the text, so an injection
      can hide a name from the list but never add text to what is sent. A list in one
      entry ("Peter Meier, Claudia Schneider") is split.
-   - After 20 s (by default; Remote Config `names_timeout_s`), without the model, or when names had to be left out (more than 50, or longer
-     than 60 characters), the preview warns that names may remain. Without Nano's list the
+   - After 20 s (by default; Remote Config `names_timeout_s`), without the model, or when names
+     had to be left out (more than 50, or longer than 60 characters), the preview warns that names may remain. Without Nano's list the
      sender's name is removed entirely.
    - Nano works on one prompt at a time: a search started while the on-device check runs waits
      behind it, and may reach its limit (then the warning shows).
@@ -217,8 +217,8 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
    panel says so: a running request's data had been sent, its answer is dropped.
 6. **Cloud call** (`runCloudCheck()`): its own system message (the same task and rules, plus what
    the placeholders mean), the verdict schema as `responseJsonSchema`, a 30 s limit in the SDK
-   and 10 s more in the panel (by default; Remote Config `cloud_timeout_s`). "Stop", another email or closing the panel stops it; a request that
-   ignores its stop is given up after 2 s. Errors are shown in short words ("the cloud refused
+   and 10 s more in the panel (by default; Remote Config `cloud_timeout_s`). "Stop", another
+   email or closing the panel stops it; a request that ignores its stop is given up after 2 s. Errors are shown in short words ("the cloud refused
    the request (HTTP 403)"), without the request URL. The answer is read by `parseVerdict()`
    like the on-device one.
 7. **Result:** its own block under the on-device verdict, labelled "Deep check", with the same
@@ -267,14 +267,17 @@ missing or out-of-range value falls back to its default:
   whatever the AI says, so a bad value can make answers worse, never hide a rule's warning.
 - **When:** the panel asks when it opens, waits at most 2 s, and otherwise starts with the values
   stored by the last request (or the defaults). After a successful request, the next goes out
-  12 h later at the earliest (1 min in dev builds); a failed one is tried again at the next opening. The values are fixed for the panel's lifetime: `configureAi()` refuses new
-  settings once a model session was made, so a running check never changes its settings.
-- **Privacy:** the request goes to `firebaseinstallations.googleapis.com` and
-  `firebaseremoteconfig.googleapis.com` and holds the Firebase installation ID (kept in
-  IndexedDB, so it stays the same for the browser profile), the installation token, the API key and
-  project ID (in the URL), the SDK versions and the dates the extension was used (the
-  `x-firebase-client` heartbeat header) and the browser language; Google also sees the IP address.
-  Never email content. It is the only request PhishLocal makes without a user action.
+  12 h later at the earliest (1 min in dev builds); a failed one is tried again at the next
+  opening. The values are fixed for the panel's lifetime: `configureAi()` refuses new settings once a model session was made, so a running check never changes its settings.
+- **Privacy:** the request goes to `firebaseremoteconfig.googleapis.com` and holds the
+  Firebase installation ID (kept in IndexedDB, so it stays the same for the browser profile), the
+  installation token, the app ID, the API key and project ID (in the URL) and the browser
+  language. Creating the installation and renewing its token (about weekly) go to
+  `firebaseinstallations.googleapis.com` and also carry the SDK versions and the dates the
+  extension was used (the `x-firebase-client` heartbeat header). Google also sees the IP address.
+  Never email content. On a server error (HTTP 429, 500, 503, 504) the SDK tries again within the
+  same opening (about 1, 2, 4 s apart, up to its 10 s limit). Besides loading "Show original"
+  from Gmail, it is the only request PhishLocal makes without a user action.
 
 ## Prompt injection (OWASP LLM01) and unsafe output (LLM05)
 

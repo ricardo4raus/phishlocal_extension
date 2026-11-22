@@ -33,13 +33,12 @@ const modelStatus = byId<HTMLElement>('model-status');
 
 // The settings from Remote Config (at most 2 s; otherwise the stored or default values), fixed
 // for this panel before the first model session is made and before any button works. Until then
-// the panel is inert, so no click or paste is lost to a listener that is not there yet.
-document.body.toggleAttribute('inert', true);
-modelStatus.textContent = 'Starting…';
+// the panel is inert (set in index.html), so no click or paste is lost to a listener that is not
+// there yet; a status line outside it says "Starting…".
 const settings = await loadSettings();
 configureAi(settings);
-document.body.toggleAttribute('inert', false);
-modelStatus.textContent = '';
+byId<HTMLElement>('app').removeAttribute('inert');
+byId<HTMLElement>('panel-starting').remove();
 
 const modelProgress = byId<HTMLElement>('model-progress');
 const modelDownload = byId<HTMLButtonElement>('model-download');
