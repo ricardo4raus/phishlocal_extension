@@ -98,8 +98,9 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    line, wrapping, never cut. Third line, the sender status: "Sender confirmed by Gmail" (DMARC
    pass from `mx.google.com`, read from Gmail's own page), "Sender confirmed by your mail
    server" (pass in pasted raw source, whatever server it names: pasted text is not Gmail's word),
-   "Sender not confirmed" (no headers, or no pass), "Checking the sender…" (Gmail headers still
-   loading). On the right an icon button "Check the open email again".
+   "Sent from your own address" (`EmailHeaders.sentToSelf`: no sender checks at all, and the
+   sender is the mailbox the email was delivered to), "Sender not confirmed" (no headers, or no
+   pass), "Checking the sender…" (Gmail headers still loading). On the right an icon button "Check the open email again".
    Under the strip one muted line, only when it says something the strip and the band do not
    (decided 22 Nov 2026): "Pasted email." / "Pasted email with its headers.", "Sample loaded:
    …", "Could not load the sender checks: …", "The email is long: only the first part was

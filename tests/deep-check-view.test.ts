@@ -13,6 +13,7 @@ import {
   type DeepCheckDeps,
   removedChips,
 } from '../src/sidepanel/deep-check-view';
+import { SENT_TO_SELF_NOTE } from '../src/ai/prompt';
 import { DEFAULT_SETTINGS } from '../src/settings';
 
 const NAMES_TIMEOUT_MS = DEFAULT_SETTINGS.namesTimeoutMs;
@@ -495,6 +496,13 @@ describe('the deep check', () => {
       'The basic checks found no warning signs.',
     ]);
     expect(text('detail')).toMatch(/Its points: The subject is empty\./);
+  });
+
+  it('tells the cloud AI in its task when the email was sent to yourself', async () => {
+    check.shown({ ...email, headers: { replyTo: [], sentToSelf: true } }, []);
+    await prepare();
+    click('send');
+    expect(runs[0]?.prompt.split(String.fromCodePoint(10))[0]).toContain(SENT_TO_SELF_NOTE);
   });
 
   it('keeps at least "suspicious" when the rules failed', async () => {

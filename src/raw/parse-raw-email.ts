@@ -69,6 +69,30 @@ export function looksLikeRawEmail(text: string): boolean {
   );
 }
 
+/** "<a@b.example>" or " a@b.example " → "a@b.example", lowercased. */
+const bareAddress = (value: string): string =>
+  value
+    .trim()
+    .replace(/^<(.*)>$/, '$1')
+    .trim()
+    .toLowerCase();
+
+/**
+ * Whether `address` is the mailbox this copy was delivered to: the topmost `Delivered-To` (the
+ * receiving server's), or, without one, the only `To` address.
+ */
+function isOwnAddress(
+  address: string,
+  parsed: Awaited<ReturnType<typeof PostalMime.parse>>,
+): boolean {
+  const own = bareAddress(address);
+  if (own === '') return false;
+  const delivered = parsed.headers.find((header) => header.key === 'delivered-to');
+  if (delivered) return bareAddress(delivered.value) === own;
+  const to = parsed.to ?? [];
+  return to.length === 1 && bareAddress(to[0]?.address ?? '') === own;
+}
+
 export async function parseRawEmail(raw: string): Promise<Email> {
   if (raw.length > MAX_RAW_CHARS) {
     throw new RawEmailError('too-large', 'The raw email is larger than 5 MB.');
@@ -91,12 +115,14 @@ export async function parseRawEmail(raw: string): Promise<Email> {
   // Only the topmost result counts: the receiving server adds it last, above everything the
   // sender wrote. A fake "dmarc=pass" further down is ignored.
   const topmost = parsed.headers.find((header) => header.key === 'authentication-results');
+  const self = !topmost && isOwnAddress(sender.address, parsed);
   return {
     ...email,
     headers: {
       replyTo: mailboxes(parsed.replyTo),
       ...(parsed.returnPath ? { returnPath: cut(parsed.returnPath, FIELD_LIMITS.address) } : {}),
       ...(topmost ? { auth: parseAuthResults(topmost.value) } : {}),
+      ...(self ? { sentToSelf: true as const } : {}),
     },
   };
 }

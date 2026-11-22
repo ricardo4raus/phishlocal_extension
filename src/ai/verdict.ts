@@ -167,6 +167,8 @@ const LEVEL: Record<Risk, number> = { safe: 0, suspicious: 1, dangerous: 2 };
  *   a transfer under time pressure: then the AI's verdict stands); one the rules miss entirely
  *   (a gift-card request in other words) shows as safe with the AI's points as notes, unless
  *   Nano is sure it is dangerous.
+ * - sent to oneself (`EmailHeaders.sentToSelf`): the same for an AI "suspicious", also with
+ *   links (a note to oneself with a link). Missing sender checks are expected there.
  */
 export function overallRisk(
   ai: Risk | undefined,
@@ -174,10 +176,11 @@ export function overallRisk(
   {
     senderConfirmed = false,
     nothingAsked = false,
-  }: { senderConfirmed?: boolean; nothingAsked?: boolean } = {},
+    sentToSelf = false,
+  }: { senderConfirmed?: boolean; nothingAsked?: boolean; sentToSelf?: boolean } = {},
 ): Risk {
   if (ai === undefined) return rules;
   if (rules === 'safe' && senderConfirmed) return rules;
-  if (rules === 'safe' && nothingAsked && ai === 'suspicious') return rules;
+  if (rules === 'safe' && (nothingAsked || sentToSelf) && ai === 'suspicious') return rules;
   return LEVEL[ai] > LEVEL[rules] ? ai : rules;
 }

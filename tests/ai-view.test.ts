@@ -815,4 +815,37 @@ describe('AI check view', () => {
       expect(text('overall')).toBe('Suspicious');
     });
   });
+
+  describe('an email sent to yourself', () => {
+    const note: Email = {
+      sender: { name: 'Me', address: 'me@mail.example' },
+      subject: '',
+      bodyText: 'Read later.',
+      links: [{ text: 'Article', href: 'https://news.example/article' }],
+      truncated: false,
+      headers: { replyTo: [], sentToSelf: true },
+    };
+
+    it('shows an AI "suspicious" as notes, also with a link, and says why', async () => {
+      await show(note, checkEmail(note));
+      await answer(verdict('suspicious'));
+      expect(text('overall')).toBe('Looks safe');
+      expect(reasons()).toEqual([
+        'Sent from your own address to yourself, not received from outside.',
+        'The basic checks found no warning signs.',
+      ]);
+      expect(text('detail')).toMatch(
+        /^The AI said: suspicious, but the email was sent from your own address and the basic checks found nothing/,
+      );
+    });
+
+    it('keeps an AI "dangerous", and a rule warning', async () => {
+      await show(note, checkEmail(note));
+      await answer(verdict('dangerous'));
+      expect(text('overall')).toBe('Dangerous');
+      await show({ ...note, subject: 'x' }, [finding('warning')]);
+      await answer(verdict('suspicious'));
+      expect(text('overall')).toBe('Suspicious');
+    });
+  });
 });

@@ -119,10 +119,14 @@ export function judge(
   ai: string,
 ): { overall: Risk; line: string; advice: string; detail: string; reasons: string[] } {
   const confirmed = senderConfirmed(email);
+  const toSelf = email.headers?.sentToSelf === true;
   const overall = overallRisk(verdict.risk, rulesRisk(findings), {
     senderConfirmed: confirmed,
     nothingAsked: nothingAsked(email, findings),
+    sentToSelf: toSelf,
   });
+  // Why the AI's concern does not count: the strongest reason first.
+  const why = confirmed ? 'confirmed' : toSelf ? 'sentToSelf' : 'nothingAsked';
   const stricter = overall !== verdict.risk;
   // The AI was more worried, but the rules found nothing and the sender is confirmed or nothing
   // is asked (overallRisk() says when): its points are notes.
@@ -132,7 +136,11 @@ export function judge(
   return {
     overall,
     line: onlyNotes
-      ? (confirmed ? m.judge.lineOnlyNotes : m.judge.lineNoLinks)(WORD[overall])
+      ? {
+          confirmed: m.judge.lineOnlyNotes,
+          sentToSelf: m.judge.lineSentToSelf,
+          nothingAsked: m.judge.lineNoLinks,
+        }[why](WORD[overall])
       : stricter
         ? m.judge.lineStricter(WORD[overall], ai, level)
         : WORD[overall],
@@ -140,14 +148,15 @@ export function judge(
     // Overruled, the AI's points would argue against the verdict above them: the band gives
     // our own reasons, and the AI's points are in Email details (tier 3).
     reasons: onlyNotes
-      ? [
-          confirmed ? m.verdict.ownReasons.confirmed : m.verdict.ownReasons.nothingAsked,
-          m.verdict.ownReasons.nothingFound,
-        ]
+      ? [m.verdict.ownReasons[why], m.verdict.ownReasons.nothingFound]
       : verdict.reasons,
     detail: onlyNotes
       ? [
-          (confirmed ? m.judge.detailOnlyNotes : m.judge.detailNoLinks)(said),
+          {
+            confirmed: m.judge.detailOnlyNotes,
+            sentToSelf: m.judge.detailSentToSelf,
+            nothingAsked: m.judge.detailNoLinks,
+          }[why](said),
           verdict.reasons.length > 0 ? m.judge.aiPoints(verdict.reasons.join(' ')) : '',
         ]
           .filter((part) => part !== '')

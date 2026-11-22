@@ -85,7 +85,7 @@ export function authSummary(auth: AuthResults | undefined): string {
 }
 
 /** The sender status in plain words (tier 1): confirmed by whom, not confirmed, or still checking. */
-export type SenderStatus = 'confirmed' | 'unconfirmed' | 'checking';
+export type SenderStatus = 'confirmed' | 'unconfirmed' | 'checking' | 'self';
 
 export function senderStatus(
   email: Email,
@@ -99,6 +99,9 @@ export function senderStatus(
         ? m.email.confirmedByGmail
         : m.email.confirmedByServer;
     return { state: 'confirmed', text, icon: 'check' };
+  }
+  if (email.headers?.sentToSelf) {
+    return { state: 'self', text: m.email.fromOwnAddress, icon: 'info' };
   }
   if (loading && !email.headers) {
     return { state: 'checking', text: m.email.checkingSender, icon: 'dot' };
