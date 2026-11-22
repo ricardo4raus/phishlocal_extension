@@ -33,19 +33,21 @@ _Draft based on Ricardo's planning notes. Ricardo: review, and add your own expe
 _Current state, updated as features land._
 
 - Chrome extension (Manifest V3) with a side panel. Clicking the toolbar icon opens it.
-- The side panel sends a test prompt through Firebase AI Logic hybrid inference
-  (`InferenceMode.PREFER_ON_DEVICE`): Gemini Nano answers on-device; the cloud is the fallback.
-  The panel shows where the prompt ran and how long it took.
+- In development builds, the side panel sends a test prompt through Firebase AI Logic hybrid
+  inference (`InferenceMode.PREFER_ON_DEVICE`): Gemini Nano answers on-device; the cloud is the
+  fallback. The panel shows where the prompt ran and how long it took.
 - When the side panel opens, it loads the on-device model in the background and shows its state
-  (loading, ready, not downloaded, not available).
+  in a pill in the top bar (ready, loading with the elapsed time, downloading with the real
+  percentage, not set up, not available, not loaded); a banner above the email offers the
+  download or says that the AI is not available on this computer.
 - While the side panel is open, every email opened in Gmail is read (sender, subject, visible
   text, links with their text and real target) and checked automatically, and its headers are
   loaded from Gmail's own "Show original" page in the background. Closing the panel stops all
   reading. Nothing leaves the browser.
-- "Or paste an email" is the fallback for other mail apps and for the demo: paste an email
-  (optionally with sender and subject) and the panel shows its text and links, including the
-  real target behind each link text. Three made-up sample emails (two phishing, one harmless)
-  load with one click.
+- "Check another email" (a fold at the bottom, opened by "Paste an email" on the empty state) is
+  the fallback for other mail apps: paste an email (optionally with sender and subject) and the
+  panel shows its text and links, including the real target behind each link text. Five made-up
+  sample emails load with one click in development and judges builds only.
 - Rule checks (no AI, on-device, in milliseconds) list red flags for every email read or pasted:
   links that run code or hide their target, link text that names a different domain than the
   real target (also behind forwarding links such as `google.com/url?q=…`), lookalike domains
@@ -60,12 +62,19 @@ _Current state, updated as features land._
   dangerous, with up to five reasons and one piece of advice in the user's language. The rule
   checks are its lower limit: the AI can raise the verdict, never lower it.
 - The rule checks cover English, German, French, Spanish, Italian and Portuguese.
-- The verdict is a traffic light at the top (green, yellow, red, each with a symbol and a word);
-  it stays grey until the AI has answered, unless the rules already found a warning. Each link
-  shows its real domain in bold and a shortened URL, and links behind a red flag are marked.
-- On request, a deep check in the cloud (Gemini through Firebase AI Logic): Gemini Nano finds
-  names on the device, a privacy filter replaces names, addresses, numbers, IBANs and full links,
-  and the panel shows exactly the data that will be sent. Only "Send to the cloud" sends it.
+- The side panel shows the answer first, in plain words (design: `docs/ui-design.md`): an email
+  strip with the sender's domain first and whether the sender is confirmed; a verdict band with
+  a word (Dangerous, Suspicious, Looks safe, No red flags found), one hedged line, the AI's
+  reasons, one "What to do" box and "Checked on this device · Done in 1.4 s"; the band stays
+  grey until the AI has answered, and grey too when the AI gave no answer ("Not checked by AI"),
+  never green without an AI answer. A Stop button ends a long wait. Red flags are rows with a
+  badge and a plain-word title per rule, links show their real domain, the unflagged ones one
+  fold away. Technical details (sender checks by name, how the AI and the basic checks were
+  combined, notes) are under "Email details".
+- On request, a deep check in the cloud (Gemini through Firebase AI Logic): a consent card with
+  two privacy level cards (Standard keeps names; High also removes the names of people, found by
+  Gemini Nano on the device), chips of what was removed, what is never sent, and the exact data
+  one click away. Only "Send to the cloud" sends it, once; the cloud's result is a second band.
 
 ## How we built it
 
@@ -162,6 +171,16 @@ _Current state, updated as features land._
 
 ## What we learned
 
+- A mockup is not a spec: it shows the happy states. Listing the real state space (source ×
+  model × verdict × consent phase) before building found more than a third of the screens
+  missing and two of them wrong.
+- "Plain words" and "overview first" are different rules: one says how to word a thing, the
+  other which things show at all. Writing both down ended the argument about the folded data:
+  what was removed is tier 1, the exact bytes are tier 2.
+- Headless Chrome screenshots of a static state are enough to catch layout and CSS bugs that
+  unit tests cannot see, at a fraction of the cost of driving the real extension.
+- Fixed-seed monkey runs prove reachability only by luck; a short deterministic "calm" script at
+  the end of each case makes the rare states certain.
 - Gemini Nano in Chrome: the first prompt after a cold start can take minutes; warm prompts take
   about 1 s. On-device prompts need `expectedInputs` / `expectedOutputs` with languages.
 - A slow step is not always heavy work: sampling CPU, GPU and memory every 5 s showed that a
@@ -902,3 +921,46 @@ _To fill in near the submission._
   see `docs/model-load-debugging.md`), so the panel shows elapsed time and a moving bar instead.
 - The spec for Monday's UI polish is `docs/ui-design.md`, with seven open points; the biggest:
   folding the sent data conflicts with the promise that the user sees it before consenting.
+
+**Session with Claude Code (night, UI polish, PRs #22 to #27):**
+
+- Reviewed the mockup against the panel's real states before building: it covered seven of about
+  thirty states (no Suspicious, no "AI did not run", no model-unavailable or download-needed
+  state, no consent phases), put the display name before the address and cut the address, showed
+  two rule severities wrong, made the cloud button the loudest element on a Dangerous email, and
+  folded the product's key moment. Two research passes (how Gmail, Chrome, Outlook, Proton and
+  the warning literature word verdicts; how product designers structure narrow UIs and plain
+  CSS) gave the rules for the rewrite.
+- New principles in the spec: "Overview first" (three tiers: always visible, one fold away,
+  "Email details") and "True claims only". Decided: the exact cloud data is one click away while
+  what was removed stays visible; one outlined deep check button on every result; no coloured
+  bars on every row; the badge alone carries the severity; counts as text, not pills; a
+  left-aligned empty state without an illustration.
+- Rebuilt the panel in five stacked PRs, one per component, each reviewed by an agent and fixed
+  before the next: the shell (tokens in cascade layers, top bar with a neutral model pill, model
+  banner, empty state with three variants, email strip with the sender's domain first and a
+  plain-word sender status, folds, icons through CSS masks so the DOM holds no `<svg>`, extension
+  icons), the verdict band (word, hedged line, advice, footer, the grey "unchecked" state, Stop),
+  red flags and links as tier-2 lists, the deep check as a consent card with radio level cards,
+  and this wrap-up.
+- Visual checks without a loaded extension: a small renderer fills the panel's HTML with a state
+  and screenshots it in headless Chrome at 380 and 320 px, light and dark. It found a hidden
+  advice box (`:has(> :empty)` matched the icon span), masks failing from `file://`, and that
+  headless Chrome's window is at least 500 px wide.
+- The reviews found real bugs each round: the pill stayed "AI not loaded" after a later check
+  loaded the model; Stop during the model load did nothing visible for minutes; the download bar
+  showed a made-up 0 %; a failed download was a dead end; pasted raw source with a forged
+  `mx.google.com` header read as "confirmed by Gmail"; rule messages with protocol names and
+  error texts reached tier 2; notes flagged links; the links fold closed when Gmail re-rendered
+  the same email.
+- The monkeys grew with each PR (new moves and promises: the empty state and the email section
+  alternate, the strip always shows a domain, green only with an AI answer, Stop offered exactly
+  while a check runs, the consent card and the offer alternate, "Names kept" exactly at
+  Standard, Send never without data) and ran with a random seed and 100× the cases after each PR.
+  Their calm phase now also feeds an unreadable page and a confirmed Gmail email, so those states
+  are reached in every case instead of by luck. The random run found one real bug after the
+  reviews: "Back to the result" while the data was on its way closed the card and left the
+  request running with no way back in.
+- The same random run (`MONKEY_SEED=2809363716 MONKEY_CASE=8753`) also failed the AI answer
+  reader's phone filter with "55512345call": an older gap, not touched by the UI work, left for
+  its own fix.
