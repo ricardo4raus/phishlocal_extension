@@ -4,13 +4,6 @@
  */
 import { revealOverrides } from '../rules/unicode';
 
-/**
- * The language of the panel's text. The AI answers in it too (on-device and in the cloud), so a
- * result reads in one language, whatever the language of Chrome or of the email. A translated
- * panel would set its own language here.
- */
-export const PANEL_LANGUAGE = 'en';
-
 /** The icons in `icons/`, drawn through CSS masks (see `.icon` in style.css). */
 export type IconName =
   | 'shield-check'
@@ -60,8 +53,8 @@ export function icon(name: IconName, className = ''): HTMLSpanElement {
   return span;
 }
 
-/** "1.4 s": a duration in seconds with one decimal. */
-export const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)} s`;
+/** "1.4 s" ("1,4 s" in German): a duration in seconds with one decimal. */
+export { seconds } from '../i18n';
 
 /** "2:14": elapsed time as minutes and seconds, for waits without a known end. */
 export function clock(ms: number): string {

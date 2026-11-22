@@ -9,7 +9,7 @@
   <body>
     <!-- Until the settings are loaded, the panel is inert: no click or paste goes to a part that
          is not set up yet. This line, outside it, tells screen readers why. -->
-    <p id="panel-starting" class="starting" role="status">Starting…</p>
+    <p id="panel-starting" class="starting" role="status" data-t="starting">Starting…</p>
     <div id="app" class="page" inert>
       <header class="topbar">
         <span class="logo" aria-hidden="true"
@@ -19,7 +19,9 @@
         <!-- Only state changes are announced; the counter next to them is not a live region. -->
         <p id="model-pill" class="pill" data-state="loading">
           <span class="pill__mark" aria-hidden="true"></span>
-          <span id="model-status" class="pill__word" role="status">On-device AI loading</span>
+          <span id="model-status" class="pill__word" role="status" data-t="modelLoading"
+            >On-device AI loading</span
+          >
           <span id="model-progress" class="pill__count"></span>
         </p>
       </header>
@@ -41,6 +43,7 @@
               class="progress"
               role="progressbar"
               aria-label="Download of the on-device AI"
+              data-t-label="downloadLabel"
               aria-valuemin="0"
               aria-valuemax="100"
               hidden
@@ -48,7 +51,9 @@
               <span class="progress__bar"></span>
             </div>
             <div class="row" id="model-banner-actions" hidden>
-              <button id="model-download" type="button" class="btn">Download now</button>
+              <button id="model-download" type="button" class="btn" data-t="downloadNow">
+                Download now
+              </button>
             </div>
           </div>
         </section>
@@ -56,23 +61,28 @@
         <!-- No email: what to do, and how privacy is kept. -->
         <section id="empty" class="empty stack stack--loose" aria-labelledby="empty-heading">
           <div class="stack">
-            <h2 id="empty-heading" class="empty__heading">Open an email in Gmail</h2>
-            <p id="empty-text" class="text-secondary">
+            <h2 id="empty-heading" class="empty__heading" data-t="emptyHeading">
+              Open an email in Gmail
+            </h2>
+            <p id="empty-text" class="text-secondary" data-t="emptyText">
               PhishLocal checks it here, automatically, while this panel is open. The email never
               leaves your browser.
             </p>
             <div class="row">
-              <button id="paste-open" type="button" class="btn">Paste an email</button>
+              <button id="paste-open" type="button" class="btn" data-t="pasteOpen">
+                Paste an email
+              </button>
             </div>
           </div>
           <div class="stack">
-            <h3 class="section-title">How your privacy is kept</h3>
+            <h3 class="section-title" data-t="privacyTitle">How your privacy is kept</h3>
             <ul class="stack">
               <li class="point">
                 <span class="icon icon--m point__icon" data-icon="device" aria-hidden="true"></span>
                 <p>
-                  <span class="point__lead">Checked on this device</span><br />
-                  <span class="text-secondary"
+                  <span class="point__lead" data-t="pointDeviceLead">Checked on this device</span
+                  ><br />
+                  <span class="text-secondary" data-t="pointDeviceText"
                     >Basic checks plus Gemini Nano, the AI built into Chrome. Works offline.</span
                   >
                 </p>
@@ -84,15 +94,18 @@
                   aria-hidden="true"
                 ></span>
                 <p>
-                  <span class="point__lead">No email is saved</span><br />
-                  <span class="text-secondary">Close the panel and all reading stops.</span>
+                  <span class="point__lead" data-t="pointSavedLead">No email is saved</span><br />
+                  <span class="text-secondary" data-t="pointSavedText"
+                    >Close the panel and all reading stops.</span
+                  >
                 </p>
               </li>
               <li class="point">
                 <span class="icon icon--m point__icon" data-icon="cloud" aria-hidden="true"></span>
                 <p>
-                  <span class="point__lead">Cloud only if you ask</span><br />
-                  <span class="text-secondary"
+                  <span class="point__lead" data-t="pointCloudLead">Cloud only if you ask</span
+                  ><br />
+                  <span class="text-secondary" data-t="pointCloudText"
                     >Personal data is removed first, and you see what is sent.</span
                   >
                 </p>
@@ -100,15 +113,20 @@
             </ul>
           </div>
           <p class="row text-muted">
-            <span class="grow">Languages: en · de · fr · es · it · pt</span>
-            <button id="how-it-works" type="button" class="btn btn--plain text-muted">
+            <span class="grow" data-t="languages">Languages: en · de · fr · es · it · pt</span>
+            <button
+              id="how-it-works"
+              type="button"
+              class="btn btn--plain text-muted"
+              data-t="howItWorks"
+            >
               How it works
             </button>
           </p>
         </section>
 
         <!-- The shown email: strip, verdict, deep check, details. -->
-        <section id="email" class="stack" aria-label="Email" hidden>
+        <section id="email" class="stack" aria-label="Email" data-t-label="emailLabel" hidden>
           <div class="strip">
             <div class="strip__text">
               <p id="strip-subject" class="strip__subject"></p>
@@ -124,7 +142,7 @@
                   data-icon="alert"
                   aria-hidden="true"
                 ></span>
-                <span id="strip-auth-text">Sender not confirmed</span>
+                <span id="strip-auth-text" data-t="senderUnconfirmed">Sender not confirmed</span>
               </p>
             </div>
             <button
@@ -133,13 +151,15 @@
               class="btn btn--icon"
               aria-label="Check the open email again"
               title="Check the open email again"
+              data-t-label="readAgain"
+              data-t-title="readAgain"
             >
               <span class="icon" data-icon="refresh" aria-hidden="true"></span>
             </button>
           </div>
           <p id="email-status" class="status" role="status"></p>
 
-          <section id="verdict" class="band" aria-label="Result" hidden>
+          <section id="verdict" class="band" aria-label="Result" data-t-label="resultLabel" hidden>
             <div class="band__head">
               <!-- Only the verdict line is announced; the status below counts seconds. -->
               <p id="ai-overall" class="band__word" role="status" tabindex="-1"></p>
@@ -156,7 +176,13 @@
               <p class="band__foot">
                 <span id="ai-source" class="band__source"></span>
                 <span id="ai-time" class="band__time"></span>
-                <button id="ai-stop" type="button" class="btn btn--plain band__stop" hidden>
+                <button
+                  id="ai-stop"
+                  type="button"
+                  class="btn btn--plain band__stop"
+                  data-t="stop"
+                  hidden
+                >
                   Stop
                 </button>
               </p>
@@ -165,25 +191,35 @@
 
           <section id="flags" class="card consent-hides" aria-labelledby="flags-heading" hidden>
             <h2 id="flags-heading" class="list-heading">
-              Red flags (<span id="flags-count">0</span>)
+              <span data-t="redFlags">Red flags</span> (<span id="flags-count">0</span>)
             </h2>
             <ul id="email-findings" class="flags"></ul>
           </section>
 
           <section id="links" class="card consent-hides" aria-labelledby="links-heading" hidden>
-            <h2 id="links-heading" class="list-heading">Links (<span id="links-count">0</span>)</h2>
+            <h2 id="links-heading" class="list-heading">
+              <span data-t="links">Links</span> (<span id="links-count">0</span>)
+            </h2>
             <ol id="email-links" class="link-list"></ol>
             <details id="links-more" class="fold fold--inner">
-              <summary id="links-more-summary" class="fold__summary">More links</summary>
+              <summary id="links-more-summary" class="fold__summary" data-t="moreLinks">
+                More links
+              </summary>
               <ol id="email-links-more" class="link-list link-list--folded fold__body"></ol>
             </details>
           </section>
 
-          <section id="deep-check" class="stack" aria-label="Deep check in the cloud" hidden>
+          <section
+            id="deep-check"
+            class="stack"
+            aria-label="Deep check in the cloud"
+            data-t-label="deepCheckLabel"
+            hidden
+          >
             <div class="stack stack--tight">
               <button id="deep-check-start" type="button" class="btn">
                 <span class="icon" data-icon="cloud" aria-hidden="true"></span>
-                Deep check in the cloud…
+                <span data-t="deepCheckStart">Deep check in the cloud…</span>
               </button>
               <p id="deep-check-intro" class="text-muted"></p>
             </div>
@@ -192,19 +228,21 @@
               <div class="row">
                 <button id="deep-check-back" type="button" class="btn btn--plain">
                   <span class="icon" data-icon="arrow-left" aria-hidden="true"></span>
-                  Back to the result
+                  <span data-t="backToResult">Back to the result</span>
                 </button>
               </div>
               <div class="stack stack--tight">
-                <h2 id="deep-check-heading" class="deep-check__title">Deep check in the cloud</h2>
-                <p class="text-secondary">
+                <h2 id="deep-check-heading" class="deep-check__title" data-t="deepCheckTitle">
+                  Deep check in the cloud
+                </h2>
+                <p class="text-secondary" data-t="deepCheckIntro">
                   A larger model in the cloud checks again. Personal data is removed on this device
                   first.
                 </p>
-                <p class="text-secondary">Nothing has been sent yet.</p>
+                <p class="text-secondary" data-t="nothingSentYet">Nothing has been sent yet.</p>
               </div>
               <fieldset id="deep-check-levels" class="levels">
-                <legend class="field__label">Privacy level</legend>
+                <legend class="field__label" data-t="privacyLevel">Privacy level</legend>
                 <div class="level" data-level="standard">
                   <input
                     id="deep-check-level-standard"
@@ -215,13 +253,18 @@
                     aria-describedby="deep-check-level-standard-list"
                   />
                   <div class="level__body">
-                    <label for="deep-check-level-standard" class="level__title">Standard</label>
-                    <p class="level__lead">Removes:</p>
+                    <label
+                      for="deep-check-level-standard"
+                      class="level__title"
+                      data-t="levelStandard"
+                      >Standard</label
+                    >
+                    <p class="level__lead" data-t="removes">Removes:</p>
                     <ul id="deep-check-level-standard-list" class="level__list">
-                      <li>Email addresses</li>
-                      <li>Phone, card, account and customer numbers</li>
-                      <li>IBANs</li>
-                      <li>Link paths (the website's name stays)</li>
+                      <li data-t="removesEmails">Email addresses</li>
+                      <li data-t="removesNumbers">Phone, card, account and customer numbers</li>
+                      <li data-t="removesIbans">IBANs</li>
+                      <li data-t="removesLinkPaths">Link paths (the website's name stays)</li>
                     </ul>
                   </div>
                 </div>
@@ -235,11 +278,13 @@
                     aria-describedby="deep-check-level-high-list"
                   />
                   <div class="level__body">
-                    <label for="deep-check-level-high" class="level__title">High</label>
-                    <p class="level__lead">Removes:</p>
+                    <label for="deep-check-level-high" class="level__title" data-t="levelHigh"
+                      >High</label
+                    >
+                    <p class="level__lead" data-t="removes">Removes:</p>
                     <ul id="deep-check-level-high-list" class="level__list">
-                      <li>Everything from Standard</li>
-                      <li class="level__item--strong">Names of people</li>
+                      <li data-t="removesStandard">Everything from Standard</li>
+                      <li class="level__item--strong" data-t="removesNames">Names of people</li>
                     </ul>
                   </div>
                 </div>
@@ -247,15 +292,15 @@
 
               <div id="deep-check-preview" class="stack" tabindex="-1" hidden>
                 <div class="stack stack--tight">
-                  <p class="field__label">Removed on this device</p>
+                  <p class="field__label" data-t="removedOnDevice">Removed on this device</p>
                   <div id="deep-check-removed" class="cluster"></div>
-                  <p class="text-muted">
+                  <p class="text-muted" data-t="neverSent">
                     Never sent: your address, the raw headers, server IP addresses.
                   </p>
                 </div>
                 <p id="deep-check-warning" class="note" hidden>
                   <span class="icon" data-icon="alert" aria-hidden="true"></span>
-                  <span
+                  <span data-t="namesMayRemain"
                     >Some names may still be in the text: read what will be sent before you send
                     it.</span
                   >
@@ -268,7 +313,7 @@
                     aria-expanded="false"
                     aria-controls="deep-check-data-panel"
                   >
-                    Show what will be sent
+                    <span data-t="showData">Show what will be sent</span>
                     <span class="icon icon--s" data-icon="chevron-down" aria-hidden="true"></span>
                   </button>
                   <div id="deep-check-data-panel" class="stack stack--tight" hidden>
@@ -277,8 +322,9 @@
                       class="data"
                       tabindex="0"
                       aria-label="Data that will be sent to the cloud"
+                      data-t-label="dataLabel"
                     ></pre>
-                    <p class="text-muted">
+                    <p class="text-muted" data-t="dataExactly">
                       Exactly this text goes to the cloud, with PhishLocal's fixed instructions and
                       nothing else.
                     </p>
@@ -287,10 +333,17 @@
                 <div class="stack stack--tight">
                   <button id="deep-check-send" type="button" class="btn btn--primary btn--tall">
                     <span class="icon" data-icon="cloud-up" aria-hidden="true"></span>
-                    Send to the cloud
+                    <span data-t="send">Send to the cloud</span>
                   </button>
-                  <button id="deep-check-cancel" type="button" class="btn btn--tall">Cancel</button>
-                  <p class="text-muted deep-check__fine">
+                  <button
+                    id="deep-check-cancel"
+                    type="button"
+                    class="btn btn--tall"
+                    data-t="cancel"
+                  >
+                    Cancel
+                  </button>
+                  <p class="text-muted deep-check__fine" data-t="sentOnce">
                     Sent once, for this check only, to Gemini through Firebase AI Logic.
                   </p>
                 </div>
@@ -300,7 +353,15 @@
             <p class="row">
               <span id="deep-check-status" class="status grow" role="status"></span>
               <span id="deep-check-elapsed" class="text-muted tabular"></span>
-              <button id="deep-check-stop" type="button" class="btn btn--plain" hidden>Stop</button>
+              <button
+                id="deep-check-stop"
+                type="button"
+                class="btn btn--plain"
+                data-t="stop"
+                hidden
+              >
+                Stop
+              </button>
             </p>
 
             <div id="deep-check-result" class="band" tabindex="-1" hidden>
@@ -323,19 +384,19 @@
           </section>
 
           <details id="email-details" class="fold" hidden>
-            <summary class="fold__summary">Email details</summary>
+            <summary class="fold__summary" data-t="emailDetails">Email details</summary>
             <dl class="fold__body details">
-              <dt class="details__term">From</dt>
+              <dt class="details__term" data-t="from">From</dt>
               <dd id="email-sender" class="details__value"></dd>
-              <dt class="details__term">Subject</dt>
+              <dt class="details__term" data-t="subject">Subject</dt>
               <dd id="email-subject" class="details__value"></dd>
-              <dt class="details__term">Sender checks</dt>
+              <dt class="details__term" data-t="senderChecks">Sender checks</dt>
               <dd id="email-auth" class="details__value"></dd>
-              <dt class="details__term">AI and basic checks</dt>
+              <dt class="details__term" data-t="aiAndBasic">AI and basic checks</dt>
               <dd id="ai-detail" class="details__value"></dd>
-              <dt class="details__term">Deep check</dt>
+              <dt class="details__term" data-t="deepCheck">Deep check</dt>
               <dd id="deep-check-detail" class="details__value"></dd>
-              <dt class="details__term">Notes</dt>
+              <dt class="details__term" data-t="notes">Notes</dt>
               <dd class="details__value"><ul id="email-notes" class="notes"></ul></dd>
               <div id="email-header-rows" class="details" hidden>
                 <dt class="details__term">Reply-To</dt>
@@ -343,7 +404,7 @@
                 <dt class="details__term">Return-Path</dt>
                 <dd id="email-return-path" class="details__value"></dd>
               </div>
-              <dt class="details__term">Text</dt>
+              <dt class="details__term" data-t="text">Text</dt>
               <dd id="email-body" class="details__value details__value--text"></dd>
             </dl>
           </details>
@@ -351,25 +412,30 @@
 
         <!-- Paste: the fallback for other mail apps. Stays on the device; nothing is saved. -->
         <details id="paste" class="fold">
-          <summary class="fold__summary">Check another email</summary>
+          <summary class="fold__summary" data-t="checkAnother">Check another email</summary>
           <div class="fold__body stack">
-            <p class="text-muted">
+            <p class="text-muted" data-t="pasteIntro">
               Paste an email from any mail app, or its raw source ("Show original"). It stays on
               this device.
             </p>
             <div class="field">
-              <label for="paste-sender" class="field__label">From (optional)</label>
+              <label for="paste-sender" class="field__label" data-t="fromOptional"
+                >From (optional)</label
+              >
               <input
                 id="paste-sender"
                 class="field__input"
                 type="text"
                 placeholder="Name &lt;address&gt;"
+                data-t-placeholder="senderPlaceholder"
                 autocomplete="off"
                 spellcheck="false"
               />
             </div>
             <div class="field">
-              <label for="paste-subject" class="field__label">Subject (optional)</label>
+              <label for="paste-subject" class="field__label" data-t="subjectOptional"
+                >Subject (optional)</label
+              >
               <input
                 id="paste-subject"
                 class="field__input"
@@ -379,7 +445,7 @@
               />
             </div>
             <div class="field">
-              <label for="paste-text" class="field__label">Email text</label>
+              <label for="paste-text" class="field__label" data-t="emailText">Email text</label>
               <textarea
                 id="paste-text"
                 class="field__textarea"
@@ -388,19 +454,42 @@
               ></textarea>
             </div>
             <div class="row">
-              <button id="paste-use" type="button" class="btn">Use pasted email</button>
-              <button id="paste-clear" type="button" class="btn btn--plain">Clear</button>
+              <button id="paste-use" type="button" class="btn" data-t="usePasted">
+                Use pasted email
+              </button>
+              <button id="paste-clear" type="button" class="btn btn--plain" data-t="clear">
+                Clear
+              </button>
             </div>
             <p id="paste-status" class="status" role="status"></p>
             <!-- Made-up samples: dev and judges builds only (main.ts shows the row). -->
             <div id="sample-row" class="field" hidden>
-              <label for="sample-select" class="field__label">Or load a made-up sample</label>
+              <label for="sample-select" class="field__label" data-t="sampleLabel"
+                >Or load a made-up sample</label
+              >
               <div class="row">
                 <select id="sample-select" class="field__select grow">
-                  <option value="">Choose a sample…</option>
+                  <option value="" data-t="chooseSample">Choose a sample…</option>
                 </select>
-                <button id="sample-load" type="button" class="btn">Load</button>
+                <button id="sample-load" type="button" class="btn" data-t="load">Load</button>
               </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Settings: the language of the panel and of the AI's answers (language-view.ts). -->
+        <details id="settings" class="fold">
+          <summary class="fold__summary" data-t="settings">Settings</summary>
+          <div class="fold__body stack">
+            <div class="field">
+              <label for="language-select" class="field__label" data-t="language">Language</label>
+              <select id="language-select" class="field__select">
+                <option value="auto">Automatic</option>
+              </select>
+              <p class="text-muted" data-t="languageHint">
+                Sets the language of the panel and of the AI's answers. The panel restarts to
+                switch.
+              </p>
             </div>
           </div>
         </details>

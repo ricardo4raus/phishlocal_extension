@@ -2,6 +2,14 @@ import type { Email } from '../email';
 import type { PastedEmail } from '../paste/parse-pasted-email';
 import { readPaste } from '../paste/read-paste';
 import { SAMPLE_EMAILS } from '../paste/samples';
+import { m } from '../i18n';
+import { RawEmailError } from '../raw/parse-raw-email';
+
+/** What the panel says when a paste cannot be read: our own words, never the parser's. */
+function pasteError(error: unknown): string {
+  if (error instanceof RawEmailError && error.kind === 'too-large') return m.paste.rawTooLarge;
+  return m.paste.rawUnreadable;
+}
 
 export interface PasteElements {
   sender: HTMLInputElement;
@@ -62,7 +70,7 @@ export function setUpPaste(elements: PasteElements, callbacks: PasteCallbacks): 
       if (current === reading) callbacks.onEmail(email, status(raw));
     } catch (error) {
       if (current === reading) {
-        callbacks.onError(error instanceof Error ? error.message : String(error));
+        callbacks.onError(pasteError(error));
       }
     } finally {
       if (current === reading) setBusy(false);
@@ -72,29 +80,26 @@ export function setUpPaste(elements: PasteElements, callbacks: PasteCallbacks): 
   elements.use.addEventListener('click', () => {
     const text = elements.text.value;
     if (text.trim() === '') {
-      callbacks.onError('Paste the email text first.');
+      callbacks.onError(m.paste.emptyText);
       return;
     }
     void show(
       { text, html: pastedHtml, sender: elements.sender.value, subject: elements.subject.value },
-      (raw) =>
-        raw
-          ? 'Raw email read, with its headers. Nothing left your browser.'
-          : 'Pasted email ready. Nothing left your browser.',
+      (raw) => (raw ? m.paste.rawRead : m.paste.ready),
     );
   });
 
   elements.loadSample.addEventListener('click', () => {
     const sample = SAMPLE_EMAILS.find((candidate) => candidate.id === elements.sample.value);
     if (!sample) {
-      callbacks.onError('Choose a sample first.');
+      callbacks.onError(m.paste.chooseSample);
       return;
     }
     elements.sender.value = sample.email.sender ?? '';
     elements.subject.value = sample.email.subject ?? '';
     elements.text.value = sample.email.text;
     pastedHtml = sample.email.html;
-    void show(sample.email, () => `Sample loaded: ${sample.label}. It is made up.`);
+    void show(sample.email, () => m.paste.sampleLoaded(sample.label));
   });
 
   elements.clear.addEventListener('click', () => {

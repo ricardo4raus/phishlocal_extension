@@ -146,7 +146,7 @@ vi.mock('../../src/ai', () => ({
     signal: AbortSignal,
   ): Promise<AiCheckResult> => {
     afterConfigure('AI check');
-    // The panel is English, so the AI answers in English, whatever Chrome's language (random).
+    // The panel is set to English, so the AI answers in English, whatever Chrome's language (random).
     if (language !== 'en') violations.push(`AI check in ${language}`);
     // The prompt is the only thing the model sees: it must hold the email as JSON, nothing else.
     if (!prompt.startsWith('Check this email for phishing.')) violations.push('odd AI prompt');
@@ -268,11 +268,16 @@ let ports: FakePort[] = [];
 let onActivated: ((info: { tabId: number; windowId: number }) => void) | undefined;
 let onUpdated: ((tabId: number, change: { status?: string }) => void) | undefined;
 
+/** Chrome's language per case, in turn (not from `rng`, so reading it moves no other draw). */
+const CHROME_LANGUAGES = ['de-CH', 'en-US', 'it', 'ja'];
+let chromeCase = 0;
+
 function stubChrome(): void {
   ports = [];
+  const chromeLanguage = CHROME_LANGUAGES[chromeCase++ % CHROME_LANGUAGES.length] ?? 'en-US';
   vi.stubGlobal('chrome', {
     runtime: { lastError: undefined },
-    i18n: { getUILanguage: () => rng.pick(['de-CH', 'en-US', 'it', 'ja']) },
+    i18n: { getUILanguage: () => chromeLanguage },
     tabs: {
       query: async () => [{ id: 7, windowId: 1 }],
       // "How it works" opens the README in a tab; the panel only ever opens that one URL.
@@ -674,6 +679,8 @@ describe('monkey: side panel', () => {
       stubChrome();
       // The remembered privacy level would carry over from the last case and break replays.
       localStorage.clear();
+      // The panel in English (the checks read its words); Chrome's own language stays random.
+      localStorage.setItem('phishlocal.language', 'en');
       await import('../../src/sidepanel/main');
       await vi.advanceTimersByTimeAsync(0);
       checkPanel();

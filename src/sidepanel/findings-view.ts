@@ -8,37 +8,13 @@ import type { Email } from '../email';
 import type { Finding, Severity } from '../rules';
 import type { RuleId } from '../rules/types';
 import { linkDisplay } from './link-display';
+import { m } from '../i18n';
 import { el, icon, setText } from './ui';
 
 /** The plain-word title per rule (tier 1 and 2 never say "rule", "DKIM" or "DMARC"). */
-export const TITLES: Record<RuleId, string> = {
-  'dangerous-link': 'A link runs code instead of opening a page',
-  'hidden-link-target': 'A link hides where it really goes',
-  'ip-link': 'A link goes to a bare number address',
-  'international-domain': 'A web address uses letters from another alphabet',
-  'link-text-mismatch': "A link doesn't go where its text says",
-  'redirect-link': 'A link goes through a forwarding service',
-  'lookalike-domain': 'A web address imitates a known one',
-  'brand-in-subdomain': 'A known name is used in front of another address',
-  'brand-in-domain': "A web address contains a known name but isn't it",
-  'sender-name-domain': "The sender's name doesn't match the address",
-  'sender-name-brand': 'The sender claims a brand from another address',
-  'hidden-characters': 'Words contain invisible characters',
-  'mixed-script': 'Words mix letters from different alphabets',
-  'direction-override': 'Text is written backwards to disguise an address',
-  'reply-to-mismatch': 'Replies would go to a different company',
-  'dmarc-fail': "The sender's address is forged",
-  'auth-fail': "The sender's mail server didn't confirm this email",
-  'dkim-other-domain': 'Signed by another domain',
-  'no-auth-results': 'No sender checks in this email',
-  'incomplete-check': 'Part of this email could not be checked',
-  urgency: 'Time pressure',
-  threat: 'Threatens consequences',
-  credentials: 'Asks for passwords, identity or card details',
-  payment: 'Asks for a payment',
-};
+export const TITLES: Record<RuleId, string> = m.titles;
 
-const BADGE: Record<Severity, string> = { danger: 'Danger', warning: 'Warning', info: 'Note' };
+const BADGE: Record<Severity, string> = m.severity;
 
 /** Rules whose evidence is the words or phrases found: shown as chips. */
 const PHRASE_RULES: ReadonlySet<RuleId> = new Set([
@@ -65,15 +41,11 @@ const SENTENCE_RULES: ReadonlySet<RuleId> = new Set([
 ]);
 
 /**
- * Plain-word sentences for rules whose own message names protocols (SPF, DKIM, DMARC): tier 2
- * never does. The rule's sentence stays in tier 3 (the notes) and in the prompt.
+ * The sentence for a rule: the panel's own where it has one (English: only for rules whose
+ * message names protocols; other languages: every rule), else the rule's message. Tier 2 never
+ * names protocols; the rule's sentence stays in the prompt.
  */
-const PLAIN_SENTENCES: Partial<Record<RuleId, string>> = {
-  'dmarc-fail':
-    "The sender's own mail service says this email did not come from them. That is the surest sign of a forged sender.",
-  'auth-fail':
-    'The checks that confirm a sender did not pass. Legitimate senders sometimes fail them too, so treat this as a warning, not proof.',
-};
+const ruleSentence = (finding: Finding): string => m.sentences[finding.rule] ?? finding.message;
 
 /** A paragraph of email-derived text, with direction overrides revealed. */
 function sentence(text: string): HTMLElement {
@@ -117,32 +89,30 @@ function evidence(finding: Finding, email: Email | undefined): HTMLElement[] {
   if (SENDER_RULES.has(rule)) {
     const [name = '', address = ''] = finding.evidence;
     const rows = el('dl', 'flag__rows');
-    rows.append(...row('Name says', name), ...row('Address is', address, true));
+    rows.append(...row(m.flags.nameSays, name), ...row(m.flags.addressIs, address, true));
     return [rows];
   }
-  if (SENTENCE_RULES.has(rule)) return [sentence(PLAIN_SENTENCES[rule] ?? finding.message)];
+  if (SENTENCE_RULES.has(rule)) return [sentence(ruleSentence(finding))];
   // Link rules: what the link says, and where it really goes.
   const index = finding.links?.[0];
   const link = index === undefined ? undefined : email?.links[index];
   const rows = el('dl', 'flag__rows');
   if (rule === 'lookalike-domain' || rule === 'brand-in-domain' || rule === 'brand-in-subdomain') {
     const [host = '', reference] = finding.evidence;
-    if (reference) rows.append(...row('Looks like', reference));
-    rows.append(...row('Is', host, true));
+    if (reference) rows.append(...row(m.flags.looksLike, reference));
+    rows.append(...row(m.flags.is, host, true));
   } else if (link) {
     const display = linkDisplay(link.href);
-    if (link.text) rows.append(...row('Says', link.text));
+    if (link.text) rows.append(...row(m.flags.says, link.text));
     const target = display.forwardsTo ?? display.domain;
-    rows.append(...row('Opens', target || link.href, true));
+    rows.append(...row(m.flags.opens, target || link.href, true));
   } else {
-    return [sentence(finding.message)];
+    return [sentence(ruleSentence(finding))];
   }
   const more = finding.links && finding.links.length > 1 ? finding.links.length - 1 : 0;
   const parts: HTMLElement[] = [rows];
   if (more > 0) {
-    parts.push(
-      el('p', 'flag__sentence', `${more} more ${more === 1 ? 'link' : 'links'} like this.`),
-    );
+    parts.push(el('p', 'flag__sentence', m.flags.moreLikeThis(more)));
   }
   return parts;
 }
@@ -166,7 +136,7 @@ function noteRow(finding: Finding): HTMLLIElement {
   const item = el('li', 'note-row');
   const label = el('strong', '', `${TITLES[finding.rule]}: `);
   const message = el('span');
-  setText(message, finding.message);
+  setText(message, ruleSentence(finding));
   item.append(label, message);
   return item;
 }
@@ -186,7 +156,7 @@ export function showFindings(
   elements.count.textContent = String(flags.length);
   elements.section.hidden = flags.length === 0;
   elements.notes.replaceChildren(...notes.map(noteRow));
-  if (notes.length === 0) elements.notes.append(el('li', 'note-row', 'None.'));
+  if (notes.length === 0) elements.notes.append(el('li', 'note-row', m.flags.noNotes));
 }
 
 /**
@@ -210,7 +180,7 @@ export function showRuleCheck(
         {
           rule: 'incomplete-check',
           severity: 'warning',
-          message: 'The basic checks could not finish. Treat this email with care.',
+          message: m.flags.checkFailed,
           evidence: [],
         },
       ],

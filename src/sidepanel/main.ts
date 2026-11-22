@@ -11,6 +11,7 @@ import {
   type WarmUpResult,
 } from '../ai';
 import { answerLanguage } from '../ai/prompt';
+import { language, m } from '../i18n';
 import { appCheckEnabled } from '../firebase';
 import type { Email } from '../email';
 import { loadSettings } from '../remote-config';
@@ -21,7 +22,8 @@ import { showEmail } from './email-view';
 import { createGmailView, type EmptyReason } from './gmail-view';
 import { showRuleCheck } from './findings-view';
 import { setUpPaste } from './paste-view';
-import { countElapsed, PANEL_LANGUAGE, seconds } from './ui';
+import { setUpLanguage, translatePage } from './language-view';
+import { countElapsed, seconds } from './ui';
 import { watchActiveTab } from './watch';
 
 /** Where "How it works" leads: the README of the public repository. */
@@ -32,6 +34,10 @@ function byId<T extends HTMLElement>(id: string): T {
   if (!element) throw new Error(`Side panel: #${id} is missing in index.html`);
   return element;
 }
+
+// The panel's text in its language first ("Starting…" too), before anything is shown.
+translatePage(document, m, language);
+setUpLanguage(byId<HTMLSelectElement>('language-select'), m);
 
 // The settings from Remote Config (at most 2 s; otherwise the stored or default values), fixed
 // for this panel before the first model session is made and before any button works. Until then
@@ -71,14 +77,7 @@ const modelBannerActions = byId<HTMLElement>('model-banner-actions');
 const modelProgressBar = byId<HTMLElement>('model-progressbar');
 const modelDownload = byId<HTMLButtonElement>('model-download');
 
-const PILL_WORDS: Record<ModelState, string> = {
-  loading: 'On-device AI loading',
-  ready: 'On-device AI ready',
-  downloading: 'On-device AI',
-  'not-downloaded': 'AI not set up',
-  unavailable: 'AI not available',
-  failed: 'AI not loaded',
-};
+const PILL_WORDS: Record<ModelState, string> = m.pill;
 
 interface Banner {
   icon: 'download' | 'alert' | 'info';
@@ -88,26 +87,10 @@ interface Banner {
 
 /** What the banner says per state; states without an entry show no banner. */
 const BANNERS: Partial<Record<ModelState, Banner>> = {
-  'not-downloaded': {
-    icon: 'download',
-    title: 'Set up on-device AI',
-    text: 'Chrome downloads Gemini Nano once, about 4 GB. After that, emails are checked on this device, also offline. Until then they get the basic checks only.',
-  },
-  downloading: {
-    icon: 'download',
-    title: 'Setting up on-device AI',
-    text: 'Chrome is downloading Gemini Nano. The basic checks already work while you wait, and you can keep using Gmail.',
-  },
-  unavailable: {
-    icon: 'alert',
-    title: 'On-device AI is not available on this computer',
-    text: 'Chrome cannot run Gemini Nano here. Emails get the basic checks only; the deep check in the cloud still works where it is offered.',
-  },
-  failed: {
-    icon: 'alert',
-    title: 'On-device AI could not load',
-    text: 'Chrome could not load Gemini Nano. Emails get the basic checks only; the next check tries again.',
-  },
+  'not-downloaded': { icon: 'download', ...m.banner['not-downloaded'] },
+  downloading: { icon: 'download', ...m.banner.downloading },
+  unavailable: { icon: 'alert', ...m.banner.unavailable },
+  failed: { icon: 'alert', ...m.banner.failed },
 };
 
 /**
@@ -147,8 +130,8 @@ function setDownloadProgress(loaded: number): void {
  * Waits for the model like `ensureModelLoaded()`, and tells the pill when a load after a failed
  * warm-up succeeded (the warm-up is the only other thing that sets the state).
  */
-async function modelReady(language: string): Promise<boolean> {
-  const ready = await ensureModelLoaded(language);
+async function modelReady(answerIn: string): Promise<boolean> {
+  const ready = await ensureModelLoaded(answerIn);
   if (ready && (modelState === 'failed' || modelState === 'loading')) setModelState('ready');
   return ready;
 }
@@ -277,20 +260,7 @@ const findingsElements = {
 };
 
 /** The empty state's words per reason. */
-const EMPTY: Record<EmptyReason, { heading: string; text: string }> = {
-  idle: {
-    heading: 'Open an email in Gmail',
-    text: 'PhishLocal checks it here, automatically, while this panel is open. The email never leaves your browser.',
-  },
-  'not-gmail': {
-    heading: 'Open Gmail in this tab',
-    text: 'PhishLocal checks the emails you open in Gmail, automatically, while this panel is open. If Gmail was open before PhishLocal was installed or updated, reload the Gmail tab. You can also paste an email from any mail app.',
-  },
-  unreadable: {
-    heading: 'Could not read this email',
-    text: 'Gmail may have changed its page. You can paste the email instead.',
-  },
-};
+const EMPTY: Record<EmptyReason, { heading: string; text: string }> = m.empty;
 
 function showEmpty(reason: EmptyReason): void {
   emptyHeading.textContent = EMPTY[reason].heading;
@@ -303,7 +273,7 @@ function showEmpty(reason: EmptyReason): void {
 const PRIVACY_LEVEL_KEY = 'phishlocal.deepCheck.privacyLevel';
 
 /** The AI check's answer language; the warm-up loads the model for exactly this one. */
-const checkLanguage = answerLanguage(PANEL_LANGUAGE);
+const checkLanguage = answerLanguage(language);
 
 // The AI check of every shown email: on-device only, with the rules as its lower limit.
 const aiCheck = createAiCheck(
@@ -320,7 +290,7 @@ const aiCheck = createAiCheck(
   },
   {
     run: runAiCheck,
-    panelLanguage: () => PANEL_LANGUAGE,
+    panelLanguage: () => language,
     modelReady,
     runTimeoutMs: settings.aiCheckTimeoutMs,
   },
@@ -358,7 +328,7 @@ const deepCheck = createDeepCheck(
   },
   {
     available: appCheckEnabled,
-    panelLanguage: () => PANEL_LANGUAGE,
+    panelLanguage: () => language,
     modelReady,
     findNames,
     // While the consent card is open, the red flags and links step aside (style.css).
@@ -410,7 +380,7 @@ function displayEmail(email: Email, message: string, options: DisplayOptions): v
   showEmail(email, emailElements, { headersNote, findings, loading: !final, fromGmail });
   emptySection.hidden = true;
   emailSection.hidden = false;
-  setEmailStatus(email.truncated ? `${message} The text is long and was cut.` : message);
+  setEmailStatus(email.truncated ? `${message} ${m.gmail.textCut}` : message);
   aiCheck.shown(email, findings, final);
   deepCheck.shown(email, findings, final);
 }
@@ -532,7 +502,7 @@ async function downloadModel(): Promise<void> {
     modelProgress.textContent = '';
     const message = error instanceof Error ? error.message : String(error);
     // Back to the offer, so the user can try again.
-    setModelState('not-downloaded', `The download failed (${message}).`);
+    setModelState('not-downloaded', m.banner.downloadFailed(message));
   } finally {
     modelDownload.disabled = false;
   }

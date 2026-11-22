@@ -5,6 +5,7 @@
 import type { Email } from '../email';
 import type { GmailMessage, OriginalFailure } from '../messages';
 import { headersFromOriginalPage } from '../raw/gmail-original-page';
+import { m } from '../i18n';
 import { HEADERS_HINT } from './email-view';
 
 export interface GmailViewUi {
@@ -23,21 +24,13 @@ export interface GmailViewUi {
 
 export type EmptyReason = 'idle' | 'not-gmail' | 'unreadable';
 
-const CHECKED = 'Checked automatically on this device.';
+const CHECKED = m.gmail.checked;
 
-const FAILURES: Record<OriginalFailure, string> = {
-  'no-account-key': "Gmail's page has changed",
-  'no-message-id': "Gmail's page has changed",
-  'request-failed': 'Gmail did not deliver them',
-  timeout: 'Gmail did not answer in time',
-};
+const FAILURES: Record<OriginalFailure, string> = m.gmail.failures;
 
-const IDLE =
-  'Open an email in Gmail: while this panel is open, PhishLocal checks it automatically, on this device.';
+const IDLE = m.gmail.idle;
 
-const NOT_GMAIL =
-  'Open Gmail in this tab to check emails automatically. If Gmail was open before PhishLocal ' +
-  'was installed or updated, reload the Gmail tab.';
+const NOT_GMAIL = m.gmail.notGmail;
 
 export interface GmailView {
   handle(message: GmailMessage): void;
@@ -72,11 +65,11 @@ export function createGmailView(ui: GmailViewUi): GmailView {
     }
     if (current !== target) return;
     if (headers) {
-      ui.show({ ...target.email, headers }, `${CHECKED} Sender checks read from Gmail.`);
+      ui.show({ ...target.email, headers }, `${CHECKED} ${m.gmail.headersRead}`);
     } else {
       ui.show(
         target.email,
-        `${CHECKED} Sender checks not available: Gmail's page could not be read.`,
+        `${CHECKED} ${m.gmail.headersMissing(m.gmail.failures.unreadable)}`,
         HEADERS_HINT,
       );
     }
@@ -90,8 +83,8 @@ export function createGmailView(ui: GmailViewUi): GmailView {
           source = 'gmail';
           ui.show(
             message.email,
-            `${CHECKED} Loading the sender checks…`,
-            'Loading from Gmail…',
+            `${CHECKED} ${m.gmail.headersLoading}`,
+            m.gmail.headersNote,
             false,
           );
           break;
@@ -102,7 +95,7 @@ export function createGmailView(ui: GmailViewUi): GmailView {
           if (current?.key === message.key) {
             ui.show(
               current.email,
-              `${CHECKED} Sender checks not available: ${FAILURES[message.reason]}.`,
+              `${CHECKED} ${m.gmail.headersMissing(FAILURES[message.reason])}`,
               HEADERS_HINT,
             );
           }
@@ -111,7 +104,7 @@ export function createGmailView(ui: GmailViewUi): GmailView {
           idle('idle', IDLE);
           break;
         case 'unreadable':
-          idle('unreadable', 'Could not read this email. Gmail may have changed its page.', true);
+          idle('unreadable', m.gmail.unreadable, true);
           break;
       }
     },
