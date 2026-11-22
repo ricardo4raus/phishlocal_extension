@@ -79,8 +79,9 @@ explain every red flag, and work offline, with a cloud only as fallback."
   2026), and to the cloud only through the deep check (21 Nov 2026,
   `src/sidepanel/deep-check-view.ts`): on request (and at privacy level High only), Nano finds
   names on the device (`findNames()`), `cloudData()` in `src/privacy/redact.ts` builds the cleaned
-  data, the panel shows exactly that JSON, and only "Send to the cloud" sends it
-  (`runCloudCheck()`), once per consent. Never send anything else from an email to the cloud, and
+  data, the panel shows what was removed and, one click away ("Show what will be sent"), exactly
+  that JSON (decided 22 Nov 2026), and only "Send to the cloud" sends it (`runCloudCheck()`),
+  once per consent. Never send anything else from an email to the cloud, and
   never raw headers. Details: `docs/ai-check.md`.
 - AI check (`src/ai/`, `runAiCheck()` in `src/ai.ts`, `src/sidepanel/ai-view.ts`): every shown
   email goes on-device to Gemini Nano with a fixed system message (as `initialPrompts`, because

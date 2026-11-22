@@ -1,156 +1,243 @@
 # Side panel design
 
-The target design for the side panel, agreed with Ricardo on 22 Nov 2026 in a mockup. It is the
-spec for the "UI polish" task (Mon 23 Nov in `TIMETABLE.md`). The code does not follow it yet.
+The target design for the side panel. It started as a mockup agreed with Ricardo on 22 Nov 2026 and
+was reviewed against the real states of the panel the same day; this file is the result, and the
+spec for the "UI polish" task in `TIMETABLE.md`. It is the source of truth for wording, states and
+decisions. Where the mockup differs, this file wins.
 
-**Mockup:** <https://claude.ai/artifact/ToTPTrGLCAURFNT2JbF1dy> (a private canvas; only
-Ricardo's account can open it, and Claude Code sessions signed in to that account can read it with
-the Artifact tool). Each screen has its own link: add `#artboard-<name>` with the names below.
-Screen 5 can be clicked through (`#play-Consent`). The mockup uses made-up emails only.
-
-This file is the source of truth for wording and decisions; the mockup shows the look. Where they
-differ, this file wins, and the difference belongs in "Open points" below.
+**Mockup:** <https://claude.ai/artifact/ToTPTrGLCAURFNT2JbF1dy> (a private canvas; only Ricardo's
+account can open it, and Claude Code sessions signed in to that account can read it with the
+Artifact tool). Each screen has its own link: add `#artboard-<name>` with the names in the state
+table. The mockup shows the look of seven states; it uses made-up emails only. Known differences
+from this file are listed under "Mockup review" at the end.
 
 ## Principles
 
 - **Answer first.** The verdict is the first thing under the header. Details, links and the
-  email itself come after it, folded where they are long.
-- **Plain words.** A result says what to do, not how it was found: no "rules", "Gemini Nano",
-  "DKIM" or "Authentication-Results" on the result screens. Technical terms stay in "Email
-  details". The empty and loading screens may name the parts once, to explain what happens.
-- **Privacy you can see.** "On this device" appears where a result appears; the cloud is always
-  an explicit step with its own screen.
+  email itself come after it.
+- **Overview first.** Three tiers, and each piece of information has exactly one tier:
+  - **Tier 1, always visible:** the verdict word, one status line, what to do, whether the AI
+    ran, whether the sender is verified, and (before anything is sent to the cloud) what is
+    removed.
+  - **Tier 2, one fold away:** the evidence behind a red flag, the links that no rule flagged,
+    the exact data that will be sent.
+  - **Tier 3, "Email details":** everything technical: headers, sender checks by name, how the AI
+    and the rules agreed or disagreed, notes, the text.
+- **Plain words.** Tier 1 and tier 2 say what to do, not how it was found: no "rules", "Gemini
+  Nano", "DKIM", "DMARC" or "Authentication-Results" there. Technical names stay in tier 3. The
+  empty, loading and download states may name the parts once ("Gemini Nano, built into Chrome"),
+  to explain what happens on the device.
+- **Privacy you can see.** "Checked on this device" appears wherever a result appears; the cloud
+  is always an explicit step with its own consent, and nothing goes there before "Send".
 - **Honest progress.** A percentage only where Chrome reports one (the model download). Waits
-  without a known end show elapsed time and a moving bar, never a made-up percentage.
-- **Never colour alone.** Every state has a colour, a symbol and a word.
-- **Own emails only.** Users check the emails they receive; the panel does not offer sample
-  emails (see "Open points" for the demo and the judges).
+  without a known end show elapsed time and a moving bar, never a made-up percentage. One moving
+  indicator per wait, not three.
+- **Never colour alone.** Every state has a colour, a symbol and a word. Green is reserved for
+  the verdict "Looks safe"; a ready model, a confirmed sender and other good news use neutral
+  colours and words.
+- **True claims only.** Every sentence in the panel must hold in every build: no "nothing is
+  saved" while a setting is saved, no "Looks safe" when only the rules looked.
+- **Own emails only.** Users check the emails they receive. Sample emails exist only in dev and
+  judges builds (for the demo video and for judges whose inbox has no phishing).
 
-## Screens
+## States
 
-| #   | Mockup name     | State                                                                     |
-| --- | --------------- | ------------------------------------------------------------------------- |
-| 1   | `Main`          | Empty: no email open                                                      |
-| 2   | `Checking`      | Rules done, on-device AI still loading (the long first load)              |
-| 3   | `Dangerous`     | Result: dangerous, with red flags and links                               |
-| 4   | `Safe`          | Result: looks safe                                                        |
-| 5   | `Consent`       | Deep check in the cloud: privacy level and consent (clickable)            |
-| 6   | `DangerousDark` | Screen 3 in dark mode                                                     |
-| 7   | `Download`      | First model download with a real percentage (the mockup animates 0–100 %) |
+The panel is one column. Its parts show and hide by state; no part moves. The columns name the
+mockup artboard where one exists.
 
-### Layout, top to bottom
+| State                      | Mockup          | Tier-1 words                                                                                                                                                                   |
+| -------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| No email, Gmail tab        | `Main`          | "Open an email in Gmail", "PhishLocal checks it here, automatically, while this panel is open. The email never leaves your browser."                                           |
+| No email, other tab        | –               | "Open Gmail in this tab" and the hint to reload a Gmail tab that was open before the install                                                                                   |
+| Email unreadable           | –               | "Could not read this email", "Gmail may have changed its page. You can paste the email instead."                                                                               |
+| Model loading              | `Checking`      | Pill "On-device AI loading"; band "Checking…", step "Chrome is preparing Gemini Nano", elapsed time, info "The first check after Chrome restarts can take a few minutes", Stop |
+| Model not downloaded       | –               | Banner "Set up on-device AI", "Chrome downloads Gemini Nano once, about 4 GB", button "Download now"                                                                           |
+| Model downloading          | `Download`      | Pill "On-device AI 42%"; banner with the real percentage, "Rule checks already work while you wait"                                                                            |
+| Model unavailable          | –               | Pill "AI not available"; banner "On-device AI is not available on this computer. Emails get the basic checks only."                                                            |
+| Model failed to load       | –               | Pill "AI not loaded"; the band shows "Not checked by AI" for every email until a check loads it                                                                                |
+| Checking, no red flags yet | `Checking`      | Band grey "Checking…", line "Basic checks done, AI check running"                                                                                                              |
+| Checking, rules found some | –               | Band already yellow or red with the rules' verdict; the line says the AI check is still running                                                                                |
+| Dangerous                  | `Dangerous`     | "Dangerous", "Don't click the links, don't reply, don't open attachments."                                                                                                     |
+| Suspicious                 | –               | "Suspicious", "Some signs of phishing. Don't enter passwords or pay through this email."                                                                                       |
+| Looks safe                 | `Safe`          | "Looks safe", "No signs of phishing found."                                                                                                                                    |
+| Not checked by AI          | –               | Grey band, "No red flags found", "Not checked by AI. The basic checks alone can miss a well-written scam."                                                                     |
+| Deep check offered         | `Dangerous`     | Button "Deep check in the cloud…", under it one line only when it is recommended or unavailable                                                                                |
+| Consent, preparing         | –               | "Looking for names on this device…" with elapsed time and Stop; Send is not shown yet                                                                                          |
+| Consent, preview           | `Consent`       | Level cards, chips of what was removed, "Never sent: …", fold "Show what will be sent", Send, Cancel                                                                           |
+| Consent, names unchecked   | –               | Same, plus the warning "Some names may still be in the text: read it before you send."                                                                                         |
+| Sending                    | –               | "Checking in the cloud…" with elapsed time and Stop                                                                                                                            |
+| Cloud result               | –               | A second band "Deep check: Dangerous / Suspicious / Looks safe" with reasons and advice; "Sent once: the data above."                                                          |
+| Cloud failed               | –               | "The deep check did not work (short reason). The result above still applies."                                                                                                  |
+| Email changed meanwhile    | –               | The five messages in `deep-check-view.ts` (`CHANGED`), in the consent's status line                                                                                            |
+| Dark mode                  | `DangerousDark` | Same words, dark tokens                                                                                                                                                        |
 
-1. **Header** (on every screen): logo, "PhishLocal", and a status pill on the right:
-   - "On-device AI ready" (green dot);
-   - "On-device AI loading" (spinner) while the model loads;
-   - "On-device AI 42%" (spinner) while the model downloads.
-2. **Email strip**: subject (one line, cut with "…"), then sender name · address (one line),
-   and an icon button "Check the open email again" (refresh icon, `aria-label`).
-3. **Verdict card**: a tinted top band with a round symbol and the verdict word, one line below
-   it; then the reasons, a "What to do" box and a footer line. Details below.
-4. **Red flags** (heading with a count badge), one card per finding.
-5. **Links** (heading with a count badge), one card per link.
-6. **Deep check** button.
-7. **"Email details"** and **"Check another email"**, both folded (`<details>`).
+"Basic checks" is the tier-1 name for the rule checks. "AI" is the tier-1 name for the on-device
+model; "Gemini Nano" appears only in the empty, loading and download texts and in tier 3.
 
-The page is one column, 16 px side padding, 12 px between blocks. It must work from 320 px wide
+## Layout, top to bottom
+
+Every part is its own component (see "How to build it"); the page sets the spacing between them.
+
+1. **Top bar** (always): logo, "PhishLocal", and the model pill on the right. The pill is
+   neutral (grey) in every state: a dot when ready, a spinner while loading or downloading, a
+   small "!" when the AI is not available or not loaded. Words: "On-device AI ready", "On-device
+   AI loading", "On-device AI 42%", "AI not available", "AI not loaded".
+2. **Model banner** (only when the model needs the user): not downloaded (text and the
+   "Download now" button), downloading (progress bar with `role="progressbar"`), unavailable
+   (text only). It never replaces the email below it.
+3. **Empty state** (only without an email): heading, text, the outlined button "Paste an
+   email", then "How your privacy is kept" with three points (icon, bold lead, one sentence), then
+   the footer line "Languages: en · de · fr · es · it · pt" and a "How it works" button that opens
+   the README. Left-aligned, no illustration: the panel is too narrow for a hero, and the logo is
+   already in the top bar.
+4. **Email strip** (with an email): subject (one line, cut with "…"), then the sender: the
+   address domain first and bold, the display name after it in grey, the full address on its own
+   line, wrapping, never cut. Third line, the sender status: "Sender confirmed by Gmail" (DMARC
+   pass from `mx.google.com`), "Sender confirmed by your mail server" (pass from another server
+   in pasted raw source), "Sender not confirmed" (no headers, or no pass), "Checking the sender…"
+   (Gmail headers still loading). On the right an icon button "Check the open email again".
+   Under the strip one muted line for the source status ("Checked automatically", "Pasted
+   email", "Sample loaded: …") and errors.
+5. **Verdict band:** a tinted head with a round symbol, the verdict word and one status line;
+   then the reasons (up to five, as the AI gives them), the "What to do" box, and the footer
+   "Checked on this device · Done in 1.4 s". While the AI check runs, the footer shows the
+   elapsed time and the Stop button instead.
+6. **Red flags** (heading "Red flags (3)", the count as text): one list in one card, one row per
+   danger or warning finding, rows separated by a hairline: a badge ("Danger" or "Warning", with
+   its symbol), the finding's title in plain words, then the evidence: "Says" and "Opens" rows
+   for link findings, "Looks like" and "Is" for lookalike domains, quoted phrases as chips,
+   otherwise the finding's sentence. The badge alone carries the severity; rows have no coloured
+   borders (a coloured bar on every row emphasises nothing). The count counts danger and warning
+   findings only. Hidden when there are none.
+7. **Links** (heading "Links (2)"): one list in one card, one row per flagged link (its badge,
+   the real domain bold, "forwards to" when it does, the shortened URL in monospace), then a fold
+   "N more links" with the unflagged ones in the same form. Link texts appear only in the
+   red-flag rows ("Says"), never twice.
+8. **Deep check:** one outlined button "Deep check in the cloud…" under the links. Filled (blue)
+   only when recommended: the AI did not run, or the UI language is one where its answers are
+   experimental (it, pt). Disabled with the line "Not available in this build" when the build has
+   no App Check. Clicking it opens the consent section in place (the strip and the band stay
+   visible; red flags and links are hidden while it is open), with "Back to the result" to close
+   it.
+9. **"Email details"** (a `<details>` fold): From, Subject, Sender checks (SPF, DKIM, DMARC by
+   name), Reply-To, Return-Path, "AI and basic checks" (how the verdict was combined, the AI's
+   own level when the rules were stricter, "the AI's notes" for a confirmed sender), Notes (the
+   `info` findings), Text.
+10. **"Check another email"** (a `<details>` fold): the paste form (From, Subject, Email text,
+    "Use pasted email", "Clear") and, in dev and judges builds only, the sample row. "Paste an
+    email" on the empty card opens this fold and focuses the text field.
+11. **Developer tools** (dev builds only): the test prompt, "Force cloud", "Run prompt".
+
+The page is one column, 16 px side padding, 12 px between parts. It must work from 320 px wide
 without sideways scrolling.
 
-### Screen 1: empty
+### The consent section
 
-- Illustration (envelope with a shield), heading "Open an email in Gmail", text "PhishLocal
-  checks it here, automatically, while this panel is open. The email never leaves your browser."
-- One outlined button: **"Paste an email"**. No sample button.
-- "How your privacy is kept", three points with icons:
-  - **Checked on this device** – "Rule checks plus Gemini Nano, built into Chrome. Works
-    offline."
-  - **Nothing is saved** – "Close the panel and all reading stops."
-  - **Cloud only if you ask** – "Personal data is removed first, and you see exactly what is
-    sent."
-- Footer: "Languages: en · de · fr · es · it · pt" and a "How it works" link.
-
-### Screen 2: checking
-
-- Verdict card in grey: "Checking…", below it "Rules first, then the on-device AI".
-- Two steps:
-  - ✓ "Rule checks" – "No red flags found" – "0.1 s" on the right;
-  - spinner "On-device AI" – "Chrome is preparing Gemini Nano" – a moving (indeterminate) bar –
-    elapsed time on the right ("2:14", counting up).
-- Info box: "The first check after Chrome restarts can take a few minutes."
-- Full-width outlined button **"Stop"**.
-- If the rules found a danger, the card is already red (the rules are the AI's lower limit);
-  the grey card is only for "rules found nothing".
-- Under "reduce motion" the bar and spinners stand still.
-
-### Screens 3, 4 and 6: result
-
-- Verdict band: **Dangerous** – "Don't click the links and don't reply." / **Suspicious** /
-  **Looks safe** – "No signs of phishing found."
-- Reasons: up to three short sentences from the AI (dangerous: bullets; safe: green check marks).
-- "What to do" box (lightbulb icon), one sentence.
-- Footer line: lock icon and **"Checked on this device"** on the left, **"Done in 1.4 s"** on the
-  right (the check's duration, not the time of day).
-- **Red-flag cards**: a badge ("Danger" or "Warning", with a symbol), the finding's title, then
-  the evidence:
-  - link text vs target as two rows, "Says" and "Opens" (target in bold, danger colour);
-  - quoted phrases as grey chips ("within 24 hours");
-  - the card's border has the badge's colour (danger or warning).
-- **Link cards**: warning triangle (when flagged), the real domain in bold and large, "Shown as:
-  …" below, then the shortened URL in monospace. The border follows the link's own mark: danger,
-  warning, or grey for an unflagged link.
-- **Deep check**: on screen 3 a full-width blue button row: cloud icon, **"Deep check in the
-  cloud…"**, arrow on the right; the whole row is one `<button>`. No description next to it (the
-  description is on screen 5).
-
-### Screen 5: deep check in the cloud
-
-- "← Back to the result", heading **"Deep check in the cloud"**.
-- Text: "A larger model in the cloud checks again. Personal data is removed on this device
-  first, and you can see the exact data before anything is sent." Then: "Nothing has been sent
-  yet. Choose how much to remove, then decide."
-- **Privacy level**: two cards, each a radio button with a title and a list. The selected card
-  has a blue border and a light blue background.
+- Heading "Deep check in the cloud", text "A larger model in the cloud checks again. Personal
+  data is removed on this device first." and "Nothing has been sent yet."
+- **Privacy level:** two radio cards. Clicking anywhere on a card selects it (the card forwards
+  the click to its radio; the list is not inside the `<label>`). The selected card has an accent
+  border and tint.
   - **Standard** – "Removes:" Email addresses; Phone, card, account and customer numbers; IBANs;
     Link paths (the website's name stays).
   - **High** – "Removes:" Everything from Standard; **Names of people** (bold).
-  - Only the radio button and the title select a card (a list inside a `<label>` is not valid
-    HTML).
-- **"Show what will be sent"**: a button with `aria-expanded`, closed by default; it opens:
-  - "Removed on this device" with counts as chips ("1 name", "1 email address", …);
-  - "Never sent: your address, the raw headers, server IP addresses.";
-  - "Exactly this will be sent": the JSON, monospace, scrollable, with the placeholders
-    (`[name]`, `[email]`, `[number]`, `[link: …]`) highlighted;
-  - "Highlighted: what was replaced on this device."
-- Buttons: **"Send to the cloud"** (filled blue, cloud icon), **"Cancel"** (outlined), both full
-  width. Below: "Sent once, for this check only, to Gemini through Firebase AI Logic."
-
-### Screen 7: first model download
-
-- Card "Setting up on-device AI": "Chrome downloads Gemini Nano once, about 4 GB. After that,
-  checks run on this device, also offline."
-- A progress bar with the real percentage (`downloadprogress`, `event.loaded` 0–1, already read
-  by `downloadOnDeviceModel()` in `src/ai.ts`), `role="progressbar"` with `aria-valuenow`.
-- Info box: "Rule checks already work while you wait. You can keep using Gmail."
+  - Default Standard, remembered in the browser. Changing the level rebuilds the data at once;
+    at High that starts the name search.
+- **While preparing** (High only): one line "Looking for names on this device… 0:07", a Stop
+  button; the chips, the fold and Send are not shown. Standard needs no search: its data shows at
+  once.
+- **Preview:** chips "1 name", "2 email addresses", "1 number", "1 link path" (or "No personal
+  data found"), the line "Never sent: your address, the raw headers, server IP addresses.", when
+  names could not be checked the warning "Some names may still be in the text: read it before
+  you send.", then the fold **"Show what will be sent"** (a button with `aria-expanded`, closed
+  by default) with the JSON, monospace, scrollable, exactly the text that is sent, no
+  highlighting (a highlight built from the text could mark an attacker's own "[name]" as removed).
+- Buttons: **"Send to the cloud"** (filled, cloud icon), **"Cancel"** (outlined), full width.
+  Below: "Sent once, for this check only, to Gemini through Firebase AI Logic."
+- **Sending:** "Checking in the cloud… 0:03" and Stop; Send and Cancel are gone; the data stays.
+- **Result:** a second band "Deep check: …" with the cloud's reasons and advice, the footer
+  "Checked in the cloud · Done in 1.9 s", and the status "Sent once: the data above." The data
+  fold stays as the record. The button "Deep check in the cloud…" is available again.
 
 ## Wording
 
-The same thing has the same name everywhere:
+Tier-1 texts. The same thing has the same name everywhere.
 
-| Use                      | Not                                             |
-| ------------------------ | ----------------------------------------------- |
-| Deep check in the cloud… | Get a second opinion, Prepare a deep check…     |
-| Show what will be sent   | Advanced: show the data that will be sent       |
-| On-device AI loading     | AI loading                                      |
-| Checked on this device   | Checked on this device · rules + Gemini Nano    |
-| Done in 1.4 s            | Checked 2:14 PM                                 |
-| Names of people          | Names of people, found by Gemini Nano on this … |
-| Paste an email           | Not in Gmail? Paste an email; Try a sample      |
+| Thing                       | Words                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| Verdict words               | Checking… / Dangerous / Suspicious / Looks safe / No red flags found                       |
+| Dangerous line              | This looks like phishing. Don't click the links, don't reply, don't open attachments.      |
+| Suspicious line             | Be careful: some signs of phishing. Don't enter passwords or pay through this email.       |
+| Looks safe line             | No signs of phishing found.                                                                |
+| Not checked by AI           | Not checked by AI. The basic checks alone can miss a well-written scam.                    |
+| AI running line             | Basic checks done, AI check running (or: Basic checks found red flags, AI check running)   |
+| Result footer               | Checked on this device · Done in 1.4 s                                                     |
+| Cloud result footer         | Checked in the cloud · Done in 1.9 s                                                       |
+| Sender status               | Sender confirmed by Gmail / Sender not confirmed / Checking the sender…                    |
+| Hedges                      | Verdict words are nouns; the line under them hedges ("looks like", "some signs"), never    |
+|                             | "this is phishing" and never "this is safe"                                                |
+| The rule checks             | basic checks (tier 1 and 2); "rule checks" in tier 3 and in the docs                       |
+| The on-device model         | AI, on-device AI; "Gemini Nano" in the empty, loading, download texts and tier 3           |
+| Deep check button           | Deep check in the cloud…                                                                   |
+| Privacy levels              | Standard / High; "Names of people"                                                         |
+| Data fold                   | Show what will be sent                                                                     |
+| Cloud send                  | Send to the cloud / Cancel / Stop                                                          |
+| After sending               | Sent once: the data above.                                                                 |
+| Paste                       | Paste an email (empty card), Check another email (fold), Use pasted email, Clear           |
+| Refresh                     | Check the open email again                                                                 |
+| Privacy points (empty card) | Checked on this device / No email is saved / Cloud only if you ask                         |
+| Not                         | Get a second opinion, Prepare a deep check…, AI loading, Checked 2:14 PM, Nothing is saved |
 
-## Visual tokens
+### Red-flag titles
+
+Plain-word titles per rule, for the red-flag cards; the rule's sentence stays in tier 3 and in
+the prompt. `info` findings are notes in "Email details" and have no card.
+
+| Rule                   | Title                                              | Evidence shown                       |
+| ---------------------- | -------------------------------------------------- | ------------------------------------ |
+| `dangerous-link`       | A link runs code instead of opening a page         | the link's scheme                    |
+| `hidden-link-target`   | A link hides where it really goes                  | Opens: real host                     |
+| `ip-link`              | A link goes to a bare number address               | Opens: the IP address                |
+| `international-domain` | A web address uses letters from another alphabet   | the host                             |
+| `link-text-mismatch`   | A link doesn't go where its text says              | Says: link text · Opens: real domain |
+| `lookalike-domain`     | A web address imitates a known one                 | Looks like: real domain · Is: domain |
+| `brand-in-subdomain`   | A known name is used in front of another address   | the host                             |
+| `brand-in-domain`      | A web address contains a known name but isn't it   | the domain                           |
+| `sender-name-domain`   | The sender's name doesn't match the address        | Name says · Address is               |
+| `sender-name-brand`    | The sender claims a brand from another address     | Name says · Address is               |
+| `hidden-characters`    | Words contain invisible characters                 | the words                            |
+| `mixed-script`         | Words mix letters from different alphabets         | the words                            |
+| `direction-override`   | Text is written backwards to disguise an address   | the finding's sentence               |
+| `reply-to-mismatch`    | Replies would go to a different company            | the Reply-To domain                  |
+| `dmarc-fail`           | The sender's address is forged                     | the finding's sentence               |
+| `auth-fail`            | The sender's mail server didn't confirm this email | the finding's sentence               |
+| `incomplete-check`     | Part of this email could not be checked            | the finding's sentence               |
+| `credentials`          | Asks for passwords, identity or card details       | quoted phrases                       |
+| `payment`              | Asks for a payment                                 | quoted phrases                       |
+| `urgency` (info)       | Time pressure                                      | quoted phrases (tier 3)              |
+| `threat` (info)        | Threatens consequences                             | quoted phrases (tier 3)              |
+| `redirect-link` (info) | A link goes through a forwarding service           | the service's host (tier 3)          |
+| `dkim-other-domain`    | Signed by another domain                           | tier 3                               |
+| `no-auth-results`      | No sender checks in this email                     | tier 3                               |
+
+## Visual system
 
 Define these as custom properties on `:root`, with the dark values under
-`@media (prefers-color-scheme: dark)`. Font: `system-ui` (no web font: nothing remote). Text
-sizes 12 / 13 / 14 (body) / 15 / 18–19 px; weights 400, 600, 650–700.
+`@media (prefers-color-scheme: dark)`. Font: `system-ui` (no web font: nothing remote).
+
+**Type:** 12 / 13 / 14 (body) / 15 / 18 px, line height 1.45; weights 400, 600 and 700 only.
+Line heights on the 4 px grid: 16 / 18 / 20 / 22 / 24 px. Hierarchy by weight and colour
+before size. **Space:** 4 / 8 / 12 / 16 / 24 px. **Radii:** one scale, inner smaller than
+outer: cards 12 px, buttons and boxes 8 px, chips 6 px, pills and badges round. **Buttons:**
+40 px high (44 px for Send and Cancel), one filled button per screen at most, hierarchy filled →
+outlined → plain text, a visible `:focus-visible` ring. **Boxes:** a card only around a thing
+that stands on its own (the verdict, a list, the consent); everything else is grouped by
+spacing and headings, and rows inside a list are separated by a hairline, not boxed. No coloured
+side bars, no gradients, no shadows, no emoji. **Colour:** one accent (blue) for interactive
+things only, the three semantic colours only for a real state, grey for everything else.
+**Icons:** one set, one stroke width (2 px on a 24 px grid), drawn as SVG files and shown
+through CSS `mask-image`, so the panel's DOM holds no `<svg>` and email text can never become
+one.
 
 | Token          | Light     | Dark      | Use                                   |
 | -------------- | --------- | --------- | ------------------------------------- |
@@ -162,8 +249,8 @@ sizes 12 / 13 / 14 (body) / 15 / 18–19 px; weights 400, 600, 650–700.
 | text-secondary | `#4A525C` | `#B0B8C1` | descriptions                          |
 | text-muted     | `#5A626C` | `#9AA3AD` | meta lines, labels                    |
 | accent         | `#1A56DB` | `#8AB4FF` | buttons (light), links, focus         |
-| accent-tint    | `#EEF3FE` | –         | info boxes, chips                     |
-| selected-tint  | `#F3F7FF` | –         | selected privacy level                |
+| accent-tint    | `#EEF3FE` | `#1C2A47` | info boxes, chips                     |
+| selected-tint  | `#F3F7FF` | `#1A2740` | selected privacy level                |
 | danger         | `#B42318` | `#E5484D` | symbols, fills                        |
 | danger-text    | `#8F1D14` | `#FFB4AB` | verdict word, badge text              |
 | danger-tint    | `#FDEEEC` | `#3A1D1B` | verdict band, badge                   |
@@ -172,60 +259,106 @@ sizes 12 / 13 / 14 (body) / 15 / 18–19 px; weights 400, 600, 650–700.
 | warning-text   | `#7A4A00` | `#FFD58A` | badge text                            |
 | warning-tint   | `#FFF4DE` | `#3A2E14` | badge                                 |
 | warning-border | `#EBCB8B` | `#5A4720` | cards                                 |
-| safe           | `#1E7A3C` | `#4CC27A` | symbols, dot                          |
-| safe-text      | `#155C2C` | `#8FD6A5` | verdict word, pill text               |
-| safe-tint      | `#EAF6EE` | `#17321F` | verdict band, pill                    |
-| safe-border    | `#BFE3CB` | –         | verdict card                          |
-| pending        | `#6B737D` | –         | "Checking…" symbol                    |
-| pending-tint   | `#F0F2F5` | –         | "Checking…" band, loading pill, chips |
+| safe           | `#1E7A3C` | `#4CC27A` | symbols                               |
+| safe-text      | `#155C2C` | `#8FD6A5` | verdict word                          |
+| safe-tint      | `#EAF6EE` | `#17321F` | verdict band                          |
+| safe-border    | `#BFE3CB` | `#2A5236` | verdict card                          |
+| pending        | `#6B737D` | `#8A939D` | "Checking…" and "unchecked" symbol    |
+| pending-tint   | `#F0F2F5` | `#232930` | "Checking…" band, loading pill, chips |
 
-"–": not drawn in the mockup yet; pick a value when implementing. The contrast of every pair has
-not been measured: check each one (text 4.5:1, symbols and meaningful borders 3:1) before using
-it, as `style.css` does today for the traffic light.
-
-Shapes: cards 12 px corners, buttons and boxes 8 px, badges and pills fully round. Buttons are
-40 px high (44 px on screen 5), with a visible `:focus-visible` ring. Icons are simple stroke
-icons (24-unit grid, 1.8–2.2 stroke).
+Every pair is measured before use (text 4.5:1, symbols and meaningful borders 3:1); the
+measurements live as comments in `style.css`.
 
 ## How to build it
 
-- Plain HTML, CSS and TypeScript as today; no component library and no new dependency.
-- Icons: static inline `<svg>` in `index.html`, or CSS `mask-image` with a bundled file. Never
-  build SVG from a string (`innerHTML` is forbidden in `src/`).
-- Placeholder highlighting in the JSON: split the text and build `<span>` elements with
-  `textContent`; the JSON text itself must stay exactly what is sent.
-- Folding: native `<details>` for "Email details" and "Check another email"; a button with
-  `aria-expanded` for "Show what will be sent".
-- Keep the element IDs that `main.ts` and the monkey tests use where possible; a new button or
-  state belongs in the monkey tests' move lists (see `CLAUDE.md`).
-- The test prompt section ("Test prompt", "Run prompt") is still visible in production builds
-  (only "Force cloud" is hidden); show it in dev builds only.
-- The extension has no icons in `manifest.json` yet: add 16, 32, 48 and 128 px versions of the
-  logo (blue rounded square with a white shield and check mark).
+- Plain HTML, CSS and TypeScript; no component library, no new dependency.
+- **CSS architecture:** cascade layers `tokens, base, layout, components, utilities`, and
+  nothing outside a layer. Tokens have semantic names (`--color-danger-text`, `--space-3`),
+  never raw hex outside the tokens layer. Width-dependent layout reacts to the panel
+  (`container-type: inline-size` on the page root, `@container`), not to the viewport. Logical
+  properties (`padding-inline`, `margin-block-start`).
+  Components are classes with a prefix per component (`.band`, `.band__word`, `.flag`,
+  `.pill`), low specificity (`:where()` where needed), no outer margins: the parent sets the gap
+  (`.stack` and `.row` primitives). A component never styles the inside of another component, no
+  descendant selectors across components, no `:last-child` margin tricks, no fixed heights on
+  text. Flex children that hold email text get `min-width: 0` and `overflow-wrap: anywhere`.
+  That is what lets a later edit on one component leave the others' spacing alone.
+- **Modules:** each part keeps a `create…(elements, deps)` function with the elements it owns
+  passed in, as today; a part never queries the DOM of another part. Shared DOM helpers (`el()`,
+  `setText()`, icons by name) live in `src/sidepanel/ui.ts`.
+- Icons: SVG files in `src/sidepanel/icons/`, shown through CSS `mask-image` on a `.icon` span.
+  Never build SVG from a string (`innerHTML` is forbidden in `src/`).
+- Folding: native `<details>` for "Email details", "Check another email" and "N more links"; a
+  button with `aria-expanded` for "Show what will be sent".
+- External links (README) open with `chrome.tabs.create`, so the panel's DOM holds no `<a>`.
+- Keep the element IDs that `main.ts` and the tests use where possible; a new button or state
+  belongs in the monkey tests' move lists and promises (see `CLAUDE.md`).
+- Dev-only parts (test prompt, sample row) stay in `index.html` with `hidden` and are shown by
+  `main.ts` in the right builds, so the tests see the same page.
+- The extension gets icons in `manifest.json`: 16, 32, 48 and 128 px PNGs rendered from the logo
+  SVG (blue rounded square, white shield and check mark).
 
-## Open points
+## Decisions (22 Nov 2026)
 
-1. **"Show what will be sent" is closed by default.** `CLAUDE.md`, `docs/ai-check.md` (step 5,
-   "the panel shows exactly that data") and `JOURNEY.md` ("Showing the exact data before sending
-   covers the miss") promise that the user sees the data before consenting. With the fold, a user
-   can send without looking. Screen 1 ("you see exactly what is sent") and screen 5 ("you can
-   see the exact data") say the same. Decide before implementing; if the fold stays, update those
-   three files and the two screen texts. Either way, a warning that names may remain (after the 20 s limit or without the model)
-   must stay visible outside the fold.
-2. **Sample emails:** hidden from users. Not decided yet: keep them in dev and judges builds for
-   the demo video and for judges whose inbox has no phishing (`TIMETABLE.md`: "demo must always
-   work").
-3. **Screen 6 and screen 4** still show the older deep check button (screen 6: icon above an
-   outlined button; screen 4: a text button). Decide whether both get screen 3's blue row; on a
-   safe email a strong blue button may pull attention from "Looks safe".
-4. **Screen 1:** only the paste button was changed; the heading "Open an email in Gmail" is still
-   there. Confirm.
-5. **Default privacy level:** the mockup shows High selected as an example; the code's default
-   (Standard, remembered in `localStorage`) stays unless decided otherwise.
+1. **The exact data is folded, what was removed is not.** The user sees the chips and the
+   "Never sent" line before consenting; the JSON is one click away. `CLAUDE.md`,
+   `docs/ai-check.md` and `JOURNEY.md` say so.
+2. **Sample emails** only in dev and judges builds.
+3. **One deep check button** on every result, outlined; filled only when recommended.
+4. **Empty heading** "Open an email in Gmail" stays; two more variants for other tabs and
+   unreadable emails.
+5. **Default privacy level** Standard.
 6. **Download progress:** measure whether Chrome also sends 0 % and 100 % when the model is
-   already downloaded before the panel relies on it.
-7. **The result after sending** (the sent data stays on screen as the record, `docs/ai-check.md`)
-   is not in the mockup yet.
-8. **Plain words in the AI's reasons:** screen 4's first reason names SPF, DKIM and DMARC,
-   against the "plain words" principle. The reasons come from the AI, so this is a prompt
-   question for the tuning task (Wed 25 Nov), not a layout one.
+   already downloaded; show the bar only once a value between them arrived.
+7. **The result after sending** is a second band under the consent section.
+8. **Plain words in the AI's reasons** (screen `Safe` names SPF, DKIM and DMARC) is a prompt
+   question for the tuning task.
+9. **No sample emails and no "How it works" link as `<a>`:** the monkey test keeps its promise
+   that the panel's DOM holds no `a`, `svg`, `img` or `template`.
+
+## Mockup review
+
+What the mockup shows and this file changes, so that nobody builds from the mockup alone:
+
+- The email strip puts the display name first and cuts the address: here the domain comes first.
+- `Dangerous` shows "Link text and real target differ" as Danger and "Time pressure" as Warning;
+  in the code they are warning and info.
+- `Safe` shows two links in one card; here one card per link, unflagged links folded.
+- `Dangerous` has a filled blue deep check row, `Safe` a text button, `DangerousDark` an older
+  outlined block; here one outlined button.
+- `Consent` shows the data at once and has no preparing, sending or result state; it also drops
+  the email strip.
+- The header pill is green; here neutral.
+- `Main` says "Nothing is saved"; here "No email is saved".
+- Missing in the mockup: Suspicious, "No red flags found (not checked by AI)", model unavailable,
+  model not downloaded, the paste form, the cloud result.
+- `Dangerous` borders every red-flag and link card in its severity colour and uses count pills on
+  the headings; here the badge alone carries the severity, rows share one card, and the count is
+  plain text. A coloured bar on every row is the mark of generated UIs and emphasises nothing.
+- `Main` centres an illustration; here the empty state is left-aligned without one.
+
+## Sources
+
+Researched on 22 Nov 2026 for this spec; the rules above are distilled from them.
+
+- Wording of real warnings: Chrome's interstitials ("Dangerous site", "This site doesn't seem
+  right", "Did you mean …?"; `security_interstitials_strings.grdp` in Chromium), Gmail's
+  banners ("This message seems dangerous", "Be careful with this message", "Gmail can't confirm
+  who sent you the email"; Gmail help 185812 and 13130196), Outlook's "This sender failed our
+  fraud detection checks and may not be who they appear to be", Proton's "Official" badge.
+  None of them names SPF, DKIM or DMARC in the default view; all pair a hedged headline with one
+  plain reason and one safe action.
+- Warning research: Akhawe and Felt, "Alice in Warningland" (USENIX 2013); Felt et al.,
+  "Improving SSL Warnings" (CHI 2015): opinionated design with one safe choice raises adherence;
+  Microsoft's NEAT/SPRUCE checklist (necessary, explained, actionable; source, process, risk,
+  unique, choices, evidence); NCSC, "Telling users to avoid clicking bad links still isn't
+  working" (no blame, no fear).
+- Visual craft: Atlassian (spacing, lozenges, one primary button, empty states), Shopify Polaris
+  (one primary button per section), GitHub Primer (type scale, semantic tokens), Material 3 and
+  Apple HIG (type, dark mode is not inversion), Lucide's icon guide (24 px grid, 2 px stroke),
+  Refactoring UI ("use fewer borders"), and the published lists of "generated UI" tells
+  (thefountaininstitute.com, superdesign.dev): boxes around everything, coloured side bars,
+  gradients, emoji icons, centred heroes, badges everywhere.
+- CSS architecture: Every Layout (stack, composition), CUBE CSS, Max Stoiber ("margin considered
+  harmful"), MDN (`@layer`, `:where()`, container queries, logical properties), Josh Comeau
+  (`min-width: 0` in flex children).

@@ -296,8 +296,8 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   filter has run can rebuild what the filter removed.
 - Let a small model point, not write: Gemini Nano only lists the names it sees, and our code
   removes only strings that are really in the text. A prompt injection can then make it miss a
-  name, but never add anything to what leaves the device. Showing the exact data before sending
-  covers the miss.
+  name, but never add anything to what leaves the device. Showing what was removed, and the exact
+  data one click away, before sending covers the miss.
 - A filter in front of the network should assume its input was already cut somewhere: patterns
   that need a whole address or IBAN miss the half that a field limit leaves behind.
 - A progress bar needs a source: a percentage the code cannot measure would stop at 90 % for
