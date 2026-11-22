@@ -65,7 +65,10 @@ explain every red flag, and work offline, with a cloud only as fallback."
   request and the ready model). Ruled out: our code, RAM, disk, CPU, crash backoff
   (`model_crash_count` 0, performance class 6), the empty GPU cache files, and Chrome still
   running in the background. The first Chrome start after a PC restart loaded in 14.1 s; the next
-  Chrome restart took 125 s again. Cause unknown (outside the extension). Full record, with the
+  Chrome restart took 125 s again. Cause found the same night: the weights load in 2.5 s; the
+  minutes are the first prefill, where the NVIDIA D3D12 driver blocks 1–7 s for about 80 of the
+  334 GPU compute pipelines Chrome's ML library creates for every new service process (outside
+  the extension; machine or driver specific until measured elsewhere). Full record, with the
   measuring methods: `docs/model-load-debugging.md`.
 - `PREFER_ON_DEVICE` falls back to the cloud silently, so the hybrid test prompt is for test
   text only. Real emails go to the on-device model (`InferenceMode.ONLY_ON_DEVICE`, decided 17 Nov
