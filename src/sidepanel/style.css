@@ -903,6 +903,53 @@
     display: none;
   }
 
+  /* The footer: where the check ran (lock icon), how long it took, or Stop while it runs. */
+  .band__foot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-block-size: var(--leading-xs);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    color: var(--color-text-3);
+  }
+
+  .band__foot:not(:has(:not(:empty):not([hidden]))) {
+    display: none;
+  }
+
+  .band__source {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .band__source:not(:empty)::before {
+    content: '';
+    display: inline-block;
+    inline-size: 14px;
+    block-size: 14px;
+    margin-inline-end: 6px;
+    vertical-align: -3px;
+    background: currentColor;
+    mask-image: url(./icons/lock.svg);
+    mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+  }
+
+  .band__time {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .band__stop {
+    margin-inline-start: auto;
+    font-size: var(--text-s);
+  }
+
+  .band[data-risk='unchecked'] .band__word::after {
+    mask-image: url(./icons/minus.svg);
+  }
+
   /* ---- Details list (tier 3). ---- */
   .details {
     display: flex;

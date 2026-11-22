@@ -364,6 +364,7 @@ const MOVES: Record<string, () => void> = {
       'paste-open',
       'sample-load',
       'how-it-works',
+      'ai-stop',
       'run',
     ]);
     trace.push(`click #${id}`);
@@ -467,6 +468,9 @@ const STATUS_IDS = [
   'ai-status',
   'ai-reasons',
   'ai-advice',
+  'ai-source',
+  'ai-time',
+  'ai-detail',
   'status',
   'progress',
   'deep-check-intro',
@@ -518,11 +522,16 @@ function checkPanelOnce(): void {
       `AI: ${(get('ai-status').textContent ?? '').replace(/[\d.]+ s/g, 'N s').slice(0, 40)}`,
     );
     const rules = listedRuleRisk();
-    if (risk === 'pending') expect(rules).toBe('safe');
+    if (risk === 'pending' || risk === 'unchecked') expect(rules).toBe('safe');
     else {
       expect(RISKS).toContain(risk);
       expect(LEVEL[risk as Risk], 'verdict below the rules').toBeGreaterThanOrEqual(LEVEL[rules]);
     }
+    // A green light only with an AI answer: without one, "no red flags" stays grey.
+    if (risk === 'safe')
+      expect(get('ai-source').textContent, 'green without AI').toBe('Checked on this device');
+    const word = get('ai-overall').textContent ?? '';
+    reached.add(`word: ${word}`);
   }
   // The deep check belongs to the shown email: it comes and goes with the verdict.
   const deep = get('deep-check');
@@ -693,9 +702,11 @@ x</pre>`,
           'light safe',
           'light suspicious',
           'light dangerous',
-          'AI: On-device (Gemini Nano)',
-          'AI: The AI check failed',
-          'AI: On-device model still loading',
+          'light unchecked',
+          'AI: This looks like phishing.',
+          'AI: Not checked by AI.',
+          'AI: AI check running',
+          'AI: On-device AI loading',
           'email: Checked automatically',
           'email: Pasted email',
           'email: Raw email read',

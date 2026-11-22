@@ -359,7 +359,7 @@ describe('the deep check', () => {
     runs[0]?.resolve(answer('safe'));
     await vi.waitFor(() => expect(get('result').hidden).toBe(false));
     expect(text('overall')).toBe(
-      'Deep check: Dangerous (rule checks; the cloud AI said: no signs of phishing)',
+      'Deep check: Dangerous (basic checks; the cloud AI said: no signs of phishing)',
     );
     expect(text('advice')).not.toBe('Cloud advice.');
   });

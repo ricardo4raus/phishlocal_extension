@@ -300,6 +300,10 @@ const aiCheck = createAiCheck(
     status: byId<HTMLElement>('ai-status'),
     reasons: byId<HTMLUListElement>('ai-reasons'),
     advice: byId<HTMLElement>('ai-advice'),
+    source: byId<HTMLElement>('ai-source'),
+    time: byId<HTMLElement>('ai-time'),
+    stop: byId<HTMLButtonElement>('ai-stop'),
+    detail: byId<HTMLElement>('ai-detail'),
   },
   {
     run: runAiCheck,

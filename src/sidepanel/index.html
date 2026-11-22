@@ -142,7 +142,7 @@
           <section id="verdict" class="band" aria-label="Result" hidden>
             <div class="band__head">
               <!-- Only the verdict line is announced; the status below counts seconds. -->
-              <p id="ai-overall" class="band__word" role="status"></p>
+              <p id="ai-overall" class="band__word" role="status" tabindex="-1"></p>
             </div>
             <div class="band__body">
               <p id="ai-status" class="band__line"></p>
@@ -151,6 +151,13 @@
                 <span class="icon" data-icon="bulb" aria-hidden="true"></span>
                 <p id="ai-advice"></p>
               </div>
+              <p class="band__foot">
+                <span id="ai-source" class="band__source"></span>
+                <span id="ai-time" class="band__time"></span>
+                <button id="ai-stop" type="button" class="btn btn--plain band__stop" hidden>
+                  Stop
+                </button>
+              </p>
             </div>
           </section>
 
@@ -225,6 +232,8 @@
               <dd id="email-subject" class="details__value"></dd>
               <dt class="details__term">Sender checks</dt>
               <dd id="email-auth" class="details__value"></dd>
+              <dt class="details__term">AI and basic checks</dt>
+              <dd id="ai-detail" class="details__value"></dd>
               <div id="email-header-rows" class="details" hidden>
                 <dt class="details__term">Reply-To</dt>
                 <dd id="email-reply-to" class="details__value"></dd>
