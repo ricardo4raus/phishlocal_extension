@@ -188,18 +188,25 @@ describe('findNames through the Firebase SDK', () => {
     options: { signal?: AbortSignal; responseConstraint?: unknown };
   }[];
 
+  /** The options of every session Chrome was asked to create. */
+  let created: Record<string, unknown>[];
+
   beforeEach(() => {
     prompts = [];
+    created = [];
     names = '["Anna Muster"]';
     vi.stubGlobal('LanguageModel', {
       availability: async () => 'available',
-      create: async () => ({
-        destroy: () => {},
-        prompt: async (input: unknown, options: (typeof prompts)[number]['options']) => {
-          prompts.push({ input, options });
-          return names;
-        },
-      }),
+      create: async (createOptions: Record<string, unknown>) => {
+        created.push(createOptions);
+        return {
+          destroy: () => {},
+          prompt: async (input: unknown, options: (typeof prompts)[number]['options']) => {
+            prompts.push({ input, options });
+            return names;
+          },
+        };
+      },
     });
   });
 
@@ -213,6 +220,13 @@ describe('findNames through the Firebase SDK', () => {
       items: { type: 'string' },
     });
     expect(sent).toHaveLength(0);
+  });
+
+  it('asks Chrome for greedy sampling, so the same text gives the same names', async () => {
+    const { findNames } = await import('../../src/ai');
+    await findNames('Dear Anna Muster', 'de');
+    // The last session is the name search's (the first ones are the warm-up's).
+    expect(created.at(-1)).toMatchObject({ temperature: 0, topK: 1 });
   });
 
   it('passes its stop signal to Chrome, and does not start once stopped', async () => {
