@@ -120,8 +120,8 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    gives way and the fold itself is titled "Links (3)", so the count is said once. Link texts
    appear only in the red-flag rows ("Says"), never twice.
 8. **Deep check:** one outlined button "Deep check in the cloud…" under the links. Filled (blue)
-   only when recommended: the AI did not run, or the UI language is one where its answers are
-   experimental (it, pt). Disabled with the line "Not available in this build" when the build has
+   only when recommended: the AI did not run, or the panel's language is one where on-device
+   answers are experimental (it, pt; not the case for the English panel). Disabled with the line "Not available in this build" when the build has
    no App Check. Clicking it opens the consent section in place (the strip and the band stay
    visible; red flags and links are hidden while it is open), with "Back to the result" to close
    it.

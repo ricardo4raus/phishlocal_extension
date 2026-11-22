@@ -4,6 +4,13 @@
  */
 import { revealOverrides } from '../rules/unicode';
 
+/**
+ * The language of the panel's text. The AI answers in it too (on-device and in the cloud), so a
+ * result reads in one language, whatever the language of Chrome or of the email. A translated
+ * panel would set its own language here.
+ */
+export const PANEL_LANGUAGE = 'en';
+
 /** The icons in `icons/`, drawn through CSS masks (see `.icon` in style.css). */
 export type IconName =
   | 'shield-check'

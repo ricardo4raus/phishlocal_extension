@@ -133,7 +133,7 @@ function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
     },
     {
       available: true,
-      uiLanguage: () => 'en-GB',
+      panelLanguage: () => 'en-GB',
       modelReady: async () => true,
       findNames: (searched, _language, signal) =>
         new Promise((resolve) => nameCalls.push({ text: searched, signal, resolve })),
@@ -331,7 +331,7 @@ describe('the deep check', () => {
     check = create({
       savedLevel: () => 'standard',
       // cloudData() reads the email: a hostile shape makes it throw.
-      uiLanguage: () => 'en',
+      panelLanguage: () => 'en',
     });
     check.shown({ ...email, links: undefined as unknown as Email['links'] }, []);
     click('start');
@@ -540,7 +540,7 @@ describe('the deep check', () => {
   });
 
   it('recommends itself where on-device answers are experimental', () => {
-    check = create({ uiLanguage: () => 'it-IT' });
+    check = create({ panelLanguage: () => 'it-IT' });
     check.shown(email, []);
     expect(text('intro')).toContain('Recommended: on-device answers in Italian are experimental');
   });

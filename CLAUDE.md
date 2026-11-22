@@ -24,9 +24,12 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Firebase config comes from `.env.local` (`VITE_FIREBASE_*` variables). `.env.local` is
   git-ignored; `.env.example` with empty values is committed.
 - License: **Apache-2.0** (hackathon requirement: public repo with visible open-source license).
-- Supported email languages: the rule checks cover en, de, fr, es, it, pt; the on-device AI
-  answers in all six, with it and pt marked experimental (Chrome: "output quality cannot be
-  guaranteed"; supported are de, en, es, fr, ja; measured 17 Nov 2026).
+- Supported email languages: the rule checks cover en, de, fr, es, it, pt. The AI answers in the
+  panel's language (`PANEL_LANGUAGE` in `src/sidepanel/ui.ts`, English; decided 22 Nov 2026),
+  whatever the language of Chrome or the email, so a result reads in one language. The code can
+  still answer in de, fr, es, it, pt (it and pt experimental on-device: Chrome says "output
+  quality cannot be guaranteed"; supported are de, en, es, fr, ja; measured 17 Nov 2026) for a
+  translated panel.
 - Privacy is the core selling point: never send email content anywhere without explicit user
   consent.
 - Keep it simple. No frameworks (React etc.) unless I ask. Plain TypeScript + HTML + CSS.

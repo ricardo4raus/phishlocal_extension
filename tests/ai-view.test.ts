@@ -80,7 +80,7 @@ function create(deps: Partial<AiCheckDeps> = {}): AiCheck {
           });
         });
       },
-      uiLanguage: () => 'de-CH',
+      panelLanguage: () => 'de-CH',
       modelReady: () => modelReady(),
       runTimeoutMs: RUN_TIMEOUT_MS,
       ...deps,
@@ -501,7 +501,7 @@ describe('AI check view', () => {
         calls.push([language, known]);
         return verdict('safe');
       },
-      uiLanguage: () => 'it-IT',
+      panelLanguage: () => 'it-IT',
     });
     await show({
       ...email,
@@ -560,7 +560,7 @@ describe('AI check view', () => {
         if (prompt.includes('Broken')) throw new Error('boom');
         return verdict('suspicious');
       },
-      uiLanguage: () => 'en',
+      panelLanguage: () => 'en',
     });
     await show({ ...email, subject: 'Broken' });
     expect(text('detail')).toBe(

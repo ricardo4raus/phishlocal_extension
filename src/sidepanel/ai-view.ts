@@ -162,8 +162,8 @@ export interface AiCheckDeps {
     knownAddresses: ReadonlySet<string>,
     signal: AbortSignal,
   ) => Promise<AiCheckResult>;
-  /** Chrome's UI language, e.g. "de-CH". */
-  uiLanguage: () => string;
+  /** The panel's language (`PANEL_LANGUAGE`), e.g. "en": the AI answers in it. */
+  panelLanguage: () => string;
   /**
    * Waits until the on-device model is loaded (that can take minutes in a bad Chrome state) and
    * says whether it is ready. The run's time limit starts only after that.
@@ -537,7 +537,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   function shown(email: Email, findings: Finding[] | undefined, final: boolean): void {
     clearTimeout(timer);
     last = { email, findings, final };
-    const language = answerLanguage(deps.uiLanguage());
+    const language = answerLanguage(deps.panelLanguage());
     const request: Request = {
       id: ++shownId,
       email,
