@@ -458,7 +458,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     set(elements.overall, m.deepCheck.resultWord(WORD[judged.overall]));
     set(elements.line, LINE[judged.overall]);
     elements.reasons.replaceChildren(
-      ...verdict.reasons.map((reason) => {
+      ...judged.reasons.map((reason) => {
         const item = document.createElement('li');
         item.textContent = reason;
         return item;

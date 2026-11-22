@@ -95,6 +95,18 @@ const set = (element: HTMLElement, text: string): void => {
 const rulesRisk = (findings: Finding[] | undefined): Risk =>
   findings ? ruleRisk(findings) : 'suspicious';
 
+/** Rules that find what an email wants the reader to do (any severity, also a note). */
+const ASK_RULES: ReadonlySet<string> = new Set(['urgency', 'threat', 'credentials', 'payment']);
+
+/**
+ * Nothing to fall for: no links, and the rules found no pressure, threat, request for data or
+ * payment, not even as a note. Unknown when the rules failed.
+ */
+const nothingAsked = (email: Email, findings: Finding[] | undefined): boolean =>
+  findings !== undefined &&
+  email.links.length === 0 &&
+  !findings.some((finding) => ASK_RULES.has(finding.rule));
+
 /**
  * How an AI verdict (on the device or from the cloud) combines with the rules: the risk shown,
  * the advice, and how to explain the combination. `ai` names the AI ("the AI", "the cloud AI").
@@ -105,24 +117,41 @@ export function judge(
   findings: Finding[] | undefined,
   email: Email,
   ai: string,
-): { overall: Risk; line: string; advice: string; detail: string } {
+): { overall: Risk; line: string; advice: string; detail: string; reasons: string[] } {
   const confirmed = senderConfirmed(email);
-  const overall = overallRisk(verdict.risk, rulesRisk(findings), { senderConfirmed: confirmed });
+  const overall = overallRisk(verdict.risk, rulesRisk(findings), {
+    senderConfirmed: confirmed,
+    nothingAsked: nothingAsked(email, findings),
+  });
   const stricter = overall !== verdict.risk;
-  // The AI was more worried, but the sender is confirmed and the rules found nothing.
-  const onlyNotes = confirmed && RISKS.indexOf(verdict.risk) > RISKS.indexOf(overall);
+  // The AI was more worried, but the rules found nothing and the sender is confirmed or nothing
+  // is asked (overallRisk() says when): its points are notes.
+  const onlyNotes = RISKS.indexOf(verdict.risk) > RISKS.indexOf(overall);
   const level = m.verdict.aiSaid[verdict.risk];
   const said = m.judge.said(ai, level);
   return {
     overall,
     line: onlyNotes
-      ? m.judge.lineOnlyNotes(WORD[overall])
+      ? (confirmed ? m.judge.lineOnlyNotes : m.judge.lineNoLinks)(WORD[overall])
       : stricter
         ? m.judge.lineStricter(WORD[overall], ai, level)
         : WORD[overall],
     advice: stricter || !verdict.advice ? ADVICE[overall] : verdict.advice,
+    // Overruled, the AI's points would argue against the verdict above them: the band gives
+    // our own reasons, and the AI's points are in Email details (tier 3).
+    reasons: onlyNotes
+      ? [
+          confirmed ? m.verdict.ownReasons.confirmed : m.verdict.ownReasons.nothingAsked,
+          m.verdict.ownReasons.nothingFound,
+        ]
+      : verdict.reasons,
     detail: onlyNotes
-      ? m.judge.detailOnlyNotes(said)
+      ? [
+          (confirmed ? m.judge.detailOnlyNotes : m.judge.detailNoLinks)(said),
+          verdict.reasons.length > 0 ? m.judge.aiPoints(verdict.reasons.join(' ')) : '',
+        ]
+          .filter((part) => part !== '')
+          .join(' ')
       : stricter
         ? m.judge.detailStricter(said)
         : '',
@@ -349,7 +378,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     set(elements.overall, WORD[judged.overall]);
     set(elements.status, LINE[judged.overall]);
     elements.reasons.replaceChildren(
-      ...verdict.reasons.map((reason) => {
+      ...judged.reasons.map((reason) => {
         const item = document.createElement('li');
         item.textContent = reason;
         return item;

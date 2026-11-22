@@ -483,6 +483,20 @@ describe('the deep check', () => {
     expect(text('advice')).not.toBe('Cloud advice.');
   });
 
+  it('gives its own reasons when the cloud AI alone is overruled, and its points as details', async () => {
+    check.shown({ ...email, links: [] }, []);
+    await prepare();
+    click('send');
+    runs[0]?.resolve(answer('suspicious', ['The subject is empty.']));
+    await vi.waitFor(() => expect(get('result').hidden).toBe(false));
+    expect(text('overall')).toBe('Deep check: Looks safe');
+    expect([...get('reasons').children].map((item) => item.textContent)).toEqual([
+      'No links and no request: there is nothing to fall for.',
+      'The basic checks found no warning signs.',
+    ]);
+    expect(text('detail')).toMatch(/Its points: The subject is empty\./);
+  });
+
   it('keeps at least "suspicious" when the rules failed', async () => {
     check.shown(email, undefined);
     await prepare();

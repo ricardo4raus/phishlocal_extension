@@ -168,6 +168,18 @@ describe('sender checks in the prompt', () => {
     );
     expect(SYSTEM_PROMPT).toMatch(/Normal notices from a confirmed sender/);
   });
+
+  it('tells the AI that missing sender checks and a harmless email are no signs of phishing', () => {
+    for (const prompt of [SYSTEM_PROMPT, CLOUD_SYSTEM_PROMPT]) {
+      expect(prompt).toMatch(/"not available" means they could not be read/);
+      expect(prompt).toMatch(/that alone is not a sign of phishing/);
+      expect(prompt).toMatch(/Judge mainly by what the email wants the reader to do/);
+      expect(prompt).toMatch(/An email without links and without such a request is safe unless/);
+      expect(prompt).toMatch(/an empty subject or technical content alone is not a sign/);
+      // Plain words in the reasons the panel shows (tiers 1 and 2).
+      expect(prompt).toMatch(/do not name technical checks such as SPF, DKIM or DMARC/);
+    }
+  });
 });
 
 describe('the cloud prompt', () => {

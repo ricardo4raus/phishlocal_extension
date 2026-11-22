@@ -1029,3 +1029,21 @@ _To fill in near the submission._
   ("Checked on this device") already said. It now shows only what they do not: a pasted email,
   a sample, sender checks that could not be loaded and why, or a text cut for length; in the
   normal case there is no line, and an empty line takes no room.
+- Gemini Nano called a developer's error log that the user had sent to themselves "suspicious":
+  no links, no request, nothing the rules flagged; its main reason was the missing sender checks,
+  which Gmail does not add to mail you send yourself. The prompt now says that missing sender
+  checks are no sign of phishing by themselves, that the AI should judge by what the email wants
+  the reader to do, and that reasons must not name SPF, DKIM or DMARC. And when nothing is asked
+  (no links, no pressure, threat, data or payment wording, not even as a note), an AI
+  "suspicious" alone becomes notes; an AI "dangerous" still stands. Testing the rules on scams
+  without links showed why the limit had to be that narrow: a gift-card request gets no rule
+  finding at all, and "reply with your password" or an urgent transfer only weak notes.
+- Seen in Chrome right after: the error log now showed "Looks safe", but the band still listed
+  Nano's five worried points under it, so the verdict contradicted its own reasons. Nano kept
+  saying "suspicious" even with the new prompt; only the limit changed the verdict. When the AI
+  is overruled (confirmed sender or nothing asked), the band now gives our own reasons for the
+  verdict and the AI's points move to Email details, in all six languages and for the deep check
+  too. Why the model itself does not get there: Gemini Nano is a small model; it leans towards
+  caution, weighs surface features (empty subject, missing checks, technical text) and does not
+  reliably follow rules such as "missing checks alone are no sign", so the code decides what a
+  sentence in the prompt cannot guarantee.
