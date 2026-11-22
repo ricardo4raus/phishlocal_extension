@@ -88,10 +88,15 @@ explain every red flag, and work offline, with a cloud only as fallback."
   the SDK does not pass `systemInstruction` on-device) and a JSON data block between random
   markers; the answer is constrained to `VERDICT_SCHEMA`, read strictly by `parseVerdict()`, and
   the rules are its lower limit. Details and limits: `docs/ai-check.md`.
-- Result UI (`feat/result-ui`): the verdict is a traffic light above the details (`data-risk` on
-  `#verdict`; grey "Checking…" until the AI answers if the rules found nothing). Links show the
-  real domain, a shortened URL (`src/sidepanel/link-display.ts`) and a mark when a finding names
-  them (`Finding.links`, set by the link and lookalike rules).
+- Result UI (rebuilt 22 Nov 2026, PRs #22 to #27, spec `docs/ui-design.md`): the verdict band
+  (`data-risk` on `#verdict`: `pending`, `safe`, `suspicious`, `dangerous`, `unchecked`) shows a
+  word, one hedged line, the AI's reasons, the advice and a footer ("Checked on this device" or
+  "Basic checks only"). Grey "Checking…" until the AI answers; grey "No red flags found / Not
+  checked by AI" when the AI gave no answer: never green without an AI answer. Red flags are rows
+  with a plain-word title per rule (`TITLES` in `src/sidepanel/findings-view.ts`), links show the
+  real domain, a shortened URL (`src/sidepanel/link-display.ts`) and a badge when a finding names
+  them (`Finding.links`); `info` findings are notes in "Email details". Tier-1 and tier-2 text
+  never says "rule", "SPF", "DKIM" or "DMARC".
 - AI check runs are stoppable: `runAiCheck()` sets an `AbortSignal` on the check model's option
   objects, which the SDK passes to Chrome by reference (tested through the SDK's browser build in
   `tests/ai/sdk-on-device.test.ts`). The panel stops a run on timeout and when its email is left.
@@ -108,10 +113,11 @@ explain every red flag, and work offline, with a cloud only as fallback."
   `SELECTORS` in
   `src/content/gmail-extract.ts` (measured 15 Nov 2026). If Gmail changes its page, measure
   again with a DevTools snippet that prints only counts and class names, never email content.
-- "Or paste an email" in the side panel is the fallback when Gmail can't be read (and for the
-  demo): the pasted text, plus the links from the clipboard's HTML (parsed with parse5, a runtime
-  dependency since 16 Nov 2026), and four made-up sample emails (`src/paste/samples.ts`).
-  Both paths show the email the same way.
+- "Check another email" (a fold; "Paste an email" on the empty state opens it) is the fallback
+  when Gmail can't be read (and for the demo): the pasted text, plus the links from the
+  clipboard's HTML (parsed with parse5, a runtime dependency since 16 Nov 2026), and five made-up
+  sample emails (`src/paste/samples.ts`), shown in dev and judges builds only. The test prompt
+  ("Developer tools") shows in dev builds only. Both paths show the email the same way.
 - Rule checks (`src/rules/`, `checkEmail()`): pure functions, no DOM, no network. They flag
   dangerous links, link text vs real target (also behind forwarding parameters), lookalike
   domains, sender name vs address, pressure phrases (en/de/fr/es), invisible characters and
@@ -139,9 +145,15 @@ explain every red flag, and work offline, with a cloud only as fallback."
   never replacing them). Every value is checked by `readSettings()` and falls back to its default.
   The panel loads them once when it opens (at most 2 s) and calls `configureAi()` before any
   model session. The prompt's security rules must never become a Remote Config value.
-- UI design (22 Nov 2026): the target design for the side panel, agreed in a mockup, is
-  specified in `docs/ui-design.md` (screens, wording, colours, how to build it, open points).
-  The code does not follow it yet; read it before any side panel UI work.
+- UI design (22 Nov 2026): `docs/ui-design.md` is the spec for the side panel (principles,
+  state table, components, wording, rule titles, tokens, CSS architecture, decisions) and the
+  code follows it since PRs #22 to #27. Read it before any side panel UI work: new text must
+  fit its tiers ("Overview first", "Plain words", "True claims only"), new CSS its layers and
+  component rules (no outer margins, no styling across components, tokens only). Icons are SVG
+  files shown through CSS masks: the panel's DOM holds no `<svg>`, `<a>` or `<img>` (the monkey
+  test checks that). To look at a state without loading the extension, fill the page's HTML in
+  a scratch file and screenshot it with headless Chrome at 380 px (`--force-device-scale-factor=1`,
+  its window is at least 500 px wide).
 - The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow

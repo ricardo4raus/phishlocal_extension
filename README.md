@@ -16,8 +16,9 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   read and checked at once: sender, subject, visible text, and every link with its text and real
   target. Its headers (SPF, DKIM, DMARC, Reply-To) are loaded in the background from Gmail's own
   "Show original" page. When the panel is closed, nothing is read. Nothing leaves the browser.
-- **Paste an email** from any other mail app, or load one of four made-up sample emails. Links
-  keep their real targets from the copied formatting.
+- **Paste an email** from any other mail app ("Check another email" at the bottom of the panel).
+  Links keep their real targets from the copied formatting. Development and judges builds also
+  offer five made-up sample emails.
 - **Sender checks from the headers:** for Gmail automatically; for other mail apps, paste the
   raw source ("View source") and PhishLocal also reads the headers: whether SPF, DKIM and DMARC passed, and where
   replies go. A forged sender whose domain says "not from us" (DMARC failed) is flagged as
@@ -113,7 +114,7 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 
 4. **Enable Gemini Nano:** open `chrome://flags/#prompt-api-for-gemini-nano`, set it to "Enabled
    Multilingual", and restart Chrome. If the model is not on the device yet, the side panel shows
-   "Download the on-device model" (about 4 GB, once).
+   a banner "Set up on-device AI" with a "Download now" button (about 4 GB, once).
 5. **Build:** `npm run dev` (development build that rebuilds on changes) or `npm run build`
    (release build). Both write to `dist/`.
 6. **Load the extension:** open `chrome://extensions`, turn on developer mode, click "Load

@@ -62,9 +62,11 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
 
 ## Phase 5 · Polish & test
 
-- [ ] Mon 23.11. – UI polish: loading states, error messages, design (automatic scanning moved
-      to 18.11). Design agreed in a mockup on 22.11; spec and open points in
-      `docs/ui-design.md`
+- [x] Mon 23.11. – UI polish: loading states, error messages, design (automatic scanning moved
+      to 18.11). Design agreed in a mockup on 22.11; spec in `docs/ui-design.md`
+      (done Sun 22.11., PRs #22 to #27: spec, shell, verdict band, red flags and links, deep
+      check consent card, wrap-up; each reviewed by an agent and checked with headless-Chrome
+      screenshots and the monkeys at 100× cases)
 - [ ] Tue 24.11. – Collect test emails (phishing samples + normal emails; private only, no company data)
 - [ ] Wed 25.11. – Test and tune prompt/thresholds; note results
 - [ ] Thu 26.11. – Fix bugs; test in a fresh Chrome profile and the cloud-only path

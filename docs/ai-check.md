@@ -137,9 +137,9 @@ are its input and its lower limit.
      the model; the status shows the seconds; after the limit the run is stopped, and the
      message says how far the model had come ("the model had written N characters"): 0 means it
      hung, many means it did not stop writing;
-   - without the model, the panel offers "Download the on-device model": Chrome starts the
-     download (about 4 GB, once) only after a user action; when it is done, the shown email is
-     checked again;
+   - without the model, the panel offers "Download now" in the banner "Set up on-device AI":
+     Chrome starts the download (about 4 GB, once) only after a user action; when it is done, the
+     shown email is checked again;
    - a Gmail email waits for its headers, but at most 3 s;
    - without a ready on-device model there is no AI check; the panel says so and the rules stand
      alone.
@@ -155,11 +155,14 @@ AI Logic, model `gemini-3.5-flash-lite`, the SDK's own default for the cloud sid
 inference; tested in Chrome on 22 Nov 2026 with a real Google email: correct verdict with sound
 reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
 
-1. **Request:** the user clicks "Prepare a deep check…" under the verdict. For Italian and
-   Portuguese, where Gemini Nano's answers are experimental, the panel recommends it. A Gmail
-   email first waits for its headers (at most 3 s, like the on-device check).
-2. **Privacy level** (decided 22 Nov 2026): a switch above "Prepare" sets how much is removed,
-   remembered in the browser (`localStorage`; without it, the default applies):
+1. **Request:** the user clicks "Deep check in the cloud…" under the links; a consent card opens
+   in place (the strip and the verdict stay, the red flags and links step aside). For Italian and
+   Portuguese, where Gemini Nano's answers are experimental, and when the on-device AI gave no
+   answer, the panel recommends it. A Gmail email first waits for its headers (at most 3 s, like
+   the on-device check).
+2. **Privacy level** (decided 22 Nov 2026): two cards in the consent card set how much is removed,
+   remembered in the browser (`localStorage`; without it, the default applies); changing the
+   level builds the data again at once:
    - **Standard** (default): email addresses (domain kept), phone and other long numbers, IBANs
      and link paths (host kept) are removed; names are kept. No name search runs, so the preview
      comes at once. Removing names also hit brands (Nano listed "Google" as a person), and with
@@ -232,7 +235,9 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
 5. **Consent:** the panel shows what was removed (counts per kind, and what is never sent) and,
    one click away under "Show what will be sent", exactly that data (the JSON that is sent;
    decided 22 Nov 2026, see [`ui-design.md`](ui-design.md)). Only "Send to the cloud" sends it,
-   once; "Cancel" sends nothing. Consent is asked
+   once per click; "Cancel" sends nothing. After a stop, a time limit or a failure the card stays
+   open with the same data, and a new click on Send is a new consent to it (the status says the
+   data may already have reached the cloud). Consent is asked
    every time, for every email. The sent data stays on screen as the record. When the email
    changes under a preview, a request or a result (Gmail shows it again with new details), the
    panel says so: a running request's data had been sent, its answer is dropped.
