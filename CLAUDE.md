@@ -138,6 +138,9 @@ explain every red flag, and work offline, with a cloud only as fallback."
   never replacing them). Every value is checked by `readSettings()` and falls back to its default.
   The panel loads them once when it opens (at most 2 s) and calls `configureAi()` before any
   model session. The prompt's security rules must never become a Remote Config value.
+- UI design (22 Nov 2026): the target design for the side panel, agreed in a mockup, is
+  specified in `docs/ui-design.md` (screens, wording, colours, how to build it, open points).
+  The code does not follow it yet; read it before any side panel UI work.
 - The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow
