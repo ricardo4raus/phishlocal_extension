@@ -17,7 +17,7 @@ import { FULL_URL, normalizeText, replacePhoneNumbers } from '../ai/patterns';
 import { PROMPT_LIMITS } from '../ai/prompt';
 import { type Email, FIELD_LIMITS, MAX_BODY_CHARS } from '../email';
 import type { Finding } from '../rules';
-import { hostOf, hostOfAddress, parseUrl } from '../rules/domains';
+import { hostOfAddress, parseUrl } from '../rules/domains';
 
 export const PLACEHOLDER = {
   name: '[name]',
@@ -542,23 +542,14 @@ export function nameSearchText(email: Email): string {
 }
 
 /**
- * The brand labels of the domains the receiving server confirmed, lower case: the sender's
- * domain when DMARC passed, and each domain whose DKIM signature passed ("google" for
- * google.com). Unconfirmed domains never count, so a sender cannot pick what stays.
+ * The brand label of the sender's domain, lower case ("google" for accounts.google.com), when
+ * DMARC confirmed it; otherwise undefined. Only this one domain counts: it is the visible From
+ * domain the sender proved to own. DKIM domains do not: anyone can sign with up to ten domains of
+ * their own, named like a person (found in review).
  */
-function confirmedBrands(email: Email): Set<string> {
-  const auth = email.headers?.auth;
-  const labels = new Set<string>();
-  if (!auth) return labels;
-  if (auth.dmarc === 'pass') {
-    const label = hostOfAddress(email.sender.address)?.label;
-    if (label) labels.add(label);
-  }
-  for (const { result, domain } of auth.dkim) {
-    const label = result === 'pass' && domain ? hostOf(domain.toLowerCase()).label : undefined;
-    if (label) labels.add(label);
-  }
-  return labels;
+function confirmedSenderBrand(email: Email): string | undefined {
+  if (email.headers?.auth?.dmarc !== 'pass') return undefined;
+  return hostOfAddress(email.sender.address)?.label;
 }
 
 /** A name without the punctuation around it, as nameVariants() takes it ("Google."), lower case. */
@@ -566,15 +557,15 @@ const bareLowerCase = (name: string): string =>
   name.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').toLowerCase();
 
 /**
- * Nano's names without the ones that are exactly a confirmed brand: Nano sometimes lists a company
- * ("Google") as a person, and removing it took the evidence the cloud needs most, the confirmed
- * sender and DKIM domains (found in Chrome on 22 Nov 2026: "[email]@[name].com"). Names found in
- * greetings are not affected.
+ * Nano's names without an entry that is exactly the confirmed sender's brand: Nano sometimes lists
+ * a company ("Google") as a person, and removing it took the evidence the cloud needs most, the
+ * confirmed sender and DKIM domains (found in Chrome on 22 Nov 2026: "[email]@[name].com").
+ * The sender can still choose this one label (it is their own domain), but every other entry, all
+ * parts of longer names ("Anna Muster" removes "Anna") and names from greetings are removed.
  */
-function withoutConfirmedBrands(names: readonly string[], email: Email): string[] {
-  const brands = confirmedBrands(email);
-  if (brands.size === 0) return [...names];
-  return names.filter((name) => !brands.has(bareLowerCase(name)));
+function withoutConfirmedBrand(names: readonly string[], email: Email): string[] {
+  const brand = confirmedSenderBrand(email);
+  return brand ? names.filter((name) => bareLowerCase(name) !== brand) : [...names];
 }
 
 /**
@@ -592,7 +583,7 @@ export function cloudData(
   const fromModel = modelNames(foundNames ?? []);
   const names = nameVariants([
     ...greetingNames(nameSearchText(email)),
-    ...withoutConfirmedBrands(fromModel.names, email),
+    ...withoutConfirmedBrand(fromModel.names, email),
   ]);
   const clean = (text: string): string => redactText(text, names, removed);
   // Hosts and domains go through the name and number filter too: "secure.anna-muster.example" is

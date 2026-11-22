@@ -476,12 +476,33 @@ describe('cloudData', () => {
       expect(data.email.body).toBe('Hi [name], you signed in to a site with Lumora.');
     });
 
-    it('stays when only the DKIM signature of its domain passed', () => {
-      const data = parseCloudData(cloudData(lumoraEmail('none', 'pass'), [], ['LUMORA.']).json);
+    it('stays written in other case or with punctuation around it', () => {
+      const data = parseCloudData(cloudData(lumoraEmail('pass', 'pass'), [], ['LUMORA.']).json);
       expect(data.email.from.name).toBe('Lumora');
     });
 
-    it('is removed when no check confirmed the domain, since a sender cannot pick what stays', () => {
+    it('is removed when only a DKIM signature passed: anyone can sign with a domain named like a person', () => {
+      const data = parseCloudData(cloudData(lumoraEmail('none', 'pass'), [], ['Lumora']).json);
+      expect(data.email.from.name).toBe('[name]');
+      // A confirmed sender does not exempt another signer's label either.
+      const signed = lumoraEmail('pass', 'pass');
+      signed.bodyText = 'Anna said hello.';
+      signed.headers?.auth?.dkim.push({ result: 'pass', domain: 'anna.example' });
+      expect(parseCloudData(cloudData(signed, [], ['Anna']).json).email.body).toBe(
+        '[name] said hello.',
+      );
+    });
+
+    it('protects a person whose name is also the sender domain, when Nano lists the full name', () => {
+      const anna = lumoraEmail('pass', 'pass');
+      anna.sender = { name: 'Anna Muster', address: 'hello@anna.example' };
+      anna.bodyText = 'Anna Muster here. Anna says hi.';
+      const data = parseCloudData(cloudData(anna, [], ['Anna', 'Anna Muster']).json);
+      expect(data.email.from).toEqual({ name: '[name]', address: '[email]@[name].example' });
+      expect(data.email.body).toBe('[name] here. [name] says hi.');
+    });
+
+    it('is removed when no check confirmed the domain', () => {
       const data = parseCloudData(cloudData(lumoraEmail('fail', 'fail'), [], ['Lumora']).json);
       expect(data.email.from).toEqual({
         name: '[name]',

@@ -168,9 +168,9 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
      entry ("Peter Meier, Claudia Schneider") is split.
    - Nano sometimes lists a company as a person ("Google", seen in Chrome on 22 Nov 2026), which
      turned the confirmed sender and DKIM domains into "[email]@[name].com". So an entry that is
-     exactly the brand of a confirmed domain (the sender's with DMARC pass, or one whose DKIM
-     signature passed) is not removed. Unconfirmed domains never count, and names from greetings
-     are always removed.
+     exactly the brand of the sender's domain is not removed, but only when DMARC confirmed that
+     domain. DKIM domains do not count (anyone can sign with domains of their own, named like a
+     person); names from greetings and every part of a longer name are always removed.
    - After 20 s (by default; Remote Config `names_timeout_s`), without the model, or when names
      had to be left out (more than 50, or longer than 60 characters), the preview warns that
      names may remain. Without Nano's list the sender's name is removed entirely.
@@ -239,8 +239,10 @@ normal production builds have none, so there the panel says the deep check is no
 
 - A name Nano misses and no greeting announces stays readable; the preview shows it before
   anything is sent.
-- A person whose name is exactly the brand of a confirmed sender domain (a company named after
-  its owner, "Muster" from muster.example) stays readable when only Nano found it.
+- A person whose name is exactly the brand of the sender's DMARC-confirmed domain (a company
+  named after its owner, "Muster" from muster.example) stays readable when Nano lists it alone
+  and nothing else removes it. The sender can choose that one label, since it is their own
+  domain.
 - A link's host stays, unless it holds a known name (then "[link: secure.[name]-bank.example]").
 - "STRAUSS" in capitals does not match "Strauß" (only "STRAUẞ" does), and a Turkish dotted
   "İ" in capitals does not match "i".
