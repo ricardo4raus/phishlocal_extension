@@ -326,30 +326,47 @@ const aiCheck = createAiCheck(
 );
 
 // The cloud deep check: only on request, with the data cleaned on the device and shown first.
+const page = byId<HTMLElement>('app');
 const deepCheck = createDeepCheck(
   {
     section: byId<HTMLElement>('deep-check'),
-    intro: byId<HTMLElement>('deep-check-intro'),
     start: byId<HTMLButtonElement>('deep-check-start'),
-    level: byId<HTMLSelectElement>('deep-check-level'),
-    stop: byId<HTMLButtonElement>('deep-check-stop'),
+    intro: byId<HTMLElement>('deep-check-intro'),
+    consent: byId<HTMLElement>('deep-check-consent'),
+    back: byId<HTMLButtonElement>('deep-check-back'),
+    levels: byId<HTMLFieldSetElement>('deep-check-levels'),
     preview: byId<HTMLElement>('deep-check-preview'),
     removed: byId<HTMLElement>('deep-check-removed'),
+    warning: byId<HTMLElement>('deep-check-warning'),
+    show: byId<HTMLButtonElement>('deep-check-show'),
+    dataPanel: byId<HTMLElement>('deep-check-data-panel'),
     data: byId<HTMLElement>('deep-check-data'),
     send: byId<HTMLButtonElement>('deep-check-send'),
     cancel: byId<HTMLButtonElement>('deep-check-cancel'),
     status: byId<HTMLElement>('deep-check-status'),
+    elapsed: byId<HTMLElement>('deep-check-elapsed'),
+    stop: byId<HTMLButtonElement>('deep-check-stop'),
     result: byId<HTMLElement>('deep-check-result'),
     overall: byId<HTMLElement>('deep-check-overall'),
-    note: byId<HTMLElement>('deep-check-note'),
+    line: byId<HTMLElement>('deep-check-line'),
     reasons: byId<HTMLUListElement>('deep-check-reasons'),
     advice: byId<HTMLElement>('deep-check-advice'),
+    source: byId<HTMLElement>('deep-check-source'),
+    time: byId<HTMLElement>('deep-check-time'),
+    detail: byId<HTMLElement>('deep-check-detail'),
   },
   {
     available: appCheckEnabled,
     uiLanguage: () => chrome.i18n.getUILanguage(),
     modelReady,
     findNames,
+    // While the consent card is open, the red flags and links step aside (style.css).
+    onConsent: (open) => {
+      if (open) page.dataset.consent = 'open';
+      else delete page.dataset.consent;
+    },
+    // The deep check is recommended when the on-device AI gave no answer for the shown email.
+    aiUnchecked: () => byId<HTMLElement>('verdict').dataset.risk === 'unchecked',
     run: runCloudCheck,
     namesTimeoutMs: settings.namesTimeoutMs,
     cloudTimeoutMs: settings.cloudTimeoutMs,

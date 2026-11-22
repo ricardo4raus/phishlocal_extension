@@ -11,7 +11,7 @@ import {
   createDeepCheck,
   type DeepCheck,
   type DeepCheckDeps,
-  removedSummary,
+  removedChips,
 } from '../src/sidepanel/deep-check-view';
 import { DEFAULT_SETTINGS } from '../src/settings';
 
@@ -30,21 +30,28 @@ const other: Email = { ...email, subject: 'Another one' };
 
 const danger: Finding = { rule: 'dangerous-link', severity: 'danger', message: 'x', evidence: [] };
 
-const BUTTONS = ['start', 'stop', 'send', 'cancel'] as const;
+const BUTTONS = ['start', 'stop', 'send', 'cancel', 'back', 'show'] as const;
 const IDS = [
   'section',
   'intro',
   ...BUTTONS,
-  'level',
+  'consent',
+  'levels',
   'preview',
   'removed',
+  'warning',
+  'dataPanel',
   'data',
   'status',
+  'elapsed',
   'result',
   'overall',
-  'note',
+  'line',
   'reasons',
   'advice',
+  'source',
+  'time',
+  'detail',
 ] as const;
 type Id = (typeof IDS)[number];
 
@@ -63,18 +70,33 @@ function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
       ? 'button'
       : id === 'reasons'
         ? 'ul'
-        : id === 'level'
-          ? 'select'
+        : id === 'levels'
+          ? 'fieldset'
           : 'div';
     const element = document.createElement(tag);
     element.id = id;
-    // As in index.html: the levels are the select's options.
-    if (element instanceof HTMLSelectElement) {
-      for (const value of ['standard', 'high']) element.append(new Option(value, value));
+    // As in index.html: one card with a radio per level; a click on the card chooses it.
+    if (element instanceof HTMLFieldSetElement) {
+      for (const value of ['standard', 'high']) {
+        const card = document.createElement('div');
+        card.dataset.level = value;
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'deep-check-level';
+        radio.value = value;
+        radio.id = `level-${value}`;
+        const label = document.createElement('label');
+        label.htmlFor = radio.id;
+        label.textContent = value;
+        const list = document.createElement('ul');
+        list.id = `list-${value}`;
+        card.append(radio, label, list);
+        element.append(card);
+      }
     }
     // As in index.html: the data and the result can take the focus.
     if (id === 'data') element.tabIndex = 0;
-    if (id === 'result') element.tabIndex = -1;
+    if (id === 'result' || id === 'consent' || id === 'preview') element.tabIndex = -1;
     return element;
   });
   // As in index.html, the section holds everything else.
@@ -84,21 +106,30 @@ function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
   return createDeepCheck(
     {
       section: get('section'),
-      intro: get('intro'),
       start: get('start') as HTMLButtonElement,
-      level: get('level') as HTMLSelectElement,
-      stop: get('stop') as HTMLButtonElement,
+      intro: get('intro'),
+      consent: get('consent'),
+      back: get('back') as HTMLButtonElement,
+      levels: get('levels') as HTMLFieldSetElement,
       preview: get('preview'),
       removed: get('removed'),
+      warning: get('warning'),
+      show: get('show') as HTMLButtonElement,
+      dataPanel: get('dataPanel'),
       data: get('data'),
       send: get('send') as HTMLButtonElement,
       cancel: get('cancel') as HTMLButtonElement,
       status: get('status'),
+      elapsed: get('elapsed'),
+      stop: get('stop') as HTMLButtonElement,
       result: get('result'),
       overall: get('overall'),
-      note: get('note'),
+      line: get('line'),
       reasons: get('reasons') as HTMLUListElement,
       advice: get('advice'),
+      source: get('source'),
+      time: get('time'),
+      detail: get('detail'),
     },
     {
       available: true,
@@ -153,6 +184,14 @@ describe('the deep check', () => {
     expect(shownData).not.toMatch(/anna|CH93|123 45 67|pay\?user/i);
     expect(shownData).toContain('"goes_to": "evil.example"');
     expect(text('removed')).toContain('2 names');
+    // The focus lands on the preview, never on Send: a second Enter must not send unread data.
+    expect(document.activeElement).toBe(get('preview'));
+    // The exact data is one click away, and that click opens it.
+    expect(get('dataPanel').hidden).toBe(true);
+    expect(get('show').getAttribute('aria-expanded')).toBe('false');
+    click('show');
+    expect(get('dataPanel').hidden).toBe(false);
+    expect(get('show').getAttribute('aria-expanded')).toBe('true');
     expect(document.activeElement).toBe(get('data'));
     expect(runs).toHaveLength(0);
 
@@ -163,12 +202,41 @@ describe('the deep check', () => {
     runs[0]?.resolve(answer('dangerous'));
     await vi.waitFor(() => expect(get('result').hidden).toBe(false));
     expect(text('overall')).toBe('Deep check: Dangerous');
+    expect(text('line')).toBe('This looks like phishing.');
+    expect(text('source')).toBe('Checked in the cloud');
+    expect(text('time')).toBe('Done in 2.0 s');
     expect(get('result').dataset.risk).toBe('dangerous');
     expect(text('advice')).toBe('Cloud advice.');
+    expect(text('status')).toBe('Sent once, for this check only.');
     expect(get('send').hidden).toBe(true);
     expect(document.activeElement).toBe(get('result'));
     // The data stays as the record of what was sent.
     expect(text('data')).toBe(shownData);
+    // "Back to the result" closes the card (the record goes with it) and keeps the result; the
+    // offer is back.
+    click('back');
+    expect(get('consent').hidden).toBe(true);
+    expect(get('preview').hidden).toBe(true);
+    expect(get('result').hidden).toBe(false);
+    expect(get('start').hidden).toBe(false);
+    expect(document.activeElement).toBe(get('start'));
+  });
+
+  it('opens the consent card in place and tells the panel, and Back cancels an open preview', async () => {
+    const opened: boolean[] = [];
+    check = create({ onConsent: (open) => opened.push(open) });
+    check.shown(email, []);
+    expect(get('consent').hidden).toBe(true);
+    await prepare();
+    expect(get('consent').hidden).toBe(false);
+    expect(get('start').hidden).toBe(true);
+    expect(opened).toEqual([true]);
+    click('back');
+    expect(get('consent').hidden).toBe(true);
+    expect(text('status')).toBe('Nothing was sent.');
+    expect(opened).toEqual([true, false]);
+    click('send');
+    expect(runs).toHaveLength(0);
   });
 
   it('sends nothing when the user cancels', async () => {
@@ -238,6 +306,56 @@ describe('the deep check', () => {
     expect(runs).toHaveLength(1);
   });
 
+  it('keeps the focus on the level cards when a keyboard user changes the level', async () => {
+    check = create({ savedLevel: () => 'standard' });
+    check.shown(email, []);
+    click('start');
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    radio('high').focus();
+    choose('high');
+    await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
+    expect(document.activeElement).toBe(radio('high'));
+    nameCalls[0]?.resolve([]);
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    expect(document.activeElement).toBe(radio('high'));
+  });
+
+  it("shows the card's text without technical terms", async () => {
+    check.shown(email, []);
+    await prepare();
+    expect(get('consent').textContent).not.toMatch(/\b(rule|DKIM|DMARC|SPF|JSON)\b/);
+  });
+
+  it('recovers when building the data throws', async () => {
+    const broken = vi.spyOn(console, 'error').mockImplementation(() => {});
+    check = create({
+      savedLevel: () => 'standard',
+      // cloudData() reads the email: a hostile shape makes it throw.
+      uiLanguage: () => 'en',
+    });
+    check.shown({ ...email, links: undefined as unknown as Email['links'] }, []);
+    click('start');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(text('status')).toBe('The deep check could not prepare its data. Nothing was sent.');
+    expect(get('consent').hidden).toBe(true);
+    expect(levelsDisabled()).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    broken.mockRestore();
+  });
+
+  it('keeps the card open while the data is on its way: Back is disabled, Stop is the way out', async () => {
+    check.shown(email, []);
+    await prepare();
+    click('send');
+    expect((get('back') as HTMLButtonElement).disabled).toBe(true);
+    click('back');
+    expect(get('consent').hidden).toBe(false);
+    expect(get('preview').hidden).toBe(false);
+    runs[0]?.resolve(answer('safe'));
+    await vi.waitFor(() => expect(get('result').hidden).toBe(false));
+    expect((get('back') as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('can be stopped while it looks for names and while it sends', async () => {
     check.shown(email, []);
     click('start');
@@ -262,14 +380,15 @@ describe('the deep check', () => {
     check = create({ modelReady: () => new Promise((resolve) => (loaded = resolve)) });
     check.shown(email, []);
     click('start');
-    expect(text('status')).toBe('Waiting for the on-device model…');
+    expect(text('status')).toBe('Waiting for the on-device AI…');
+    expect(get('stop').hidden).toBe(false);
     await vi.advanceTimersByTimeAsync(NAMES_TIMEOUT_MS * 10);
     loaded?.(true);
     await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
     expect(nameCalls[0]?.signal.aborted).toBe(false);
     nameCalls[0]?.resolve([]);
     await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
-    expect(text('status')).not.toContain('names may remain');
+    expect(get('warning').hidden).toBe(true);
   });
 
   it('removes the sender name and warns when Nano could not look for names', async () => {
@@ -281,7 +400,7 @@ describe('the deep check', () => {
     // A late answer after the time limit is not trusted to be complete.
     nameCalls[0]?.resolve([]);
     await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
-    expect(text('status')).toContain('names may remain');
+    expect(get('warning').hidden).toBe(false);
     expect(JSON.parse(text('data'))).toMatchObject({ email: { from: { name: '[name]' } } });
   });
 
@@ -291,7 +410,7 @@ describe('the deep check', () => {
     click('start');
     await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
     expect(nameCalls).toHaveLength(0);
-    expect(text('status')).toContain('names may remain');
+    expect(get('warning').hidden).toBe(false);
   });
 
   it('never waits forever, also not for work that ignores its stop signal', async () => {
@@ -306,13 +425,14 @@ describe('the deep check', () => {
     click('start');
     await vi.advanceTimersByTimeAsync(NAMES_TIMEOUT_MS + STOP_GRACE_MS);
     expect(get('preview').hidden).toBe(false);
-    expect(text('status')).toContain('names may remain');
+    expect(get('warning').hidden).toBe(false);
     click('send');
     await vi.advanceTimersByTimeAsync(CLOUD_LIMIT_MS);
     expect(runs[0]?.signal.aborted).toBe(true);
     await vi.advanceTimersByTimeAsync(STOP_GRACE_MS);
-    expect(text('status')).toBe(
-      `The deep check failed (no answer within ${CLOUD_LIMIT_MS / 1000} s). The on-device and rule checks still apply.`,
+    expect(text('status')).toMatch(/^The deep check did not work\./);
+    expect(text('detail')).toBe(
+      `The cloud request failed: no answer within ${CLOUD_LIMIT_MS / 1000} s.`,
     );
     // Nothing left running once zero-delay tasks have run.
     await vi.advanceTimersByTimeAsync(1);
@@ -335,9 +455,7 @@ describe('the deep check', () => {
     expect(get('preview').hidden).toBe(false);
     click('send');
     await vi.advanceTimersByTimeAsync(20_000 + STOP_GRACE_MS);
-    expect(text('status')).toBe(
-      'The deep check failed (no answer within 20 s). The on-device and rule checks still apply.',
-    );
+    expect(text('detail')).toBe('The cloud request failed: no answer within 20 s.');
   });
 
   it('treats a throwing name finder like one that could not look', async () => {
@@ -349,7 +467,7 @@ describe('the deep check', () => {
     check.shown(email, []);
     click('start');
     await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
-    expect(text('status')).toContain('names may remain');
+    expect(get('warning').hidden).toBe(false);
   });
 
   it('keeps the rules as the lower limit', async () => {
@@ -358,8 +476,9 @@ describe('the deep check', () => {
     click('send');
     runs[0]?.resolve(answer('safe'));
     await vi.waitFor(() => expect(get('result').hidden).toBe(false));
-    expect(text('overall')).toBe(
-      'Deep check: Dangerous (basic checks; the cloud AI said: no signs of phishing)',
+    expect(text('overall')).toBe('Deep check: Dangerous');
+    expect(text('detail')).toMatch(
+      /^The cloud AI said: no signs of phishing; the basic checks found more, so their verdict stands\./,
     );
     expect(text('advice')).not.toBe('Cloud advice.');
   });
@@ -388,9 +507,15 @@ describe('the deep check', () => {
     await prepare();
     click('send');
     runs[0]?.resolve({ ok: false, reason: 'failed', detail: 'the cloud refused the request' });
-    await vi.waitFor(() => expect(text('status')).toContain('the cloud refused the request'));
+    await vi.waitFor(() => expect(text('status')).toContain('did not work'));
+    // The cloud's own words are tier 3.
+    expect(text('detail')).toBe('The cloud request failed: the cloud refused the request.');
     expect(get('result').hidden).toBe(true);
-    expect(get('start').hidden).toBe(false);
+    // The card stays open with the data: the user can send again or go back.
+    expect(get('consent').hidden).toBe(false);
+    expect(get('send').hidden).toBe(false);
+    click('send');
+    expect(runs).toHaveLength(2);
   });
 
   it('cannot start where the cloud is not available', () => {
@@ -409,11 +534,17 @@ describe('the deep check', () => {
   });
 });
 
-const level = (): HTMLSelectElement => get('level') as HTMLSelectElement;
+const radio = (value: string): HTMLInputElement =>
+  document.getElementById(`level-${value}`) as HTMLInputElement;
+const chosen = (): string | undefined =>
+  [...document.querySelectorAll<HTMLInputElement>('input[name="deep-check-level"]')].find(
+    (input) => input.checked,
+  )?.value;
+const levelsDisabled = (): boolean => (get('levels') as HTMLFieldSetElement).disabled;
 
 const choose = (value: string): void => {
-  level().value = value;
-  level().dispatchEvent(new Event('change'));
+  radio(value).checked = true;
+  radio(value).dispatchEvent(new Event('change', { bubbles: true }));
 };
 
 describe('the privacy level', () => {
@@ -426,7 +557,7 @@ describe('the privacy level', () => {
         return true;
       },
     });
-    expect(level().value).toBe('standard');
+    expect(chosen()).toBe('standard');
     check.shown(email, []);
     click('start');
     await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
@@ -436,17 +567,17 @@ describe('the privacy level', () => {
     expect(data).toContain('Dear Anna Muster');
     expect(data).toContain('"name": "Anna Muster"');
     expect(data).not.toMatch(/CH93|123 45 67|pay\?user|anna\.muster@/i);
-    expect(text('status')).toContain('Names are kept (privacy level Standard)');
+    expect(text('removed')).toContain('Names kept');
     click('send');
     expect(runs[0]?.prompt).toContain('Dear Anna Muster');
   });
 
   it('uses the level chosen last time, and ignores a stored value it does not know', () => {
-    expect(create({ savedLevel: () => 'high' }) && level().value).toBe('high');
-    expect(create({ savedLevel: () => 'everything' }) && level().value).toBe('standard');
+    expect(create({ savedLevel: () => 'high' }) && chosen()).toBe('high');
+    expect(create({ savedLevel: () => 'everything' }) && chosen()).toBe('standard');
   });
 
-  it('remembers a new level and discards a preview prepared at the old one', async () => {
+  it('remembers a new level and builds the data again at it', async () => {
     const saved: string[] = [];
     check = create({ savedLevel: () => undefined, saveLevel: (value) => saved.push(value) });
     check.shown(email, []);
@@ -454,30 +585,46 @@ describe('the privacy level', () => {
     await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
     choose('high');
     expect(saved).toEqual(['high']);
+    // The old data is gone at once; nothing can be sent until the new data is there.
     expect(get('preview').hidden).toBe(true);
-    expect(text('status')).toBe(
-      'The privacy level changed, so the prepared data was discarded. Nothing was sent.',
-    );
     click('send');
     expect(runs).toHaveLength(0);
-    // Prepared again, now at "high": Nano looks for names.
+    // Built again, now at "high": Nano looks for names, and the names are gone from the data.
+    await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
+    nameCalls[0]?.resolve(['Anna Muster']);
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    expect(text('removed')).not.toContain('Names kept');
+    expect(text('data')).not.toContain('Anna');
+  });
+
+  it('chooses a level by a click anywhere on its card', async () => {
+    check = create({ savedLevel: () => 'standard' });
+    check.shown(email, []);
+    const list = document.getElementById('list-high') as HTMLElement;
+    list.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(chosen()).toBe('high');
+    // Not while the levels are disabled.
     click('start');
     await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
+    (document.getElementById('list-standard') as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
+    expect(chosen()).toBe('high');
   });
 
   it('cannot change while names are searched or the data is on its way', async () => {
     check.shown(email, []);
     click('start');
     await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
-    expect(level().disabled).toBe(true);
+    expect(levelsDisabled()).toBe(true);
     nameCalls[0]?.resolve(['Anna Muster']);
     await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
-    expect(level().disabled).toBe(false);
+    expect(levelsDisabled()).toBe(false);
     click('send');
-    expect(level().disabled).toBe(true);
+    expect(levelsDisabled()).toBe(true);
     runs[0]?.resolve(answer('safe'));
     await vi.waitFor(() => expect(get('result').hidden).toBe(false));
-    expect(level().disabled).toBe(false);
+    expect(levelsDisabled()).toBe(false);
   });
 
   it('keeps a result readable after a change, and says which level its data was sent at', async () => {
@@ -498,17 +645,22 @@ describe('the privacy level', () => {
   it('cannot be chosen when the cloud is not available', () => {
     check = create({ available: false });
     check.shown(email, []);
-    expect(level().disabled).toBe(true);
+    expect(levelsDisabled()).toBe(true);
   });
 });
 
-describe('removedSummary', () => {
-  it('names only what was removed', () => {
-    expect(removedSummary({ names: 1, emails: 2, numbers: 0, ibans: 1, links: 0 })).toBe(
-      'Removed on this device: 1 name, 2 email addresses (domain kept), 1 IBAN. Links are sent as their domain only.',
-    );
-    expect(removedSummary({ names: 0, emails: 0, numbers: 0, ibans: 0, links: 0 })).toBe(
-      'No personal data found to remove. Links are sent as their domain only.',
-    );
+describe('removedChips', () => {
+  it('names only what was removed, and what was kept on purpose', () => {
+    expect(removedChips({ names: 1, emails: 2, numbers: 0, ibans: 1, links: 0 }, 'high')).toEqual([
+      '1 name',
+      '2 email addresses',
+      '1 IBAN',
+    ]);
+    expect(
+      removedChips({ names: 0, emails: 0, numbers: 0, ibans: 0, links: 3 }, 'standard'),
+    ).toEqual(['3 link paths', 'Names kept']);
+    expect(removedChips({ names: 0, emails: 0, numbers: 0, ibans: 0, links: 0 }, 'high')).toEqual([
+      'No personal data found',
+    ]);
   });
 });

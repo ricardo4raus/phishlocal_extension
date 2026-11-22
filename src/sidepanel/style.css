@@ -238,6 +238,13 @@
     min-width: 0;
   }
 
+  /* While the consent card is open (main.ts sets data-consent on the page when the deep check
+     says so), the tier-2 lists step aside: the user decides about one email, with the strip and
+     the verdict still in view. */
+  .page[data-consent='open'] .consent-hides {
+    display: none;
+  }
+
   /* Shown only while the settings load; out of the flow, so the panel does not jump when it goes. */
   .starting {
     position: absolute;
@@ -1038,6 +1045,19 @@
     content: '\201D';
   }
 
+  /* A plain chip (no quotation marks): a count or a label on the accent tint. */
+  .chip--plain {
+    background: var(--color-accent-tint);
+    color: var(--color-accent-text);
+    font-weight: 600;
+    border-radius: var(--radius-pill);
+  }
+
+  .chip--plain::before,
+  .chip--plain::after {
+    content: none;
+  }
+
   /* ---- Red flags: rows in one card, separated by hairlines; the badge carries the severity. ---- */
   .flags {
     display: flex;
@@ -1173,10 +1193,103 @@
     overflow-wrap: anywhere;
   }
 
-  /* ---- Deep check (restyled in the deep check PR). ---- */
+  /* ---- Deep check: the offer, the consent card, the privacy level cards. ---- */
   .deep-check__title {
-    font-size: var(--text-m);
-    line-height: var(--leading-m);
+    font-size: var(--text-xl);
+    line-height: var(--leading-xl);
+    font-weight: 700;
+  }
+
+  .deep-check__show {
+    align-self: flex-start;
+  }
+
+  .deep-check__show[aria-expanded='true'] > .icon {
+    transform: rotate(180deg);
+  }
+
+  .deep-check__fine {
+    text-align: center;
+  }
+
+  .levels {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .levels > legend {
+    margin-block-end: var(--space-2);
+  }
+
+  /* A level card: the whole card chooses it (a click is forwarded to the radio). */
+  .level {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+    padding: var(--space-3);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    cursor: pointer;
+  }
+
+  .level:has(> .level__radio:checked) {
+    border-color: var(--color-accent);
+    background: var(--color-selected-tint);
+  }
+
+  .levels:disabled .level {
+    cursor: default;
+    opacity: 0.7;
+  }
+
+  /* The radio drawn by the panel, so it looks the same in every Chrome and in dark mode. */
+  .level__radio {
+    appearance: none;
+    flex: none;
+    inline-size: 18px;
+    block-size: 18px;
+    margin: 1px 0 0;
+    border: 2px solid var(--color-border-strong);
+    border-radius: 50%;
+    background: var(--color-surface);
+    cursor: pointer;
+  }
+
+  .level__radio:checked {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    box-shadow: inset 0 0 0 3px var(--color-surface);
+  }
+
+  .level__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .level__title {
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .level__lead,
+  .level__list {
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
+    color: var(--color-text-2);
+  }
+
+  .level__list {
+    padding-inline-start: 18px;
+    list-style: disc;
+  }
+
+  .level__item--strong {
+    color: var(--color-text);
     font-weight: 600;
   }
 
