@@ -293,6 +293,11 @@ export const fr: Messages = {
     sourceDevice: 'Vérifié sur cet appareil',
     sourceRulesOnly: 'Vérifications de base seulement',
     doneIn: (time) => `Terminé en ${time}`,
+    ownReasons: {
+      confirmed: 'L’expéditeur est confirmé : l’e-mail vient vraiment du domaine affiché.',
+      nothingAsked: 'Aucun lien et aucune demande : il n’y a rien qui puisse vous piéger.',
+      nothingFound: 'Les vérifications de base n’ont trouvé aucun signal d’alerte.',
+    },
   },
 
   judge: {
@@ -309,6 +314,7 @@ export const fr: Messages = {
       `${word} (aucun lien, les vérifications de base n’ont rien trouvé ; remarques de l’IA ci-dessous)`,
     detailNoLinks: (said) =>
       `${said}, mais l’e-mail ne contient aucun lien et les vérifications de base n’ont rien trouvé : ses points ne sont que des remarques.`,
+    aiPoints: (points) => `Ses points : ${points}`,
     detailStricter: (said) =>
       `${said} ; les vérifications de base ont trouvé davantage, leur verdict prévaut donc.`,
   },

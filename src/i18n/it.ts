@@ -291,6 +291,11 @@ export const it: Messages = {
     sourceDevice: 'Controllata su questo dispositivo',
     sourceRulesOnly: 'Solo controlli di base',
     doneIn: (time) => `Fatto in ${time}`,
+    ownReasons: {
+      confirmed: 'Il mittente è confermato: l’email arriva davvero dal dominio indicato.',
+      nothingAsked: 'Nessun link e nessuna richiesta: non c’è nulla in cui cadere.',
+      nothingFound: 'I controlli di base non hanno trovato segnali di allarme.',
+    },
   },
 
   judge: {
@@ -306,6 +311,7 @@ export const it: Messages = {
       `${word} (nessun link, i controlli di base non hanno trovato nulla; note dell’IA sotto)`,
     detailNoLinks: (said) =>
       `${said}, ma l’email non contiene link e i controlli di base non hanno trovato nulla, quindi i suoi punti sono solo note.`,
+    aiPoints: (points) => `I suoi punti: ${points}`,
     detailStricter: (said) =>
       `${said}; i controlli di base hanno trovato di più, quindi vale il loro verdetto.`,
   },

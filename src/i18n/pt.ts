@@ -291,6 +291,11 @@ export const pt: Messages = {
     sourceDevice: 'Verificado neste dispositivo',
     sourceRulesOnly: 'Só verificações básicas',
     doneIn: (time) => `Feito em ${time}`,
+    ownReasons: {
+      confirmed: 'O remetente está confirmado: o e-mail vem mesmo do domínio indicado.',
+      nothingAsked: 'Sem ligações nem pedidos: não há nada em que cair.',
+      nothingFound: 'As verificações básicas não encontraram sinais de alerta.',
+    },
   },
 
   judge: {
@@ -306,6 +311,7 @@ export const pt: Messages = {
       `${word} (sem ligações, as verificações básicas não encontraram nada; notas da IA abaixo)`,
     detailNoLinks: (said) =>
       `${said}, mas o e-mail não tem ligações e as verificações básicas não encontraram nada, por isso os seus pontos são apenas notas.`,
+    aiPoints: (points) => `Os seus pontos: ${points}`,
     detailStricter: (said) =>
       `${said}; as verificações básicas encontraram mais, por isso vale o veredicto delas.`,
   },

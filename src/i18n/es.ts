@@ -292,6 +292,11 @@ export const es: Messages = {
     sourceDevice: 'Revisado en este dispositivo',
     sourceRulesOnly: 'Solo revisiones básicas',
     doneIn: (time) => `Hecho en ${time}`,
+    ownReasons: {
+      confirmed: 'El remitente está confirmado: el correo viene de verdad del dominio que muestra.',
+      nothingAsked: 'Sin enlaces ni peticiones: no hay nada en lo que caer.',
+      nothingFound: 'Las revisiones básicas no encontraron señales de alerta.',
+    },
   },
 
   judge: {
@@ -307,6 +312,7 @@ export const es: Messages = {
       `${word} (sin enlaces, las revisiones básicas no encontraron nada; notas de la IA abajo)`,
     detailNoLinks: (said) =>
       `${said}, pero el correo no tiene enlaces y las revisiones básicas no encontraron nada, así que sus puntos son solo notas.`,
+    aiPoints: (points) => `Sus puntos: ${points}`,
     detailStricter: (said) =>
       `${said}; las revisiones básicas encontraron más, así que su veredicto se mantiene.`,
   },

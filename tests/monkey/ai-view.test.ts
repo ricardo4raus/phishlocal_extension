@@ -3,6 +3,7 @@
 // jumps, and a model that answers, fails, crashes, hangs or ignores the stop signal at random.
 // After every step the panel must still keep its promises.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { en } from '../../src/i18n/en';
 import type { AiCheckResult } from '../../src/ai';
 import { RISKS, type Risk, ruleRisk } from '../../src/ai/verdict';
 import type { Email } from '../../src/email';
@@ -222,8 +223,11 @@ function checkPanelOnce(): void {
   }
   // Reasons and advice shown belong to the email on screen.
   const token = tokenOf(shown.email.subject);
+  const own = Object.values(en.verdict.ownReasons);
   for (const item of document.querySelectorAll('#reasons li')) {
-    // Made for this email and its own addresses (an answer may name exactly those).
+    // Our own reasons when the AI was overruled, else made for this email and its own addresses
+    // (an answer may name exactly those).
+    if (own.includes(item.textContent ?? '')) continue;
     expect(item.textContent).toBe(`About ${token} for ${ownOf(shown.email)}`);
   }
   const advice = get('advice').textContent ?? '';

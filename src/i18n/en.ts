@@ -283,6 +283,12 @@ export const en = {
     sourceDevice: 'Checked on this device',
     sourceRulesOnly: 'Basic checks only',
     doneIn: (time: string) => `Done in ${time}`,
+    /** Our own reasons, shown when the AI's concerns are overruled (its points: Email details). */
+    ownReasons: {
+      confirmed: 'The sender is confirmed: the email really comes from the domain it shows.',
+      nothingAsked: 'No links and no request: there is nothing to fall for.',
+      nothingFound: 'The basic checks found no warning signs.',
+    },
   },
 
   /** How the AI's verdict and the rules were combined (tier 3), and the deep check's old line. */
@@ -300,6 +306,7 @@ export const en = {
     lineNoLinks: (word: string) => `${word} (no links, basic checks found nothing; AI notes below)`,
     detailNoLinks: (said: string) =>
       `${said}, but the email has no links and the basic checks found nothing, so its points are notes only.`,
+    aiPoints: (points: string) => `Its points: ${points}`,
     detailStricter: (said: string) =>
       `${said}; the basic checks found more, so their verdict stands.`,
   },

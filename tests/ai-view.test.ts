@@ -529,9 +529,13 @@ describe('AI check view', () => {
     await answer(verdict('suspicious', 'Check the URL carefully.'));
     expect(text('overall')).toBe('Looks safe');
     expect(text('detail')).toMatch(
-      /^The AI said: suspicious, but the sender is confirmed and the basic checks found nothing, so its points are notes only\./,
+      /^The AI said: suspicious, but the sender is confirmed and the basic checks found nothing, so its points are notes only\. Its points: AI reason \(suspicious\)/,
     );
-    expect(reasons()).toEqual(['AI reason (suspicious)']);
+    // The band gives our reasons for the verdict, never the overruled AI's worries.
+    expect(reasons()).toEqual([
+      'The sender is confirmed: the email really comes from the domain it shows.',
+      'The basic checks found no warning signs.',
+    ]);
     expect(text('advice')).toMatch(/^Stay careful/);
 
     // A rule warning lets the AI raise the verdict again.
@@ -755,9 +759,12 @@ describe('AI check view', () => {
       expect(text('overall')).toBe('Looks safe');
       expect(get('verdict').dataset.risk).toBe('safe');
       expect(text('detail')).toMatch(
-        /^The AI said: suspicious, but the email has no links and the basic checks found nothing, so its points are notes only\./,
+        /^The AI said: suspicious, but the email has no links and the basic checks found nothing, so its points are notes only\. Its points: AI reason \(suspicious\)/,
       );
-      expect(reasons()).toEqual(['AI reason (suspicious)']);
+      expect(reasons()).toEqual([
+        'No links and no request: there is nothing to fall for.',
+        'The basic checks found no warning signs.',
+      ]);
       expect(text('advice')).toMatch(/^Stay careful/);
     });
 

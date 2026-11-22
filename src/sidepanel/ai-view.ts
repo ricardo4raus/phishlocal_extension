@@ -117,7 +117,7 @@ export function judge(
   findings: Finding[] | undefined,
   email: Email,
   ai: string,
-): { overall: Risk; line: string; advice: string; detail: string } {
+): { overall: Risk; line: string; advice: string; detail: string; reasons: string[] } {
   const confirmed = senderConfirmed(email);
   const overall = overallRisk(verdict.risk, rulesRisk(findings), {
     senderConfirmed: confirmed,
@@ -137,8 +137,21 @@ export function judge(
         ? m.judge.lineStricter(WORD[overall], ai, level)
         : WORD[overall],
     advice: stricter || !verdict.advice ? ADVICE[overall] : verdict.advice,
+    // Overruled, the AI's points would argue against the verdict above them: the band gives
+    // our own reasons, and the AI's points are in Email details (tier 3).
+    reasons: onlyNotes
+      ? [
+          confirmed ? m.verdict.ownReasons.confirmed : m.verdict.ownReasons.nothingAsked,
+          m.verdict.ownReasons.nothingFound,
+        ]
+      : verdict.reasons,
     detail: onlyNotes
-      ? (confirmed ? m.judge.detailOnlyNotes : m.judge.detailNoLinks)(said)
+      ? [
+          (confirmed ? m.judge.detailOnlyNotes : m.judge.detailNoLinks)(said),
+          verdict.reasons.length > 0 ? m.judge.aiPoints(verdict.reasons.join(' ')) : '',
+        ]
+          .filter((part) => part !== '')
+          .join(' ')
       : stricter
         ? m.judge.detailStricter(said)
         : '',
@@ -365,7 +378,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     set(elements.overall, WORD[judged.overall]);
     set(elements.status, LINE[judged.overall]);
     elements.reasons.replaceChildren(
-      ...verdict.reasons.map((reason) => {
+      ...judged.reasons.map((reason) => {
         const item = document.createElement('li');
         item.textContent = reason;
         return item;
