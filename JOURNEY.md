@@ -1038,3 +1038,12 @@ _To fill in near the submission._
   "suspicious" alone becomes notes; an AI "dangerous" still stands. Testing the rules on scams
   without links showed why the limit had to be that narrow: a gift-card request gets no rule
   finding at all, and "reply with your password" or an urgent transfer only weak notes.
+- Seen in Chrome right after: the error log now showed "Looks safe", but the band still listed
+  Nano's five worried points under it, so the verdict contradicted its own reasons. Nano kept
+  saying "suspicious" even with the new prompt; only the limit changed the verdict. When the AI
+  is overruled (confirmed sender or nothing asked), the band now gives our own reasons for the
+  verdict and the AI's points move to Email details, in all six languages and for the deep check
+  too. Why the model itself does not get there: Gemini Nano is a small model; it leans towards
+  caution, weighs surface features (empty subject, missing checks, technical text) and does not
+  reliably follow rules such as "missing checks alone are no sign", so the code decides what a
+  sentence in the prompt cannot guarantee.

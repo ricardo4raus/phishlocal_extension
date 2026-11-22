@@ -80,17 +80,20 @@ are its input and its lower limit.
    - When the rules are stricter, the panel names both and shows our own advice instead of the
      AI's.
    - **Exception against false alarms:** if the sender's domain is confirmed (DMARC pass) and the
-     rules found no warning, the AI alone cannot raise the verdict. Its points are shown as
-     notes, with our own advice. Gemini Nano rated a real Google security notice as suspicious
+     rules found no warning, the AI alone cannot raise the verdict. The band then gives our own
+     reasons ("The sender is confirmed …", "The basic checks found no warning signs.") and our
+     own advice; the AI's points are in Email details, so a green band never lists worries
+     (decided 22 Nov 2026, after a green "Looks safe" over five suspicious reasons). Gemini Nano rated a real Google security notice as suspicious
      even with the sender checks in its data. Phishing from a confirmed but hijacked sender
      almost always trips the rules too (requests for identity, log-in or card details, payments).
    - **Second exception, when nothing is asked** (22 Nov 2026): no links, and the rules found no
      pressure, threat, request for data or payment, not even as a note. Then an AI "suspicious"
-     alone is shown as notes with our own advice; an AI "dangerous" still stands. Gemini Nano
+     alone is overruled the same way (our reasons: "No links and no request: there is nothing
+     to fall for.", "The basic checks found no warning signs."); an AI "dangerous" still stands. Gemini Nano
      called a developer's error log that the user had sent to themselves suspicious, mainly
      because Gmail adds no sender checks to such mail. The rules miss some scams without links:
      a gift-card request in other words gets no finding at all, so if Nano only calls it
-     "suspicious", it shows as safe with Nano's points as notes. A password request or a transfer
+     "suspicious", it shows as safe with Nano's points in Email details. A password request or a transfer
      under time pressure is at least a note, so the AI's verdict stands there
      (`tests/ai-view.test.ts`, "an email without links").
    - **Prompt** (same date): "not available" sender checks are no sign of phishing by
