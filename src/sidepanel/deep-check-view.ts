@@ -568,8 +568,10 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     if (phase === 'preview' || phase === 'preparing') {
       cancel();
     } else if (phase !== 'sending') {
-      // Done, or nothing prepared: close the card and keep the result. While the data is on
-      // its way, Stop is the way out (the button is disabled then), so the record stays in view.
+      // Done, or nothing prepared: close the card (the sent data goes with it) and keep the
+      // result. While the data is on its way, Stop is the way out (the button is disabled then),
+      // so the record stays in view.
+      clearPreview();
       setConsent(false);
       showOffer();
       elements.start.focus();

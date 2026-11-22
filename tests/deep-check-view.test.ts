@@ -212,11 +212,14 @@ describe('the deep check', () => {
     expect(document.activeElement).toBe(get('result'));
     // The data stays as the record of what was sent.
     expect(text('data')).toBe(shownData);
-    // "Back to the result" closes the card and keeps the result; the offer is back.
+    // "Back to the result" closes the card (the record goes with it) and keeps the result; the
+    // offer is back.
     click('back');
     expect(get('consent').hidden).toBe(true);
+    expect(get('preview').hidden).toBe(true);
     expect(get('result').hidden).toBe(false);
     expect(get('start').hidden).toBe(false);
+    expect(document.activeElement).toBe(get('start'));
   });
 
   it('opens the consent card in place and tells the panel, and Back cancels an open preview', async () => {
