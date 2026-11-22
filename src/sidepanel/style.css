@@ -264,6 +264,19 @@ h2 {
   font-size: 14px;
 }
 
+/* The label, the short select and the explanation under it. */
+.deep-check-level {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.deep-check-level p {
+  margin: 0;
+}
+
 .deep-check-preview {
   display: flex;
   flex-direction: column;

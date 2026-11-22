@@ -289,8 +289,10 @@ describe('monkey: privacy filter in front of the cloud', () => {
         ];
       }
       const nanoLooked = rng.chance(0.7);
+      // "standard" keeps names but must remove everything else just the same.
+      const level = rng.pick(['standard', 'high'] as const);
       const data = timed('cloudData', () =>
-        cloudData(email, checkEmail(email), nanoLooked ? ['Zorbald Quint'] : undefined),
+        cloudData(email, checkEmail(email), nanoLooked ? ['Zorbald Quint'] : undefined, level),
       );
       const { json } = data;
       expect(() => JSON.parse(json) as unknown).not.toThrow();
@@ -308,14 +310,17 @@ describe('monkey: privacy filter in front of the cloud', () => {
       }
       expect(json.replace(/\D/g, ''), 'phone number').not.toContain('41795551234');
       expect(json.replace(/\s/g, ''), 'IBAN').not.toContain('CH930076');
-      // Names: everywhere when Nano looked; without it, at least the sender name goes.
-      expect(nanoLooked && /Zorbald|Quint/i.test(json), 'name').toBe(false);
+      const high = level === 'high';
       const parsed = JSON.parse(json) as { email: { from: { name: string } } };
-      expect(parsed.email.from.name).not.toMatch(/Zorbald|Quint/i);
-      expect(data.namesChecked).toBe(nanoLooked);
+      // At "high": names everywhere when Nano looked; without it, at least the sender name goes.
+      expect(high && nanoLooked && /Zorbald|Quint/i.test(json), 'name').toBe(false);
+      expect(high && /Zorbald|Quint/i.test(parsed.email.from.name), 'sender name').toBe(false);
+      expect(data.namesChecked).toBe(high ? nanoLooked : true);
+      // At "standard" no name is removed.
+      expect(!high && data.removed.names > 0, 'names removed at "standard"').toBe(false);
       // The same email, the same data.
       expect(
-        cloudData(email, checkEmail(email), nanoLooked ? ['Zorbald Quint'] : undefined),
+        cloudData(email, checkEmail(email), nanoLooked ? ['Zorbald Quint'] : undefined, level),
       ).toEqual(data);
     });
   });

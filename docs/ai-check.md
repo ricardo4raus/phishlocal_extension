@@ -158,7 +158,18 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
 1. **Request:** the user clicks "Prepare a deep check…" under the verdict. For Italian and
    Portuguese, where Gemini Nano's answers are experimental, the panel recommends it. A Gmail
    email first waits for its headers (at most 3 s, like the on-device check).
-2. **Names, on the device** (`findNames()` in [`src/ai.ts`](../src/ai.ts)):
+2. **Privacy level** (decided 22 Nov 2026): a switch above "Prepare" sets how much is removed,
+   remembered in the browser (`localStorage`; without it, the default applies):
+   - **Standard** (default): email addresses (domain kept), phone and other long numbers, IBANs
+     and link paths (host kept) are removed; names are kept. No name search runs, so the preview
+     comes at once. Removing names also hit brands (Nano listed "Google" as a person), and with
+     the names the cloud can tell a mass email ("Dear customer") from one written for the
+     recipient.
+   - **High**: also the names of people, found by Gemini Nano (step below) and after greetings.
+   - Changing the level discards a prepared preview ("Nothing was sent"); it cannot change while
+     names are searched or the data is on its way.
+
+   **Names, on the device, at level High** (`findNames()` in [`src/ai.ts`](../src/ai.ts)):
    - The panel first waits for the on-device model to be loaded (that can take minutes; "Stop"
      ends the wait), outside the search's time limit.
    - Gemini Nano gets the text that will be cleaned and lists the names of people in it, as a
@@ -176,6 +187,7 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
      names may remain. Without Nano's list the sender's name is removed entirely.
    - Nano works on one prompt at a time: a search started while the on-device check runs waits
      behind it, and may reach its limit (then the warning shows).
+
 3. **Privacy filter, on the device** ([`src/privacy/redact.ts`](../src/privacy/redact.ts),
    `cloudData()`), in this order:
    - fields are cut to the prompt limits first; a cut field (also one already cut when the email
@@ -183,10 +195,10 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
      it, so no half number or address goes;
    - text normalized as for the answer reader (NFKC, invisible characters removed, whitespace
      joined);
-   - names are replaced first among the patterns, so that a name inside a link or an address goes
-     with it. Until the end each one stands as a single letter that normalized text cannot hold,
-     so the link and address patterns below still see whole words ("hans.muster@…" goes as one
-     address), and then becomes "[name]". The names: the one after a greeting in the six
+   - at level High, names are replaced first among the patterns, so that a name inside a link or
+     an address goes with it. Until the end each one stands as a single letter that normalized
+     text cannot hold, so the link and address patterns below still see whole words
+     ("hans.muster@…" goes as one address), and then becomes "[name]". The names: the one after a greeting in the six
      languages ("Dear Anna Muster", "Guten Tag Frau Muster", "Grüezi Anna"; "Dear Customer"
      stays, it is evidence; a brand after a greeting is removed too), and Nano's names and their
      parts (split at spaces and hyphens). They match in any case ("ANNA", "STRAUẞ" for

@@ -38,10 +38,12 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   target of a forwarding link), a shortened URL (the full one as tooltip) and its text. Links
   behind a red flag are marked, and each red flag names its links ("link 2").
 - **Deep check in the cloud, only on request:** a larger Gemini model in the cloud checks the
-  email again. Before anything is sent, Gemini Nano finds names on the device, and a privacy
-  filter replaces names, email addresses (domain kept), phone and other long numbers, IBANs and
-  full links (host kept). The panel shows exactly what will be sent; only "Send to the cloud"
-  sends it. Details: [`docs/ai-check.md`](docs/ai-check.md#deep-check-in-the-cloud).
+  email again. Before anything is sent, a privacy filter on the device replaces email addresses
+  (domain kept), phone and other long numbers, IBANs and full links (host kept). At privacy level
+  "High" it also removes the names of people, found by Gemini Nano on the device; "Standard"
+  (the default) keeps names, so the cloud sees whether an email was written for you or for
+  everyone. The panel shows exactly what will be sent; only "Send to the cloud" sends it.
+  Details: [`docs/ai-check.md`](docs/ai-check.md#deep-check-in-the-cloud).
 - **Hybrid AI:** a test prompt runs through Firebase AI Logic with
   `InferenceMode.PREFER_ON_DEVICE`. Gemini Nano answers on the device; the cloud (Gemini
   Developer API) is the fallback. The panel loads the on-device model when it opens and shows
@@ -62,7 +64,8 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 - Email content is shown only as text, never rendered as HTML, so pasted emails can't load
   tracking pixels or run scripts.
 - The cloud deep check runs only when you ask for it and agree to the data shown: personal data
-  is removed on the device first, raw headers are never sent, and you see exactly the email data
+  is removed on the device first (addresses, numbers, IBANs, link paths; at privacy level "High"
+  also names), raw headers are never sent, and you see exactly the email data
   that goes (besides PhishLocal's own instructions, which hold no personal data). Each email
   needs its own consent.
 - Besides loading "Show original" from Gmail, the only request PhishLocal makes on its own: when

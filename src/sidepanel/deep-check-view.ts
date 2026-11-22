@@ -17,7 +17,15 @@ import {
   EXPERIMENTAL_LANGUAGES,
 } from '../ai/prompt';
 import type { Email } from '../email';
-import { type CloudData, cloudData, nameSearchText, type Removed } from '../privacy/redact';
+import {
+  type CloudData,
+  cloudData,
+  DEFAULT_PRIVACY_LEVEL,
+  nameSearchText,
+  PRIVACY_LEVELS,
+  type PrivacyLevel,
+  type Removed,
+} from '../privacy/redact';
 import type { Finding } from '../rules';
 import { HEADERS_WAIT_MS, judge, STOP_GRACE_MS } from './ai-view';
 
@@ -27,6 +35,9 @@ import { HEADERS_WAIT_MS, judge, STOP_GRACE_MS } from './ai-view';
  */
 export const CLOUD_LIMIT_EXTRA_MS = 10_000;
 
+/** The name search ended because the email changed or the user stopped it: show nothing. */
+const STOPPED = Symbol('stopped');
+
 /** The reason a run is stopped when it reaches its time limit. */
 const TIME_LIMIT = 'time limit';
 
@@ -34,6 +45,8 @@ export interface DeepCheckElements {
   section: HTMLElement;
   intro: HTMLElement;
   start: HTMLButtonElement;
+  /** The privacy level: its options' values are the PrivacyLevel names. */
+  level: HTMLSelectElement;
   /** Stops the name search or the cloud request. */
   stop: HTMLButtonElement;
   preview: HTMLElement;
@@ -68,6 +81,10 @@ export interface DeepCheckDeps {
   /** The cloud request's own time limit (settings' `cloudTimeoutMs`). */
   cloudTimeoutMs: number;
   headersWaitMs?: number;
+  /** The level chosen last time in this browser, if any (any text; checked here). */
+  savedLevel?: () => string | undefined;
+  /** Remembers the chosen level for the next time. */
+  saveLevel?: (level: PrivacyLevel) => void;
 }
 
 export interface DeepCheck {
@@ -84,6 +101,15 @@ const CLOUD_NOTE = 'Cloud (Gemini via Firebase AI Logic). AI can be wrong.';
 
 const NAMES_MAY_REMAIN =
   'Not every name could be checked on this device, so names may remain: read the data before you send it.';
+
+const PREVIEW_STATUS: Record<PrivacyLevel, string> = {
+  standard:
+    'This is everything that will be sent, besides our fixed instructions. Names are kept (privacy level Standard).',
+  high: 'This is everything that will be sent, besides our fixed instructions.',
+};
+
+const isPrivacyLevel = (value: string | undefined): value is PrivacyLevel =>
+  PRIVACY_LEVELS.some((level) => level === value);
 
 const plural = (count: number, one: string, many: string): string =>
   `${count} ${count === 1 ? one : many}`;
@@ -185,6 +211,12 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
   // The status can take the focus from a button that disappears (not by Tab).
   elements.status.tabIndex = -1;
 
+  const saved = deps.savedLevel?.();
+  elements.level.value = isPrivacyLevel(saved) ? saved : DEFAULT_PRIVACY_LEVEL;
+  /** The chosen level; an unknown value (a changed page) counts as the stricter one. */
+  const level = (): PrivacyLevel =>
+    isPrivacyLevel(elements.level.value) ? elements.level.value : 'high';
+
   const language = (): string => answerLanguage(deps.uiLanguage());
 
   function intro(): string {
@@ -216,6 +248,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     set(elements.status, status);
     elements.start.hidden = false;
     elements.start.disabled = !deps.available || !shown?.final;
+    elements.level.disabled = !deps.available;
     elements.stop.hidden = true;
     elements.send.hidden = false;
     elements.cancel.hidden = false;
@@ -232,16 +265,20 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     }
   }
 
-  async function prepare(): Promise<void> {
-    if (!shown?.final || !deps.available || phase === 'preparing' || phase === 'sending') return;
-    const { email, findings } = shown;
-    const answerIn = language();
-    reset();
+  /**
+   * Gemini Nano's names for the email, or undefined if it could not look (then names may remain);
+   * {@link STOPPED} if the email changed or the user stopped meanwhile.
+   */
+  async function searchNames(
+    email: Email,
+    answerIn: string,
+  ): Promise<string[] | undefined | typeof STOPPED> {
     const mine = generation;
     phase = 'preparing';
     const controller = new AbortController();
     stop = controller;
     elements.start.hidden = true;
+    elements.level.disabled = true;
     elements.stop.hidden = false;
     elements.stop.focus();
     set(elements.status, 'Waiting for the on-device model…');
@@ -250,7 +287,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
       () => deps.modelReady(answerIn),
       () => false,
     );
-    if (mine !== generation) return;
+    if (mine !== generation) return STOPPED;
     let names: string[] | undefined;
     if (ready) {
       set(elements.status, 'Looking for names on this device (Gemini Nano)…');
@@ -260,24 +297,32 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
         namesTimeoutMs,
         () => undefined,
       );
-      if (mine !== generation) return;
+      if (mine !== generation) return STOPPED;
     }
     stop = undefined;
     // A search stopped by the time limit may still answer: its list is not trusted to be complete.
-    const found = controller.signal.aborted ? undefined : names;
-    const data = cloudData(email, findings ?? [], found);
+    return controller.signal.aborted ? undefined : names;
+  }
+
+  async function prepare(): Promise<void> {
+    if (!shown?.final || !deps.available || phase === 'preparing' || phase === 'sending') return;
+    const { email, findings } = shown;
+    const answerIn = language();
+    // Fixed for this preview: changing it discards the preview (see the listener below).
+    const chosen = level();
+    reset();
+    // "standard" keeps names: no model, no name search, nothing to wait for or stop.
+    const found = chosen === 'high' ? await searchNames(email, answerIn) : [];
+    if (found === STOPPED) return;
+    const data = cloudData(email, findings ?? [], found, chosen);
     prepared = { data, language: answerIn };
     phase = 'preview';
     set(elements.removed, removedSummary(data.removed));
     set(elements.data, data.json);
     elements.stop.hidden = true;
+    elements.level.disabled = false;
     elements.preview.hidden = false;
-    set(
-      elements.status,
-      data.namesChecked
-        ? 'This is everything that will be sent, besides our fixed instructions.'
-        : NAMES_MAY_REMAIN,
-    );
+    set(elements.status, data.namesChecked ? PREVIEW_STATUS[chosen] : NAMES_MAY_REMAIN);
     elements.data.focus();
   }
 
@@ -285,6 +330,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     phase = 'done';
     elements.stop.hidden = true;
     elements.start.hidden = false;
+    elements.level.disabled = false;
     if (!result.ok) {
       set(
         elements.status,
@@ -322,6 +368,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     const mine = generation;
     phase = 'sending';
     prepared = undefined;
+    elements.level.disabled = true;
     // The data stays visible as the record of what was sent; it is sent only once.
     elements.send.hidden = true;
     elements.cancel.hidden = true;
@@ -354,6 +401,19 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
 
   elements.start.addEventListener('click', () => void prepare());
   elements.send.addEventListener('click', () => void send());
+  elements.level.addEventListener('change', () => {
+    deps.saveLevel?.(level());
+    // The preview must show exactly what goes: data prepared at the other level is discarded.
+    if (phase === 'preview') {
+      reset('The privacy level changed, so the prepared data was discarded. Nothing was sent.');
+    } else if (phase === 'done') {
+      // The result stays readable; the data above was sent at the level chosen before.
+      set(
+        elements.status,
+        'The new privacy level applies to the next deep check. The data above was sent at the previous level.',
+      );
+    }
+  });
   elements.cancel.addEventListener('click', () => {
     if (phase !== 'preview') return;
     reset('Nothing was sent.');

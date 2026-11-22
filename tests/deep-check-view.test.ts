@@ -35,6 +35,7 @@ const IDS = [
   'section',
   'intro',
   ...BUTTONS,
+  'level',
   'preview',
   'removed',
   'data',
@@ -62,9 +63,15 @@ function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
       ? 'button'
       : id === 'reasons'
         ? 'ul'
-        : 'div';
+        : id === 'level'
+          ? 'select'
+          : 'div';
     const element = document.createElement(tag);
     element.id = id;
+    // As in index.html: the levels are the select's options.
+    if (element instanceof HTMLSelectElement) {
+      for (const value of ['standard', 'high']) element.append(new Option(value, value));
+    }
     // As in index.html: the data and the result can take the focus.
     if (id === 'data') element.tabIndex = 0;
     if (id === 'result') element.tabIndex = -1;
@@ -79,6 +86,7 @@ function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
       section: get('section'),
       intro: get('intro'),
       start: get('start') as HTMLButtonElement,
+      level: get('level') as HTMLSelectElement,
       stop: get('stop') as HTMLButtonElement,
       preview: get('preview'),
       removed: get('removed'),
@@ -105,6 +113,8 @@ function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
         }),
       namesTimeoutMs: NAMES_TIMEOUT_MS,
       cloudTimeoutMs: DEFAULT_SETTINGS.cloudTimeoutMs,
+      // Most tests here are about the name search, which only "high" runs.
+      savedLevel: () => 'high',
       ...deps,
     },
   );
@@ -396,6 +406,99 @@ describe('the deep check', () => {
     check = create({ uiLanguage: () => 'it-IT' });
     check.shown(email, []);
     expect(text('intro')).toContain('Recommended: on-device answers in Italian are experimental');
+  });
+});
+
+const level = (): HTMLSelectElement => get('level') as HTMLSelectElement;
+
+const choose = (value: string): void => {
+  level().value = value;
+  level().dispatchEvent(new Event('change'));
+};
+
+describe('the privacy level', () => {
+  it('starts at "standard": no name search, names kept, everything else removed', async () => {
+    let modelWaits = 0;
+    check = create({
+      savedLevel: () => undefined,
+      modelReady: async () => {
+        modelWaits++;
+        return true;
+      },
+    });
+    expect(level().value).toBe('standard');
+    check.shown(email, []);
+    click('start');
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    expect(nameCalls).toHaveLength(0);
+    expect(modelWaits).toBe(0);
+    const data = text('data');
+    expect(data).toContain('Dear Anna Muster');
+    expect(data).toContain('"name": "Anna Muster"');
+    expect(data).not.toMatch(/CH93|123 45 67|pay\?user|anna\.muster@/i);
+    expect(text('status')).toContain('Names are kept (privacy level Standard)');
+    click('send');
+    expect(runs[0]?.prompt).toContain('Dear Anna Muster');
+  });
+
+  it('uses the level chosen last time, and ignores a stored value it does not know', () => {
+    expect(create({ savedLevel: () => 'high' }) && level().value).toBe('high');
+    expect(create({ savedLevel: () => 'everything' }) && level().value).toBe('standard');
+  });
+
+  it('remembers a new level and discards a preview prepared at the old one', async () => {
+    const saved: string[] = [];
+    check = create({ savedLevel: () => undefined, saveLevel: (value) => saved.push(value) });
+    check.shown(email, []);
+    click('start');
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    choose('high');
+    expect(saved).toEqual(['high']);
+    expect(get('preview').hidden).toBe(true);
+    expect(text('status')).toBe(
+      'The privacy level changed, so the prepared data was discarded. Nothing was sent.',
+    );
+    click('send');
+    expect(runs).toHaveLength(0);
+    // Prepared again, now at "high": Nano looks for names.
+    click('start');
+    await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
+  });
+
+  it('cannot change while names are searched or the data is on its way', async () => {
+    check.shown(email, []);
+    click('start');
+    await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
+    expect(level().disabled).toBe(true);
+    nameCalls[0]?.resolve(['Anna Muster']);
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    expect(level().disabled).toBe(false);
+    click('send');
+    expect(level().disabled).toBe(true);
+    runs[0]?.resolve(answer('safe'));
+    await vi.waitFor(() => expect(get('result').hidden).toBe(false));
+    expect(level().disabled).toBe(false);
+  });
+
+  it('keeps a result readable after a change, and says which level its data was sent at', async () => {
+    check = create({ savedLevel: () => undefined });
+    check.shown(email, []);
+    click('start');
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    click('send');
+    runs[0]?.resolve(answer('safe'));
+    await vi.waitFor(() => expect(get('result').hidden).toBe(false));
+    choose('high');
+    expect(get('result').hidden).toBe(false);
+    expect(text('status')).toBe(
+      'The new privacy level applies to the next deep check. The data above was sent at the previous level.',
+    );
+  });
+
+  it('cannot be chosen when the cloud is not available', () => {
+    check = create({ available: false });
+    check.shown(email, []);
+    expect(level().disabled).toBe(true);
   });
 });
 

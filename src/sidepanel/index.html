@@ -67,6 +67,17 @@
         <section id="deep-check" class="deep-check" aria-labelledby="deep-check-heading" hidden>
           <h3 id="deep-check-heading">Deep check in the cloud</h3>
           <p id="deep-check-intro" class="hint"></p>
+          <div class="deep-check-level">
+            <label for="deep-check-level">Privacy level</label>
+            <select id="deep-check-level" aria-describedby="deep-check-level-hint">
+              <option value="standard">Standard</option>
+              <option value="high">High</option>
+            </select>
+            <p id="deep-check-level-hint" class="hint">
+              Standard removes email addresses, phone and other long numbers, IBANs and link paths,
+              and keeps names. High also removes the names of people, found on this device.
+            </p>
+          </div>
           <button id="deep-check-start" type="button">Prepare a deep check…</button>
           <button id="deep-check-stop" type="button" hidden>Stop</button>
           <div id="deep-check-preview" class="deep-check-preview" hidden>

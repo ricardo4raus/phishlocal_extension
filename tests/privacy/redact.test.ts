@@ -462,6 +462,30 @@ describe('cloudData', () => {
     expect(data.removed).toEqual({ names: 2, emails: 0, numbers: 1, ibans: 0, links: 0 });
   });
 
+  it('keeps every name at "standard", and removes the rest as at "high"', () => {
+    const mail = email({
+      sender: { name: 'Anna Muster', address: 'anna.muster@mail.example' },
+      bodyText: 'Dear Anna Muster, pay to CH93 0076 2011 6238 5295 7 or call +41 79 123 45 67.',
+      links: [{ text: 'Log in', href: 'https://secure.anna-muster.example/login?id=anna' }],
+    });
+    // Nano's list is ignored at "standard", even if one is passed.
+    const data = cloudData(mail, findings, ['Anna Muster'], 'standard');
+    const parsed = JSON.parse(data.json) as {
+      email: { from: { name: string; address: string }; body: string; links: unknown[] };
+    };
+    expect(parsed.email.from).toEqual({ name: 'Anna Muster', address: '[email]@mail.example' });
+    expect(parsed.email.body).toBe('Dear Anna Muster, pay to [iban] or call [number].');
+    expect(parsed.email.links).toEqual([{ text: 'Log in', goes_to: 'secure.anna-muster.example' }]);
+    expect(data.json).not.toMatch(/CH93|123 45 67|login\?id/);
+    expect(data.namesChecked).toBe(true);
+    expect(data.removed.names).toBe(0);
+    // Without Nano's list the sender's name is kept too.
+    const unchecked = JSON.parse(cloudData(mail, findings, undefined, 'standard').json) as {
+      email: { from: { name: string } };
+    };
+    expect(unchecked.email.from.name).toBe('Anna Muster');
+  });
+
   describe('a brand Nano takes for a name', () => {
     it('stays when the sender domain is confirmed (found in Chrome: "[email]@[name].com")', () => {
       const data = parseCloudData(
