@@ -21,7 +21,7 @@ import { showEmail } from './email-view';
 import { createGmailView, type EmptyReason } from './gmail-view';
 import { showRuleCheck } from './findings-view';
 import { setUpPaste } from './paste-view';
-import { countElapsed, seconds } from './ui';
+import { countElapsed, PANEL_LANGUAGE, seconds } from './ui';
 import { watchActiveTab } from './watch';
 
 /** Where "How it works" leads: the README of the public repository. */
@@ -303,7 +303,7 @@ function showEmpty(reason: EmptyReason): void {
 const PRIVACY_LEVEL_KEY = 'phishlocal.deepCheck.privacyLevel';
 
 /** The AI check's answer language; the warm-up loads the model for exactly this one. */
-const checkLanguage = answerLanguage(chrome.i18n.getUILanguage());
+const checkLanguage = answerLanguage(PANEL_LANGUAGE);
 
 // The AI check of every shown email: on-device only, with the rules as its lower limit.
 const aiCheck = createAiCheck(
@@ -320,7 +320,7 @@ const aiCheck = createAiCheck(
   },
   {
     run: runAiCheck,
-    uiLanguage: () => chrome.i18n.getUILanguage(),
+    panelLanguage: () => PANEL_LANGUAGE,
     modelReady,
     runTimeoutMs: settings.aiCheckTimeoutMs,
   },
@@ -358,7 +358,7 @@ const deepCheck = createDeepCheck(
   },
   {
     available: appCheckEnabled,
-    uiLanguage: () => chrome.i18n.getUILanguage(),
+    panelLanguage: () => PANEL_LANGUAGE,
     modelReady,
     findNames,
     // While the consent card is open, the red flags and links step aside (style.css).

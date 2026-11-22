@@ -87,8 +87,8 @@ export interface DeepCheckElements {
 export interface DeepCheckDeps {
   /** The cloud can be reached in this build (it needs App Check). */
   available: boolean;
-  /** Chrome's UI language, e.g. "de-CH". */
-  uiLanguage: () => string;
+  /** The panel's language (`PANEL_LANGUAGE`), e.g. "en": the AI answers in it. */
+  panelLanguage: () => string;
   /** Waits until the on-device model is loaded (that can take minutes); says whether it is ready. */
   modelReady: (language: string) => Promise<boolean>;
   /** Gemini Nano, on the device: the names of people in `text`, or undefined if it could not look. */
@@ -245,7 +245,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     elements.levels.disabled = disabled;
   };
 
-  const language = (): string => answerLanguage(deps.uiLanguage());
+  const language = (): string => answerLanguage(deps.panelLanguage());
 
   /** The line under the offer button: only when the deep check is recommended or unavailable. */
   function intro(): string {

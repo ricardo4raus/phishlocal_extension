@@ -56,7 +56,7 @@ describe('buildUserPrompt', () => {
     const prompt = buildUserPrompt(email, findings, 'de', 'a1b2c3d4');
     const lines = prompt.split('\n');
     expect(lines[0]).toBe(
-      'Check this email for phishing. Write the reasons and the advice in German.',
+      'Check this email for phishing. Write the reasons and the advice in German, also when the email is in another language.',
     );
     expect(lines[2]).toBe('<data-a1b2c3d4>');
     expect(lines[4]).toBe('</data-a1b2c3d4>');

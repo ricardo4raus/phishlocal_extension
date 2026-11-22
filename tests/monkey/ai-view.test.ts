@@ -168,7 +168,7 @@ function create(rng: Rng): AiCheck {
           }, after);
         });
       },
-      uiLanguage: () => rng.pick(['de-CH', 'de']),
+      panelLanguage: () => rng.pick(['de-CH', 'de']),
       modelReady: () => {
         const wait = calm ? 0 : rng.pick([0, 0, 500, 3_000, 300_000]);
         const outcome = calm ? 'ready' : rng.pick(['ready', 'ready', 'ready', 'no', 'throw']);
