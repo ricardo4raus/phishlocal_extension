@@ -85,14 +85,16 @@ Every part is its own component (see "How to build it"); the page sets the spaci
 2. **Model banner** (only when the model needs the user): not downloaded (text and the
    "Download now" button), downloading (progress bar with `role="progressbar"`), unavailable
    (text only). It never replaces the email below it.
-3. **Empty card** (only without an email): illustration, heading, text, the outlined button
-   "Paste an email", then "How your privacy is kept" with three points, then the footer line
-   "Languages: en · de · fr · es · it · pt" and a "How it works" button that opens the README.
+3. **Empty state** (only without an email): heading, text, the outlined button "Paste an
+   email", then "How your privacy is kept" with three points (icon, bold lead, one sentence), then
+   the footer line "Languages: en · de · fr · es · it · pt" and a "How it works" button that opens
+   the README. Left-aligned, no illustration: the panel is too narrow for a hero, and the logo is
+   already in the top bar.
 4. **Email strip** (with an email): subject (one line, cut with "…"), then the sender: the
    address domain first and bold, the display name after it in grey, the full address on its own
    line, wrapping, never cut. Third line, the sender status: "Sender confirmed by Gmail" (DMARC
    pass from `mx.google.com`), "Sender confirmed by your mail server" (pass from another server
-   in pasted raw source), "Sender not verified" (no headers, or no pass), "Checking the sender…"
+   in pasted raw source), "Sender not confirmed" (no headers, or no pass), "Checking the sender…"
    (Gmail headers still loading). On the right an icon button "Check the open email again".
    Under the strip one muted line for the source status ("Checked automatically", "Pasted
    email", "Sample loaded: …") and errors.
@@ -100,14 +102,17 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    then the reasons (up to five, as the AI gives them), the "What to do" box, and the footer
    "Checked on this device · Done in 1.4 s". While the AI check runs, the footer shows the
    elapsed time and the Stop button instead.
-6. **Red flags** (heading with a count), one card per danger or warning finding: a badge
-   ("Danger" or "Warning"), the finding's title in plain words, then the evidence: "Says" and
-   "Opens" rows for link findings, quoted phrases as chips, otherwise the finding's sentence. The
-   count counts danger and warning findings only. Hidden when there are none.
-7. **Links** (heading with a count): one card per flagged link (the real domain bold, "forwards
-   to" when it does, the shortened URL in monospace, the border in the link's severity), then a
-   fold "N more links" with the unflagged ones in the same form. Link texts appear only in the
-   red-flag cards ("Says"), never twice.
+6. **Red flags** (heading "Red flags (3)", the count as text): one list in one card, one row per
+   danger or warning finding, rows separated by a hairline: a badge ("Danger" or "Warning", with
+   its symbol), the finding's title in plain words, then the evidence: "Says" and "Opens" rows
+   for link findings, "Looks like" and "Is" for lookalike domains, quoted phrases as chips,
+   otherwise the finding's sentence. The badge alone carries the severity; rows have no coloured
+   borders (a coloured bar on every row emphasises nothing). The count counts danger and warning
+   findings only. Hidden when there are none.
+7. **Links** (heading "Links (2)"): one list in one card, one row per flagged link (its badge,
+   the real domain bold, "forwards to" when it does, the shortened URL in monospace), then a fold
+   "N more links" with the unflagged ones in the same form. Link texts appear only in the
+   red-flag rows ("Says"), never twice.
 8. **Deep check:** one outlined button "Deep check in the cloud…" under the links. Filled (blue)
    only when recommended: the AI did not run, or the UI language is one where its answers are
    experimental (it, pt). Disabled with the line "Not available in this build" when the build has
@@ -161,14 +166,16 @@ Tier-1 texts. The same thing has the same name everywhere.
 | Thing                       | Words                                                                                      |
 | --------------------------- | ------------------------------------------------------------------------------------------ |
 | Verdict words               | Checking… / Dangerous / Suspicious / Looks safe / No red flags found                       |
-| Dangerous line              | Don't click the links, don't reply, don't open attachments.                                |
-| Suspicious line             | Some signs of phishing. Don't enter passwords or pay through this email.                   |
+| Dangerous line              | This looks like phishing. Don't click the links, don't reply, don't open attachments.      |
+| Suspicious line             | Be careful: some signs of phishing. Don't enter passwords or pay through this email.       |
 | Looks safe line             | No signs of phishing found.                                                                |
 | Not checked by AI           | Not checked by AI. The basic checks alone can miss a well-written scam.                    |
 | AI running line             | Basic checks done, AI check running (or: Basic checks found red flags, AI check running)   |
 | Result footer               | Checked on this device · Done in 1.4 s                                                     |
 | Cloud result footer         | Checked in the cloud · Done in 1.9 s                                                       |
-| Sender status               | Sender confirmed by Gmail / Sender not verified / Checking the sender…                     |
+| Sender status               | Sender confirmed by Gmail / Sender not confirmed / Checking the sender…                    |
+| Hedges                      | Verdict words are nouns; the line under them hedges ("looks like", "some signs"), never    |
+|                             | "this is phishing" and never "this is safe"                                                |
 | The rule checks             | basic checks (tier 1 and 2); "rule checks" in tier 3 and in the docs                       |
 | The on-device model         | AI, on-device AI; "Gemini Nano" in the empty, loading, download texts and tier 3           |
 | Deep check button           | Deep check in the cloud…                                                                   |
@@ -193,7 +200,7 @@ the prompt. `info` findings are notes in "Email details" and have no card.
 | `ip-link`              | A link goes to a bare number address               | Opens: the IP address                |
 | `international-domain` | A web address uses letters from another alphabet   | the host                             |
 | `link-text-mismatch`   | A link doesn't go where its text says              | Says: link text · Opens: real domain |
-| `lookalike-domain`     | A web address imitates a known one                 | the domain and the one it imitates   |
+| `lookalike-domain`     | A web address imitates a known one                 | Looks like: real domain · Is: domain |
 | `brand-in-subdomain`   | A known name is used in front of another address   | the host                             |
 | `brand-in-domain`      | A web address contains a known name but isn't it   | the domain                           |
 | `sender-name-domain`   | The sender's name doesn't match the address        | Name says · Address is               |
@@ -219,11 +226,18 @@ Define these as custom properties on `:root`, with the dark values under
 `@media (prefers-color-scheme: dark)`. Font: `system-ui` (no web font: nothing remote).
 
 **Type:** 12 / 13 / 14 (body) / 15 / 18 px, line height 1.45; weights 400, 600 and 700 only.
-**Space:** 4 / 8 / 12 / 16 / 24 px. **Radii:** cards 12 px, buttons and boxes 8 px, pills and
-badges round. **Buttons:** 40 px high (44 px for Send and Cancel), one filled button per screen
-at most, a visible `:focus-visible` ring. **Icons:** one stroke width (2 px on a 24 px grid),
-drawn as SVG files and shown through CSS `mask-image`, so the panel's DOM holds no `<svg>` and
-email text can never become one. No emoji.
+Line heights on the 4 px grid: 16 / 18 / 20 / 22 / 24 px. Hierarchy by weight and colour
+before size. **Space:** 4 / 8 / 12 / 16 / 24 px. **Radii:** one scale, inner smaller than
+outer: cards 12 px, buttons and boxes 8 px, chips 6 px, pills and badges round. **Buttons:**
+40 px high (44 px for Send and Cancel), one filled button per screen at most, hierarchy filled →
+outlined → plain text, a visible `:focus-visible` ring. **Boxes:** a card only around a thing
+that stands on its own (the verdict, a list, the consent); everything else is grouped by
+spacing and headings, and rows inside a list are separated by a hairline, not boxed. No coloured
+side bars, no gradients, no shadows, no emoji. **Colour:** one accent (blue) for interactive
+things only, the three semantic colours only for a real state, grey for everything else.
+**Icons:** one set, one stroke width (2 px on a 24 px grid), drawn as SVG files and shown
+through CSS `mask-image`, so the panel's DOM holds no `<svg>` and email text can never become
+one.
 
 | Token          | Light     | Dark      | Use                                   |
 | -------------- | --------- | --------- | ------------------------------------- |
@@ -258,8 +272,11 @@ measurements live as comments in `style.css`.
 ## How to build it
 
 - Plain HTML, CSS and TypeScript; no component library, no new dependency.
-- **CSS architecture:** cascade layers `tokens, base, layout, components, states`. Tokens have
-  semantic names (`--color-danger-text`, `--space-3`), never raw hex outside the tokens layer.
+- **CSS architecture:** cascade layers `tokens, base, layout, components, utilities`, and
+  nothing outside a layer. Tokens have semantic names (`--color-danger-text`, `--space-3`),
+  never raw hex outside the tokens layer. Width-dependent layout reacts to the panel
+  (`container-type: inline-size` on the page root, `@container`), not to the viewport. Logical
+  properties (`padding-inline`, `margin-block-start`).
   Components are classes with a prefix per component (`.band`, `.band__word`, `.flag`,
   `.pill`), low specificity (`:where()` where needed), no outer margins: the parent sets the gap
   (`.stack` and `.row` primitives). A component never styles the inside of another component, no
@@ -315,3 +332,33 @@ What the mockup shows and this file changes, so that nobody builds from the mock
 - `Main` says "Nothing is saved"; here "No email is saved".
 - Missing in the mockup: Suspicious, "No red flags found (not checked by AI)", model unavailable,
   model not downloaded, the paste form, the cloud result.
+- `Dangerous` borders every red-flag and link card in its severity colour and uses count pills on
+  the headings; here the badge alone carries the severity, rows share one card, and the count is
+  plain text. A coloured bar on every row is the mark of generated UIs and emphasises nothing.
+- `Main` centres an illustration; here the empty state is left-aligned without one.
+
+## Sources
+
+Researched on 22 Nov 2026 for this spec; the rules above are distilled from them.
+
+- Wording of real warnings: Chrome's interstitials ("Dangerous site", "This site doesn't seem
+  right", "Did you mean …?"; `security_interstitials_strings.grdp` in Chromium), Gmail's
+  banners ("This message seems dangerous", "Be careful with this message", "Gmail can't confirm
+  who sent you the email"; Gmail help 185812 and 13130196), Outlook's "This sender failed our
+  fraud detection checks and may not be who they appear to be", Proton's "Official" badge.
+  None of them names SPF, DKIM or DMARC in the default view; all pair a hedged headline with one
+  plain reason and one safe action.
+- Warning research: Akhawe and Felt, "Alice in Warningland" (USENIX 2013); Felt et al.,
+  "Improving SSL Warnings" (CHI 2015): opinionated design with one safe choice raises adherence;
+  Microsoft's NEAT/SPRUCE checklist (necessary, explained, actionable; source, process, risk,
+  unique, choices, evidence); NCSC, "Telling users to avoid clicking bad links still isn't
+  working" (no blame, no fear).
+- Visual craft: Atlassian (spacing, lozenges, one primary button, empty states), Shopify Polaris
+  (one primary button per section), GitHub Primer (type scale, semantic tokens), Material 3 and
+  Apple HIG (type, dark mode is not inversion), Lucide's icon guide (24 px grid, 2 px stroke),
+  Refactoring UI ("use fewer borders"), and the published lists of "generated UI" tells
+  (thefountaininstitute.com, superdesign.dev): boxes around everything, coloured side bars,
+  gradients, emoji icons, centred heroes, badges everywhere.
+- CSS architecture: Every Layout (stack, composition), CUBE CSS, Max Stoiber ("margin considered
+  harmful"), MDN (`@layer`, `:where()`, container queries, logical properties), Josh Comeau
+  (`min-width: 0` in flex children).
