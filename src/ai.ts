@@ -229,11 +229,19 @@ function createNameModel(language: string) {
   const inputs = ON_DEVICE_LANGUAGES.includes(language)
     ? ON_DEVICE_LANGUAGES
     : [...ON_DEVICE_LANGUAGES, language];
-  const sessionOptions: LanguageModelCreateOptions = {
+  // Chrome's sampling settings for extensions; the SDK's type does not list them, but it hands the
+  // object to Chrome unchanged.
+  const sessionOptions: LanguageModelCreateOptions & { temperature: number; topK: number } = {
     expectedInputs: [{ type: 'text', languages: inputs }],
     // The answer holds only names copied from the text.
     expectedOutputs: [{ type: 'text', languages: ['en'] }],
     initialPrompts: [{ role: 'system', content: [{ type: 'text', value: NAMES_PROMPT }] }],
+    // Greedy: the same text gives the same list. With Chrome's defaults (temperature 1, topK 64)
+    // one email gave "Google" as a name in one run and nothing in the next (22 Nov 2026). Measured
+    // the same day on four made-up texts, 20 runs each: no name missed and no brand listed, with
+    // either setting.
+    temperature: 0,
+    topK: 1,
   };
   const promptOptions: LanguageModelPromptOptions & { signal?: AbortSignal } = {
     responseConstraint: NAMES_SCHEMA,

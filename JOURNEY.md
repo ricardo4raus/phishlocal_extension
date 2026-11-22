@@ -857,3 +857,16 @@ _To fill in near the submission._
 - Nothing public matches the pattern; it may be specific to this GPU and driver. Next: measure on
   a second PC, then file a Chromium bug with the trace. Details in
   `docs/model-load-debugging.md`.
+
+**Session with Claude Code (after the freeze, bug fix):**
+
+- Fixed the brand that Gemini Nano took for a name: an entry from Nano that is exactly the brand
+  of the sender's domain, when DMARC confirmed that domain, is no longer removed, so "Google" and
+  "[email]@accounts.google.com" reach the cloud again. Greeting names and every part of a longer
+  name are still removed. A person named exactly like that brand stays readable when only Nano
+  found them; documented as a limit.
+- The privacy review caught a false claim in the first version, "a sender cannot choose what
+  stays": it also exempted every domain with a passing DKIM signature, and anyone can sign with
+  up to ten domains of their own, named like a person. Now only the visible, confirmed sender
+  domain counts, with tests for a second signer named "Anna" and for "Anna" next to
+  "Anna Muster".
