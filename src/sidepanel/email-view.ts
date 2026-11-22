@@ -4,6 +4,7 @@ import type { Finding, Severity } from '../rules';
 import { revealOverrides } from '../rules/unicode';
 import { GMAIL_SERVER } from '../raw/gmail-original-page';
 import { linkDisplay } from './link-display';
+import { m } from '../i18n';
 import { el, icon, type IconName, setText } from './ui';
 
 /** Number of body characters shown in the panel (the full text is kept for the check). */
@@ -65,23 +66,22 @@ export interface ShowEmailOptions {
 }
 
 /** Where to get the headers when the email was read without them. */
-export const HEADERS_HINT =
-  'Not available. For the full check with SPF, DKIM and DMARC: in Gmail, open ⋮ → Show original → ' +
-  'Copy to clipboard, then paste it under "Check another email".';
+export const HEADERS_HINT = m.email.headersHint;
 
 const mailbox = ({ name, address }: Mailbox): string =>
   name && address ? `${name} <${address}>` : name || address || '–';
 
 /** "SPF pass · DKIM pass (shop.example) · DMARC pass, checked by mx.example". */
 export function authSummary(auth: AuthResults | undefined): string {
-  if (!auth) return 'None in the headers: the sender cannot be verified.';
+  if (!auth) return m.email.noAuth;
+  const none = m.email.none;
   const dkim =
     auth.dkim.length === 0
-      ? 'none'
+      ? none
       : auth.dkim
           .map((entry) => (entry.domain ? `${entry.result} (${entry.domain})` : entry.result))
           .join(', ');
-  return `SPF ${auth.spf ?? 'none'} · DKIM ${dkim} · DMARC ${auth.dmarc ?? 'none'}, checked by ${auth.server}`;
+  return `SPF ${auth.spf ?? none} · DKIM ${dkim} · DMARC ${auth.dmarc ?? none}, ${m.email.checkedBy(auth.server)}`;
 }
 
 /** The sender status in plain words (tier 1): confirmed by whom, not confirmed, or still checking. */
@@ -94,13 +94,16 @@ export function senderStatus(
 ): { state: SenderStatus; text: string; icon: IconName } {
   const auth = email.headers?.auth;
   if (auth?.dmarc === 'pass') {
-    const by = fromGmail && auth.server === GMAIL_SERVER ? 'Gmail' : 'your mail server';
-    return { state: 'confirmed', text: `Sender confirmed by ${by}`, icon: 'check' };
+    const text =
+      fromGmail && auth.server === GMAIL_SERVER
+        ? m.email.confirmedByGmail
+        : m.email.confirmedByServer;
+    return { state: 'confirmed', text, icon: 'check' };
   }
   if (loading && !email.headers) {
-    return { state: 'checking', text: 'Checking the sender…', icon: 'dot' };
+    return { state: 'checking', text: m.email.checkingSender, icon: 'dot' };
   }
-  return { state: 'unconfirmed', text: 'Sender not confirmed', icon: 'alert' };
+  return { state: 'unconfirmed', text: m.email.unconfirmed, icon: 'alert' };
 }
 
 /** The sender's domain, the one thing in the strip that an attacker cannot choose freely. */
@@ -109,7 +112,7 @@ export function senderDomain(address: string): string {
   return host?.domain ?? host?.hostname ?? '';
 }
 
-const MARK: Record<Severity, string> = { danger: 'Danger', warning: 'Warning', info: 'Note' };
+const MARK: Record<Severity, string> = m.severity;
 const STRENGTH: Record<Severity, number> = { danger: 2, warning: 1, info: 0 };
 const MARK_ICON: Record<Severity, IconName> = { danger: 'cross', warning: 'alert', info: 'info' };
 
@@ -145,10 +148,10 @@ function linkItem(link: EmailLink, severity: Severity | undefined): HTMLLIElemen
     badge.append(icon(MARK_ICON[severity], 'icon--s'), MARK[severity]);
     head.append(badge);
   }
-  head.append(part('strong', 'link__domain', display.domain || 'Not a valid web address'));
+  head.append(part('strong', 'link__domain', display.domain || m.email.invalidAddress));
   if (display.forwardsTo) {
     head.append(
-      part('span', 'link__via', 'forwards to'),
+      part('span', 'link__via', m.email.forwardsTo),
       part('strong', 'link__domain', display.forwardsTo),
     );
   }
@@ -182,15 +185,14 @@ function showLinks(email: Email, links: LinksElements, findings: readonly Findin
     links.more.open = false;
     links.more.dataset.email = key;
   }
-  const noun = rest.length === 1 ? 'link' : 'links';
   links.moreSummary.textContent =
-    flagged.length > 0 ? `${rest.length} more ${noun}` : `Links (${rest.length})`;
+    flagged.length > 0 ? m.email.moreLinks(rest.length) : m.email.linksTitle(rest.length);
 }
 
 function showStrip(email: Email, strip: StripElements, loading: boolean, fromGmail: boolean): void {
-  setText(strip.subject, email.subject || '(no subject)');
+  setText(strip.subject, email.subject || m.email.noSubject);
   const domain = senderDomain(email.sender.address);
-  setText(strip.domain, domain || email.sender.address || 'Unknown sender');
+  setText(strip.domain, domain || email.sender.address || m.email.unknownSender);
   setText(strip.name, email.sender.name ? `· ${email.sender.name}` : '');
   // The address line repeats the domain only when the address says more than it.
   setText(strip.address, domain && email.sender.address !== domain ? email.sender.address : '');

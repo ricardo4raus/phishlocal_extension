@@ -42,17 +42,14 @@ beforeEach(() => {
 });
 
 describe('Gmail view', () => {
-  it('shows an opened email at once and again with its headers', async () => {
+  it('shows an opened email at once and again with its headers, with no status line', async () => {
     view.handle({ type: 'email', key: 'msg-f:1', email });
-    expect(shown[0]).toEqual({
-      email,
-      status: 'Checked automatically on this device. Loading the sender checks…',
-      note: 'Loading from Gmail…',
-    });
+    // The card says "Checking the sender…" and then who confirmed it: the line adds nothing.
+    expect(shown[0]).toEqual({ email, status: '', note: 'Loading from Gmail…' });
     view.handle({ type: 'original', key: 'msg-f:1', html: PAGE });
     await settle();
     expect(shown[1]?.email.headers?.auth).toMatchObject({ server: 'mx.google.com', dmarc: 'pass' });
-    expect(shown[1]?.status).toMatch(/Sender checks read from Gmail/);
+    expect(shown[1]?.status).toBe('');
   });
 
   it('ignores headers for an email that is no longer shown', async () => {
@@ -69,8 +66,7 @@ describe('Gmail view', () => {
     view.handle({ type: 'original-failed', key: 'msg-f:1', reason: 'timeout' });
     expect(shown[1]).toEqual({
       email,
-      status:
-        'Checked automatically on this device. Sender checks not available: Gmail did not answer in time.',
+      status: 'Could not load the sender checks: Gmail did not answer in time.',
       note: HEADERS_HINT,
     });
     view.handle({ type: 'original', key: 'msg-f:1', html: '<p>no pre</p>' });

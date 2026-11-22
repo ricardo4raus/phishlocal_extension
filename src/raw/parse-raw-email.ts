@@ -34,7 +34,15 @@ const LIMITS: PostalMimeOptions = {
   maxForwardedAddresses: 100,
 };
 
-export class RawEmailError extends Error {}
+/** Raw source that cannot be read: too large, or not valid email. The message is English. */
+export class RawEmailError extends Error {
+  readonly kind: 'too-large' | 'unreadable';
+
+  constructor(kind: 'too-large' | 'unreadable', message: string) {
+    super(message);
+    this.kind = kind;
+  }
+}
 
 function mailboxes(addresses: Address[] | undefined): Mailbox[] {
   return (addresses ?? [])
@@ -63,14 +71,14 @@ export function looksLikeRawEmail(text: string): boolean {
 
 export async function parseRawEmail(raw: string): Promise<Email> {
   if (raw.length > MAX_RAW_CHARS) {
-    throw new RawEmailError('The raw email is larger than 5 MB.');
+    throw new RawEmailError('too-large', 'The raw email is larger than 5 MB.');
   }
   let parsed;
   try {
     parsed = await PostalMime.parse(raw.trimStart(), LIMITS);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    throw new RawEmailError(`The raw email could not be read (${reason}).`);
+    throw new RawEmailError('unreadable', `The raw email could not be read (${reason}).`);
   }
 
   const [sender = { name: '', address: '' }] = mailboxes(parsed.from ? [parsed.from] : []);

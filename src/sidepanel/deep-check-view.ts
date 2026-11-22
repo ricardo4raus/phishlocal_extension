@@ -15,12 +15,10 @@
  * What is shown follows docs/ui-design.md ("The consent section").
  */
 import type { CloudCheckResult } from '../ai';
-import {
-  AI_LANGUAGES,
-  answerLanguage,
-  buildCloudPrompt,
-  EXPERIMENTAL_LANGUAGES,
-} from '../ai/prompt';
+import { answerLanguage, buildCloudPrompt, EXPERIMENTAL_LANGUAGES } from '../ai/prompt';
+import { localDetail, m } from '../i18n';
+import { en } from '../i18n/en';
+import { isLanguage } from '../i18n/languages';
 import type { Email } from '../email';
 import {
   type CloudData,
@@ -87,7 +85,7 @@ export interface DeepCheckElements {
 export interface DeepCheckDeps {
   /** The cloud can be reached in this build (it needs App Check). */
   available: boolean;
-  /** The panel's language (`PANEL_LANGUAGE`), e.g. "en": the AI answers in it. */
+  /** The panel's language (`language` in src/i18n), e.g. "de": the AI answers in it. */
   panelLanguage: () => string;
   /** Waits until the on-device model is loaded (that can take minutes); says whether it is ready. */
   modelReady: (language: string) => Promise<boolean>;
@@ -123,25 +121,23 @@ export interface DeepCheck {
   hidden(): void;
 }
 
-const NOT_AVAILABLE = 'Not available in this build.';
+const NOT_AVAILABLE = m.deepCheck.notAvailable;
 
 const isPrivacyLevel = (value: string | undefined): value is PrivacyLevel =>
   PRIVACY_LEVELS.some((level) => level === value);
 
-const plural = (count: number, one: string, many: string): string =>
-  `${count} ${count === 1 ? one : many}`;
-
 /** The chips: what was removed on this device, and what was kept on purpose. */
 export function removedChips(removed: Removed, level: PrivacyLevel): string[] {
+  const text = m.deepCheck.chips;
   const chips = [
-    removed.names > 0 && plural(removed.names, 'name', 'names'),
-    removed.emails > 0 && plural(removed.emails, 'email address', 'email addresses'),
-    removed.numbers > 0 && plural(removed.numbers, 'number', 'numbers'),
-    removed.ibans > 0 && plural(removed.ibans, 'IBAN', 'IBANs'),
-    removed.links > 0 && plural(removed.links, 'link path', 'link paths'),
+    removed.names > 0 && text.names(removed.names),
+    removed.emails > 0 && text.emails(removed.emails),
+    removed.numbers > 0 && text.numbers(removed.numbers),
+    removed.ibans > 0 && text.ibans(removed.ibans),
+    removed.links > 0 && text.links(removed.links),
   ].filter((chip) => chip !== false);
-  if (chips.length === 0) chips.push('No personal data found');
-  if (level === 'standard') chips.push('Names kept');
+  if (chips.length === 0) chips.push(text.nothing);
+  if (level === 'standard') chips.push(text.namesKept);
   return chips;
 }
 
@@ -203,14 +199,7 @@ type Phase = 'idle' | 'preparing' | 'preview' | 'sending' | 'done';
  * What the user is told when the email changes under a deep check, by phase. Gmail also shows
  * the same email again with new details (its headers), so "changed" covers both.
  */
-const CHANGED: Record<Phase, string> = {
-  idle: '',
-  preparing: 'The email changed, so the deep check was stopped. Nothing was sent.',
-  preview: 'The email changed, so the prepared data was discarded. Nothing was sent.',
-  sending:
-    'The email changed while the deep check ran: its data had been sent, its answer was dropped.',
-  done: 'The email changed, so the deep check result was cleared.',
-};
+const CHANGED: Record<Phase, string> = m.deepCheck.changed;
 
 export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps): DeepCheck {
   const { namesTimeoutMs } = deps;
@@ -247,26 +236,28 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
 
   const language = (): string => answerLanguage(deps.panelLanguage());
 
-  /** The line under the offer button: only when the deep check is recommended or unavailable. */
-  function intro(): string {
-    if (!deps.available) return NOT_AVAILABLE;
-    if (shown && !shown.final) return 'Waiting for the sender checks…';
-    if (EXPERIMENTAL_LANGUAGES.has(language())) {
-      return `Recommended: on-device answers in ${AI_LANGUAGES[language()] ?? 'English'} are experimental.`;
+  /**
+   * The line under the offer button (only when the deep check is recommended or unavailable), and
+   * whether it is a recommendation.
+   */
+  function intro(): { text: string; recommended: boolean } {
+    if (!deps.available) return { text: NOT_AVAILABLE, recommended: false };
+    if (shown && !shown.final) return { text: m.deepCheck.waitingHeaders, recommended: false };
+    const answerIn = language();
+    if (EXPERIMENTAL_LANGUAGES.has(answerIn)) {
+      const name = isLanguage(answerIn) ? m.languageNames[answerIn] : answerIn;
+      return { text: m.deepCheck.recommendedExperimental(name), recommended: true };
     }
-    if (deps.aiUnchecked?.()) return 'Recommended: the on-device AI did not check this email.';
-    return '';
+    if (deps.aiUnchecked?.()) return { text: m.deepCheck.recommendedUnchecked, recommended: true };
+    return { text: '', recommended: false };
   }
 
   /** The offer button: filled when recommended, disabled when the cloud cannot be reached. */
   function showOffer(): void {
-    const text = intro();
+    const { text, recommended } = intro();
     set(elements.intro, text);
     elements.start.disabled = !deps.available || !shown?.final;
-    elements.start.classList.toggle(
-      'btn--primary',
-      deps.available && text.startsWith('Recommended'),
-    );
+    elements.start.classList.toggle('btn--primary', recommended);
   }
 
   function setConsent(open: boolean): void {
@@ -359,7 +350,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     const controller = new AbortController();
     stop = controller;
     setLevelsDisabled(true);
-    running('Waiting for the on-device AI…');
+    running(m.deepCheck.waitingModel);
     // Not inside the search's time limit: a load can take minutes ("Stop" ends the wait).
     const ready = await settle(
       () => deps.modelReady(answerIn),
@@ -368,7 +359,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     if (mine !== generation) return STOPPED;
     let names: string[] | undefined;
     if (ready) {
-      running('Looking for names on this device…');
+      running(m.deepCheck.lookingForNames);
       names = await bounded(
         () => deps.findNames(nameSearchText(email), answerIn, controller.signal),
         controller,
@@ -416,7 +407,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
       if (!elements.levels.contains(document.activeElement)) elements.preview.focus();
     } catch (error) {
       console.error('PhishLocal: the deep check could not prepare its data', error);
-      reset('The deep check could not prepare its data. Nothing was sent.');
+      reset(m.deepCheck.prepareFailed);
       elements.status.classList.add('status--error');
     }
   }
@@ -435,19 +426,19 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
       set(
         elements.status,
         result.reason === 'stopped'
-          ? 'The deep check was stopped. The data shown may already have reached the cloud; you can send it again.'
+          ? m.deepCheck.stopped
           : result.reason === 'limit'
-            ? "The deep check has reached today's limit. Nothing was sent; the result above still applies."
+            ? m.deepCheck.limit
             : result.reason === 'unreadable-answer'
-              ? 'The cloud answer could not be read. The result above still applies; you can send the data again.'
-              : 'The deep check did not work. The result above still applies; you can send the data again.',
+              ? m.deepCheck.unreadable
+              : m.deepCheck.failed,
       );
       elements.status.classList.add('status--error');
       // What went wrong, in the cloud's or the network's words: tier 3.
       set(
         elements.detail,
         result.reason === 'failed'
-          ? `The cloud request failed: ${result.detail ?? 'unknown error'}.`
+          ? m.deepCheck.failedDetail(localDetail(result.detail ?? m.aiCheck.unknownError))
           : '',
       );
       // The card stays open with the data as the record; a new click on Send is a new consent
@@ -461,10 +452,10 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     // Sent and answered: this consent is used up.
     prepared = undefined;
     const { verdict } = result;
-    const judged = judge(verdict, findings, email, 'the cloud AI');
+    const judged = judge(verdict, findings, email, m.judge.theCloudAi);
     elements.result.dataset.risk = judged.overall;
     elements.result.hidden = false;
-    set(elements.overall, `Deep check: ${WORD[judged.overall]}`);
+    set(elements.overall, m.deepCheck.resultWord(WORD[judged.overall]));
     set(elements.line, LINE[judged.overall]);
     elements.reasons.replaceChildren(
       ...verdict.reasons.map((reason) => {
@@ -474,18 +465,15 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
       }),
     );
     set(elements.advice, judged.advice);
-    set(elements.source, 'Checked in the cloud');
-    set(elements.time, `Done in ${seconds(result.durationMs)}`);
+    set(elements.source, m.deepCheck.source);
+    set(elements.time, m.verdict.doneIn(seconds(result.durationMs)));
     set(
       elements.detail,
-      [
-        judged.detail,
-        `Cloud (Gemini via Firebase AI Logic). AI can be wrong. ${seconds(result.durationMs)}.`,
-      ]
+      [judged.detail, m.deepCheck.note(seconds(result.durationMs))]
         .filter((part) => part !== '')
         .join(' '),
     );
-    set(elements.status, 'Sent once, for this check only.');
+    set(elements.status, m.deepCheck.sentOnce);
     elements.result.focus();
   }
 
@@ -500,7 +488,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     elements.send.hidden = true;
     elements.cancel.hidden = true;
     elements.back.disabled = true;
-    running('Checking in the cloud…');
+    running(m.deepCheck.checking);
     elements.stop.focus();
     const controller = new AbortController();
     stop = controller;
@@ -521,13 +509,17 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     stop = undefined;
     const result: CloudCheckResult =
       controller.signal.reason === TIME_LIMIT && !answer.ok
-        ? { ok: false, reason: 'failed', detail: `no answer within ${cloudLimitMs / 1000} s` }
+        ? {
+            ok: false,
+            reason: 'failed',
+            detail: en.errors.noAnswerWithin(String(cloudLimitMs / 1000)),
+          }
         : answer;
     try {
       showResult(result, findings, email);
     } catch (error) {
       console.error('PhishLocal: the deep check could not show its result', error);
-      reset('The deep check result could not be shown.', { keepResult: false, close: false });
+      reset(m.deepCheck.showFailed, { keepResult: false, close: false });
       elements.status.classList.add('status--error');
     }
   }
@@ -547,10 +539,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
       void prepare();
     } else if (phase === 'done') {
       // The result stays readable; the data above was sent at the level chosen before.
-      set(
-        elements.status,
-        'The new privacy level applies to the next deep check. The data above was sent at the previous level.',
-      );
+      set(elements.status, m.deepCheck.levelChanged);
     }
   });
   // A click anywhere on a level card chooses it (the list is not inside the label).
@@ -565,7 +554,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
   });
   const cancel = (): void => {
     if (phase === 'preview' || phase === 'preparing') {
-      reset('Nothing was sent.');
+      reset(m.deepCheck.nothingSent);
       elements.start.focus();
     }
   };
@@ -585,7 +574,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
   });
   elements.stop.addEventListener('click', () => {
     if (phase === 'preparing') {
-      reset('Stopped. Nothing was sent.');
+      reset(m.deepCheck.stoppedNothingSent);
       elements.start.focus();
     } else if (phase === 'sending') {
       // The request may already be out; send() reports the stop.

@@ -15,6 +15,8 @@ import { answerLanguage, buildUserPrompt, EXPERIMENTAL_LANGUAGES, promptData } f
 import { type AiVerdict, overallRisk, type Risk, RISKS, ruleRisk } from '../ai/verdict';
 import type { Email } from '../email';
 import type { Finding } from '../rules';
+import { localDetail, m } from '../i18n';
+import { en } from '../i18n/en';
 import { clock, seconds } from './ui';
 
 /** How long the AI waits for a Gmail email's headers before it runs without them. */
@@ -44,47 +46,19 @@ export interface AiElements {
 }
 
 /** The verdict words (tier 1). */
-export const WORD: Record<BandState, string> = {
-  pending: 'Checking…',
-  safe: 'Looks safe',
-  suspicious: 'Suspicious',
-  dangerous: 'Dangerous',
-  unchecked: 'No red flags found',
-};
+export const WORD: Record<BandState, string> = m.verdict.word;
 
 /** The line under the verdict word: hedged, never "this is phishing" or "this is safe". */
-export const LINE: Record<Exclude<BandState, 'pending'>, string> = {
-  safe: 'No signs of phishing found.',
-  suspicious: 'Be careful: some signs of phishing.',
-  dangerous: 'This looks like phishing.',
-  unchecked: 'Not checked by AI. The basic checks alone can miss a well-written scam.',
-};
-
-/** How the AI's own level is named in tier 3 ("The AI said: …"). */
-const AI_SAID: Record<Risk, string> = {
-  safe: 'no signs of phishing',
-  suspicious: 'suspicious',
-  dangerous: 'dangerous',
-};
+export const LINE: Record<Exclude<BandState, 'pending'>, string> = m.verdict.line;
 
 /** Our own advice, used whenever the rules are stricter than the AI, or the AI did not run. */
-export const ADVICE: Record<Exclude<BandState, 'pending'>, string> = {
-  safe: 'Stay careful with unexpected requests: if an email asks you to log in or pay, open the site yourself instead of using its links.',
-  suspicious:
-    "Don't enter passwords or card details and don't pay. Check with the sender through a way you already know.",
-  dangerous:
-    "Don't click links, open attachments or reply. Delete the email or report it as phishing.",
-  unchecked:
-    'Stay careful with unexpected requests: if an email asks you to log in or pay, open the site yourself instead of using its links.',
-};
+export const ADVICE: Record<Exclude<BandState, 'pending'>, string> = m.verdict.advice;
 
 /** The footer's source line. */
 export const SOURCE = {
-  device: 'Checked on this device',
-  rulesOnly: 'Basic checks only',
+  device: m.verdict.sourceDevice,
+  rulesOnly: m.verdict.sourceRulesOnly,
 } as const;
-
-const AI_NOTE = 'On-device AI (Gemini Nano). AI can be wrong.';
 
 /** Percent-decoding that never throws: a link like `mailto:%E0` is attacker-written. */
 const decode = (text: string): string => {
@@ -137,19 +111,20 @@ export function judge(
   const stricter = overall !== verdict.risk;
   // The AI was more worried, but the sender is confirmed and the rules found nothing.
   const onlyNotes = confirmed && RISKS.indexOf(verdict.risk) > RISKS.indexOf(overall);
-  const said = `${ai[0]?.toUpperCase() ?? ''}${ai.slice(1)} said: ${AI_SAID[verdict.risk]}`;
+  const level = m.verdict.aiSaid[verdict.risk];
+  const said = m.judge.said(ai, level);
   return {
     overall,
     line: onlyNotes
-      ? `${WORD[overall]} (sender confirmed, basic checks found nothing; AI notes below)`
+      ? m.judge.lineOnlyNotes(WORD[overall])
       : stricter
-        ? `${WORD[overall]} (basic checks; ${ai} said: ${AI_SAID[verdict.risk]})`
+        ? m.judge.lineStricter(WORD[overall], ai, level)
         : WORD[overall],
     advice: stricter || !verdict.advice ? ADVICE[overall] : verdict.advice,
     detail: onlyNotes
-      ? `${said}, but the sender is confirmed and the basic checks found nothing, so its points are notes only.`
+      ? m.judge.detailOnlyNotes(said)
       : stricter
-        ? `${said}; the basic checks found more, so their verdict stands.`
+        ? m.judge.detailStricter(said)
         : '',
   };
 }
@@ -162,7 +137,7 @@ export interface AiCheckDeps {
     knownAddresses: ReadonlySet<string>,
     signal: AbortSignal,
   ) => Promise<AiCheckResult>;
-  /** The panel's language (`PANEL_LANGUAGE`), e.g. "en": the AI answers in it. */
+  /** The panel's language (`language` in src/i18n), e.g. "de": the AI answers in it. */
   panelLanguage: () => string;
   /**
    * Waits until the on-device model is loaded (that can take minutes in a bad Chrome state) and
@@ -249,21 +224,19 @@ const retryable = (result: AiCheckResult): boolean =>
   (result.reason === 'unreadable-answer' ||
     (result.reason === 'failed' && !LASTING_ERROR.test(result.detail ?? '')));
 
-const wholeSeconds = (ms: number): string => `${Math.round(ms / 1000)} s`;
-
 /** Why the AI gave no answer, in one tier-3 sentence. */
 function failureDetail(result: AiCheckResult & { ok: false }, attempt: number | undefined): string {
   // The two tries may have failed differently: name only the last reason.
-  const again = attempt === 2 ? ' after a second try' : '';
+  const again = attempt === 2;
   switch (result.reason) {
     case 'no-model':
-      return 'The on-device AI is not ready, so only the basic checks ran.';
+      return m.aiCheck.noModel;
     case 'stopped':
-      return 'The AI check was stopped. The basic checks still apply.';
+      return m.aiCheck.stopped;
     case 'failed':
-      return `The AI check failed${again} (${result.detail ?? 'unknown error'}). The basic checks still apply.`;
+      return m.aiCheck.failed(again, localDetail(result.detail ?? m.aiCheck.unknownError));
     default:
-      return `The AI answer could not be read${again}. The basic checks still apply.`;
+      return m.aiCheck.unreadable(again);
   }
 }
 
@@ -297,17 +270,17 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     const now = performance.now();
     if (current?.id === shownId && !current.cancelled) {
       const elapsed = now - current.since;
-      const second = current.attempt === 2 ? ' (second try)' : '';
+      const second = current.attempt === 2;
       set(
         elements.status,
         current.phase === 'model' && elapsed >= LOADING_HINT_MS
-          ? `On-device AI loading${second}… The first load after Chrome restarts can take a few minutes; the result appears here by itself.`
-          : `AI check running${second}…`,
+          ? m.aiCheck.loading(second)
+          : m.aiCheck.running(second),
       );
       set(elements.time, clock(elapsed));
       elements.stop.hidden = false;
     } else if (waiting?.id === shownId && current) {
-      set(elements.status, "Waiting for the previous email's check…");
+      set(elements.status, m.aiCheck.waitingPrevious);
       set(elements.time, clock(now - waiting.since));
       elements.stop.hidden = false;
     }
@@ -370,7 +343,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       return;
     }
     const { verdict } = result;
-    const judged = judge(verdict, request.findings, request.email, 'the AI');
+    const judged = judge(verdict, request.findings, request.email, m.judge.theAi);
     elements.verdict.hidden = false;
     setState(judged.overall);
     set(elements.overall, WORD[judged.overall]);
@@ -384,14 +357,14 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     );
     set(elements.advice, judged.advice);
     set(elements.source, SOURCE.device);
-    set(elements.time, `Done in ${seconds(result.durationMs)}`);
+    set(elements.time, m.verdict.doneIn(seconds(result.durationMs)));
     elements.stop.hidden = true;
     const experimental = EXPERIMENTAL_LANGUAGES.has(request.language)
-      ? ' Answers in this language are experimental.'
+      ? ` ${m.aiCheck.experimental}`
       : '';
     set(
       elements.detail,
-      [judged.detail, `${AI_NOTE} ${seconds(result.durationMs)}.${experimental}`]
+      [judged.detail, `${m.aiCheck.note} ${seconds(result.durationMs)}.${experimental}`]
         .filter((part) => part !== '')
         .join(' '),
     );
@@ -429,7 +402,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
         return {
           ok: false,
           reason: 'failed',
-          detail: `no answer within ${wholeSeconds(runTimeoutMs)}${progress}`,
+          detail: `${en.errors.noAnswerWithin(String(Math.round(runTimeoutMs / 1000)))}${progress}`,
         };
       }
       return result;
@@ -558,7 +531,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
       showResult(request, known);
       return;
     }
-    showPending(request, final ? 'AI check starting…' : 'Waiting for the sender checks…');
+    showPending(request, final ? m.aiCheck.starting : m.aiCheck.waitingHeaders);
     // The same email is already being checked: use that run's answer.
     if (adopt(request)) return;
     timer = setTimeout(() => enqueue(request), final ? STABLE_MS : waitMs);

@@ -65,7 +65,7 @@ describe('paste area', () => {
       bodyText: 'Confirm: paypal.com',
       links: [{ text: 'paypal.com', href: 'https://evil.example/login' }],
     });
-    expect(onEmail.mock.calls.at(-1)?.[1]).toMatch(/Nothing left your browser/);
+    expect(onEmail.mock.calls.at(-1)?.[1]).toBe('Pasted email.');
   });
 
   it('never puts the pasted HTML into the page', async () => {
