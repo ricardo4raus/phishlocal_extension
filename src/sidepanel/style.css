@@ -824,6 +824,11 @@
     overflow-wrap: anywhere;
   }
 
+  /* An empty status line takes no room (and no gap in the stack). */
+  .status:empty {
+    display: none;
+  }
+
   .status--error {
     color: var(--color-danger-text);
     font-weight: 600;

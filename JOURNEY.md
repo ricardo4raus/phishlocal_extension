@@ -1024,3 +1024,8 @@ _To fill in near the submission._
   read now says so in the panel's words, without the parser's English reason. The monkey test first lost a coverage state:
   the language menu read Chrome's language from the fake Chrome, which drew it from the shared
   random sequence and shifted every later move.
+- The line under the email strip said "Checked automatically on this device. Sender checks read
+  from Gmail." on every Gmail email, which the strip ("Sender confirmed by Gmail") and the band
+  ("Checked on this device") already said. It now shows only what they do not: a pasted email,
+  a sample, sender checks that could not be loaded and why, or a text cut for length; in the
+  normal case there is no line, and an empty line takes no room.

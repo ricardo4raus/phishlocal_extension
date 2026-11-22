@@ -24,8 +24,6 @@ export interface GmailViewUi {
 
 export type EmptyReason = 'idle' | 'not-gmail' | 'unreadable';
 
-const CHECKED = m.gmail.checked;
-
 const FAILURES: Record<OriginalFailure, string> = m.gmail.failures;
 
 const IDLE = m.gmail.idle;
@@ -65,13 +63,10 @@ export function createGmailView(ui: GmailViewUi): GmailView {
     }
     if (current !== target) return;
     if (headers) {
-      ui.show({ ...target.email, headers }, `${CHECKED} ${m.gmail.headersRead}`);
+      // The card says it all ("Sender confirmed by Gmail"): no status line.
+      ui.show({ ...target.email, headers }, '');
     } else {
-      ui.show(
-        target.email,
-        `${CHECKED} ${m.gmail.headersMissing(m.gmail.failures.unreadable)}`,
-        HEADERS_HINT,
-      );
+      ui.show(target.email, m.gmail.headersMissing(m.gmail.failures.unreadable), HEADERS_HINT);
     }
   }
 
@@ -83,7 +78,8 @@ export function createGmailView(ui: GmailViewUi): GmailView {
           source = 'gmail';
           ui.show(
             message.email,
-            `${CHECKED} ${m.gmail.headersLoading}`,
+            // The card says "Checking the sender…" meanwhile.
+            '',
             m.gmail.headersNote,
             false,
           );
@@ -93,11 +89,7 @@ export function createGmailView(ui: GmailViewUi): GmailView {
           break;
         case 'original-failed':
           if (current?.key === message.key) {
-            ui.show(
-              current.email,
-              `${CHECKED} ${m.gmail.headersMissing(FAILURES[message.reason])}`,
-              HEADERS_HINT,
-            );
+            ui.show(current.email, m.gmail.headersMissing(FAILURES[message.reason]), HEADERS_HINT);
           }
           break;
         case 'no-email':

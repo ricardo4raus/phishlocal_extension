@@ -142,11 +142,9 @@ export const es: Messages = {
   },
 
   gmail: {
-    checked: 'Revisado automáticamente en este dispositivo.',
-    headersRead: 'Comprobaciones del remitente leídas de Gmail.',
-    headersLoading: 'Cargando las comprobaciones del remitente…',
     headersNote: 'Cargando desde Gmail…',
-    headersMissing: (reason) => `Comprobaciones del remitente no disponibles: ${reason}.`,
+    headersMissing: (reason) =>
+      `No se pudieron cargar las comprobaciones del remitente: ${reason}.`,
     failures: {
       'no-account-key': 'la página de Gmail ha cambiado',
       'no-message-id': 'la página de Gmail ha cambiado',
@@ -158,12 +156,12 @@ export const es: Messages = {
     notGmail:
       'Abre Gmail en esta pestaña para revisar los correos automáticamente. Si Gmail ya estaba abierto antes de instalar o actualizar PhishLocal, recarga la pestaña de Gmail.',
     unreadable: 'No se pudo leer este correo. Puede que Gmail haya cambiado su página.',
-    textCut: 'El texto es largo y se recortó.',
+    textCut: 'El correo es largo: solo se revisó la primera parte.',
   },
 
   paste: {
-    rawRead: 'Código fuente leído, con sus encabezados. Nada salió de tu navegador.',
-    ready: 'Correo pegado listo. Nada salió de tu navegador.',
+    rawRead: 'Correo pegado, con sus encabezados.',
+    ready: 'Correo pegado.',
     sampleLoaded: (label) => `Ejemplo cargado: ${label}. Es inventado.`,
     emptyText: 'Pega primero el texto del correo.',
     chooseSample: 'Elige primero un ejemplo.',

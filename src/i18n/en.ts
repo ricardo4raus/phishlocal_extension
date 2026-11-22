@@ -150,13 +150,10 @@ export const en = {
     },
   },
 
-  /** Status lines about Gmail and the sender checks. */
+  /** The status line under the email: only when it says something the card does not. */
   gmail: {
-    checked: 'Checked automatically on this device.',
-    headersRead: 'Sender checks read from Gmail.',
-    headersLoading: 'Loading the sender checks…',
     headersNote: 'Loading from Gmail…',
-    headersMissing: (reason: string) => `Sender checks not available: ${reason}.`,
+    headersMissing: (reason: string) => `Could not load the sender checks: ${reason}.`,
     failures: {
       'no-account-key': "Gmail's page has changed",
       'no-message-id': "Gmail's page has changed",
@@ -168,13 +165,13 @@ export const en = {
     notGmail:
       'Open Gmail in this tab to check emails automatically. If Gmail was open before PhishLocal was installed or updated, reload the Gmail tab.',
     unreadable: 'Could not read this email. Gmail may have changed its page.',
-    textCut: 'The text is long and was cut.',
+    textCut: 'The email is long: only the first part was checked.',
   },
 
   /** The pasted email. */
   paste: {
-    rawRead: 'Raw email read, with its headers. Nothing left your browser.',
-    ready: 'Pasted email ready. Nothing left your browser.',
+    rawRead: 'Pasted email with its headers.',
+    ready: 'Pasted email.',
     sampleLoaded: (label: string) => `Sample loaded: ${label}. It is made up.`,
     emptyText: 'Paste the email text first.',
     chooseSample: 'Choose a sample first.',

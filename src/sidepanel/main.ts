@@ -380,7 +380,9 @@ function displayEmail(email: Email, message: string, options: DisplayOptions): v
   showEmail(email, emailElements, { headersNote, findings, loading: !final, fromGmail });
   emptySection.hidden = true;
   emailSection.hidden = false;
-  setEmailStatus(email.truncated ? `${message} ${m.gmail.textCut}` : message);
+  setEmailStatus(
+    [message, email.truncated ? m.gmail.textCut : ''].filter((part) => part !== '').join(' '),
+  );
   aiCheck.shown(email, findings, final);
   deepCheck.shown(email, findings, final);
 }

@@ -100,8 +100,11 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    server" (pass in pasted raw source, whatever server it names: pasted text is not Gmail's word),
    "Sender not confirmed" (no headers, or no pass), "Checking the sender…" (Gmail headers still
    loading). On the right an icon button "Check the open email again".
-   Under the strip one muted line for the source status ("Checked automatically", "Pasted
-   email", "Sample loaded: …") and errors.
+   Under the strip one muted line, only when it says something the strip and the band do not
+   (decided 22 Nov 2026): "Pasted email." / "Pasted email with its headers.", "Sample loaded:
+   …", "Could not load the sender checks: …", "The email is long: only the first part was
+   checked.", and errors. A Gmail email whose sender checks loaded has no line: the strip says
+   who confirmed the sender, the band's footer where it was checked.
 5. **Verdict band:** a tinted head with a round symbol, the verdict word and one status line;
    then the reasons (up to five, as the AI gives them), the "What to do" box (a gold bulb that
    glows like the ready dot), and the footer
