@@ -319,8 +319,13 @@ green, decided 22 Nov 2026).
   belongs in the monkey tests' move lists and promises (see `CLAUDE.md`).
 - Dev-only parts (test prompt, sample row) stay in `index.html` with `hidden` and are shown by
   `main.ts` in the right builds, so the tests see the same page.
-- The extension gets icons in `manifest.json`: 16, 32, 48 and 128 px PNGs rendered from the logo
-  SVG (blue rounded square, white shield and check mark).
+- The extension gets icons in `manifest.json`: 16, 32, 48 and 128 px PNGs rendered from the logo,
+  `design/logo.svg` (navy rounded square, white house, koi with orange glitter; decided 23 Nov
+  2026). It started as an Inkscape trace of the drawing: the background, the house, the mouth's
+  border and the top of the head are redrawn, the glitter and the teeth are kept as traced.
+  Render the PNGs with Inkscape, for example:
+  `inkscape design/logo.svg -w 128 -h 128 -o public/icons/icon-128.png`.
+  The SVG itself never ships: it is about 200 KB, and its detail cannot be seen at icon sizes.
 
 ## Decisions (22 Nov 2026)
 
