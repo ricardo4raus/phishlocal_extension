@@ -1,7 +1,8 @@
 /*
- * The panel's language: its static text (index.html) in the language of this page load, and the
- * language menu in Settings. Choosing a language saves it and reloads the panel, so every part
- * comes up in that language at once; "Automatic" follows Chrome's language.
+ * The panel's language: its static text (index.html) in the language of this page load, the
+ * flag button with its menu, and the language menu in Settings (the only way back to
+ * "Automatic", which follows Chrome's language). Choosing a language saves it and reloads the
+ * page, so every part comes up in that language at once.
  */
 import type { Messages } from '../i18n';
 import {
@@ -13,6 +14,7 @@ import {
   savedChoice,
   saveChoice,
 } from '../i18n/languages';
+import { el, icon } from './ui';
 
 /** A page's static text by `data-t` key; only string entries are used. */
 export type PageTexts = Readonly<Record<string, unknown>>;
@@ -83,4 +85,53 @@ export function setUpLanguage(
     if (choice !== 'auto' && !LANGUAGES.some((language) => language === choice)) return;
     if (saveChoice(choice as LanguageChoice)) reload();
   });
+}
+
+/** A flag for a language, drawn by CSS (`.lang-flag`); decorative, the name says it. */
+function flag(language: Language): HTMLSpanElement {
+  const span = el('span', 'lang-flag');
+  span.dataset.flag = language;
+  span.setAttribute('aria-hidden', 'true');
+  return span;
+}
+
+/**
+ * The flag button and its menu (a popover the button opens without script): the button shows
+ * the flag of the page's language; the menu lists every language with its flag and its own name,
+ * the current one marked. Choosing another saves it and reloads; the current one just closes.
+ */
+export function setUpLanguageMenu(
+  button: HTMLButtonElement,
+  menu: HTMLElement,
+  messages: Messages,
+  current: Language,
+  reload: () => void = () => location.reload(),
+): void {
+  const label = messages.languageMenu(LANGUAGE_NAMES[current]);
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.replaceChildren(flag(current), icon('chevron-down', 'icon--s'));
+
+  const close = (): void => {
+    if (typeof menu.hidePopover === 'function' && menu.matches(':popover-open')) menu.hidePopover();
+  };
+  menu.replaceChildren(
+    ...LANGUAGES.map((language) => {
+      const item = el('button', 'lang-menu__item');
+      item.type = 'button';
+      item.lang = language;
+      item.dataset.language = language;
+      const name = el('span', 'lang-menu__name', LANGUAGE_NAMES[language]);
+      item.append(flag(language), name);
+      if (language === current) {
+        item.setAttribute('aria-current', 'true');
+        item.append(icon('check', 'icon--s'));
+      }
+      item.addEventListener('click', () => {
+        if (language === current) close();
+        else if (saveChoice(language)) reload();
+      });
+      return item;
+    }),
+  );
 }

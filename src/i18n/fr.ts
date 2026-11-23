@@ -23,7 +23,6 @@ export const fr: Messages = {
     pointCloudLead: 'Le cloud seulement si vous le demandez',
     pointCloudText:
       'Les données personnelles sont d’abord retirées, et vous voyez ce qui est envoyé.',
-    languages: 'Langues : en · de · fr · es · it · pt',
     howItWorks: 'Comment ça marche',
     emailLabel: 'E-mail',
     senderUnconfirmed: 'Expéditeur non confirmé',
@@ -107,6 +106,7 @@ export const fr: Messages = {
   },
 
   automatic: (name) => `Automatique (${name})`,
+  languageMenu: (name) => `Langue : ${name}`,
   languageNames: {
     en: 'anglais',
     de: 'allemand',

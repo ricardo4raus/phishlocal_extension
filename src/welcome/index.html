@@ -102,8 +102,17 @@
         </ul>
       </section>
 
-      <p class="row text-muted">
-        <span class="grow" data-t="languages">Languages: en · de · fr · es · it · pt</span>
+      <div class="row row--spread">
+        <!-- The flag of the page's language; it opens the language menu (language-view.ts). -->
+        <button
+          id="language-button"
+          type="button"
+          class="lang-button"
+          popovertarget="language-menu"
+          data-t-label="language"
+          aria-label="Language"
+        ></button>
+        <div id="language-menu" class="lang-menu" popover></div>
         <button
           id="how-it-works"
           type="button"
@@ -112,7 +121,7 @@
         >
           How it works
         </button>
-      </p>
+      </div>
     </main>
     <script type="module" src="./main.ts"></script>
   </body>

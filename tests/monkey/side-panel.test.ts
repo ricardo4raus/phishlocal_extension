@@ -391,6 +391,8 @@ const MOVES: Record<string, () => void> = {
       'paste-open',
       'sample-load',
       'how-it-works',
+      // Not the flag button: it opens its menu without script (jsdom has no popover), and the
+      // menu's entries reload the panel, like the language menu in Settings.
       'ai-stop',
       'run',
     ]);

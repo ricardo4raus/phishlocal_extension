@@ -27,7 +27,6 @@ export const en = {
     pointSavedText: 'Close the panel and all reading stops.',
     pointCloudLead: 'Cloud only if you ask',
     pointCloudText: 'Personal data is removed first, and you see what is sent.',
-    languages: 'Languages: en · de · fr · es · it · pt',
     howItWorks: 'How it works',
     emailLabel: 'Email',
     senderUnconfirmed: 'Sender not confirmed',
@@ -110,6 +109,8 @@ export const en = {
 
   /** The language menu. */
   automatic: (name: string) => `Automatic (${name})`,
+  /** The flag button's label: the language now shown. */
+  languageMenu: (name: string) => `Language: ${name}`,
   /** The languages' names in this language, for sentences ("answers in Italian"). */
   languageNames: {
     en: 'English',

@@ -22,7 +22,7 @@ import { showEmail } from './email-view';
 import { createGmailView, type EmptyReason } from './gmail-view';
 import { showRuleCheck } from './findings-view';
 import { setUpPaste } from './paste-view';
-import { setUpLanguage, translatePage } from './language-view';
+import { setUpLanguage, setUpLanguageMenu, translatePage } from './language-view';
 import { countElapsed, seconds } from './ui';
 import { watchActiveTab } from './watch';
 import { HOW_IT_WORKS_URL } from '../links';
@@ -36,6 +36,7 @@ function byId<T extends HTMLElement>(id: string): T {
 // The panel's text in its language first ("Starting…" too), before anything is shown.
 translatePage(document, m, language);
 setUpLanguage(byId<HTMLSelectElement>('language-select'), m);
+setUpLanguageMenu(byId('language-button'), byId('language-menu'), m, language);
 
 // The settings from Remote Config (at most 2 s; otherwise the stored or default values), fixed
 // for this panel before the first model session is made and before any button works. Until then

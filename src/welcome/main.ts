@@ -6,7 +6,7 @@
 import { language, m, type Messages } from '../i18n';
 import type { Language } from '../i18n/languages';
 import { GMAIL_URL, HOW_IT_WORKS_URL } from '../links';
-import { translatePage } from '../sidepanel/language-view';
+import { setUpLanguageMenu, translatePage } from '../sidepanel/language-view';
 
 /** The Chrome APIs the page uses; `chrome` itself in the extension, a fake in the tests. */
 export interface WelcomeApi {
@@ -20,6 +20,7 @@ export function setUpWelcome(
   api: WelcomeApi,
   messages: Messages = m,
   pageLanguage: Language = language,
+  reload: () => void = () => location.reload(),
 ): void {
   translatePage(root, messages, pageLanguage, { ...messages.html, ...messages.welcome });
 
@@ -28,6 +29,10 @@ export function setUpWelcome(
     if (!element) throw new Error(`Welcome page: #${id} is missing in index.html`);
     return element;
   };
+
+  const menu = root.querySelector<HTMLElement>('#language-menu');
+  if (!menu) throw new Error('Welcome page: #language-menu is missing in index.html');
+  setUpLanguageMenu(button('language-button'), menu, messages, pageLanguage, reload);
 
   // Chrome opens the side panel only within the click's user gesture, so the click handler must
   // not wait for anything: the window is looked up now. Without the API (older Chrome) or a

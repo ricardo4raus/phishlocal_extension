@@ -153,6 +153,18 @@ describe('the welcome page', () => {
     expect(fake.create.mock.calls).toEqual([[{ url: GMAIL_URL }], [{ url: HOW_IT_WORKS_URL }]]);
   });
 
+  it('has the flag button: another language is saved and the page reloads', () => {
+    const reload = vi.fn<() => void>();
+    setUpWelcome(document, fakeApi().api, MESSAGES.fr, 'fr', reload);
+    expect(document.querySelector<HTMLElement>('#language-button .lang-flag')?.dataset.flag).toBe(
+      'fr',
+    );
+    document.querySelector<HTMLButtonElement>('#language-menu button[lang="de"]')?.click();
+    expect(localStorage.getItem('phishlocal.language')).toBe('de');
+    expect(reload).toHaveBeenCalledTimes(1);
+    localStorage.clear();
+  });
+
   it('holds no <a>, <img> or <svg>', () => {
     expect(document.querySelectorAll('a, img, svg')).toHaveLength(0);
   });

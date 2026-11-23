@@ -247,6 +247,11 @@
     min-width: 0;
   }
 
+  /* A row with its items at both ends. */
+  .row--spread {
+    justify-content: space-between;
+  }
+
   /* While the consent card is open (main.ts sets data-consent on the page when the deep check
      says so), the tier-2 lists step aside: the user decides about one email, with the strip and
      the verdict still in view. */
@@ -760,6 +765,104 @@
 
   .point__lead {
     font-weight: 600;
+  }
+
+  /* ---- Language: the flag button and its menu, a popover above it (language-view.ts). Flags
+     are SVG files as backgrounds (colour, so no mask), all shown at 3:2. ---- */
+  .lang-flag {
+    display: inline-block;
+    flex: none;
+    inline-size: 21px;
+    block-size: 14px;
+    border-radius: 2px;
+    background: center / cover no-repeat;
+    /* White parts of a flag need an edge on a white surface. */
+    outline: 1px solid var(--color-border);
+    outline-offset: -1px;
+  }
+
+  .lang-flag[data-flag='en'] {
+    background-image: url(./flags/en.svg);
+  }
+  .lang-flag[data-flag='de'] {
+    background-image: url(./flags/de.svg);
+  }
+  .lang-flag[data-flag='fr'] {
+    background-image: url(./flags/fr.svg);
+  }
+  .lang-flag[data-flag='es'] {
+    background-image: url(./flags/es.svg);
+  }
+  .lang-flag[data-flag='it'] {
+    background-image: url(./flags/it.svg);
+  }
+  .lang-flag[data-flag='pt'] {
+    background-image: url(./flags/pt.svg);
+  }
+
+  .lang-button {
+    anchor-name: --language-button;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-block-size: 32px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-box);
+    background: var(--color-surface);
+    color: var(--color-text-2);
+  }
+
+  .lang-button:hover {
+    background: var(--color-surface-2);
+  }
+
+  /* Chrome's popover: Esc and a click outside close it. Placed above the button, or below when
+     there is no room. The UA centres popovers (inset 0, margin auto): undone here. */
+  .lang-menu {
+    position-anchor: --language-button;
+    position-area: top span-right;
+    position-try-fallbacks: flip-block;
+    inset: auto;
+    margin: 0;
+    margin-block: var(--space-1);
+    min-inline-size: 180px;
+    padding: var(--space-1);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  .lang-menu:popover-open {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .lang-menu__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-block-size: 36px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-chip);
+    background: transparent;
+    text-align: start;
+  }
+
+  .lang-menu__item:hover {
+    background: var(--color-surface-2);
+  }
+
+  .lang-menu__item[aria-current='true'] {
+    background: var(--color-selected-tint);
+    font-weight: 600;
+  }
+
+  .lang-menu__name {
+    flex: 1;
   }
 
   /* ---- Email strip: subject, sender (domain first), sender status, refresh. ---- */

@@ -22,7 +22,6 @@ export const es: Messages = {
     pointSavedText: 'Cierra el panel y toda lectura se detiene.',
     pointCloudLead: 'Nube solo si lo pides',
     pointCloudText: 'Primero se eliminan los datos personales, y ves lo que se envía.',
-    languages: 'Idiomas: en · de · fr · es · it · pt',
     howItWorks: 'Cómo funciona',
     emailLabel: 'Correo',
     senderUnconfirmed: 'Remitente no confirmado',
@@ -106,6 +105,7 @@ export const es: Messages = {
   },
 
   automatic: (name) => `Automático (${name})`,
+  languageMenu: (name) => `Idioma: ${name}`,
   languageNames: {
     en: 'inglés',
     de: 'alemán',
