@@ -185,7 +185,7 @@ A tab of its own (`src/welcome/`), opened once after the first install, not afte
 reloads (decided 23 Nov 2026). It is where the logo is seen big: in Chrome the icons are 16 to
 48 px. Top to bottom, in one centred column of at most 600 px:
 
-1. The logo (160 px, a 320 px PNG of `design/logo.svg`), "Welcome to PhishLocal", one sentence
+1. The logo (200 px, a 400 px PNG of `design/logo.svg`), "Welcome to PhishLocal", one sentence
    on what it does, an info box "Made for Gmail on the web. From other mail apps, paste an email
    into the panel.", and two buttons: "Open the panel" (filled; Chrome opens the side panel only
    within the click, so the page looks up its window on load and hides the button without one)
