@@ -14,22 +14,29 @@ import {
   saveChoice,
 } from '../i18n/languages';
 
-type HtmlKey = keyof Messages['html'];
+/** A page's static text by `data-t` key; only string entries are used. */
+export type PageTexts = Readonly<Record<string, unknown>>;
 
-const htmlText = (messages: Messages, key: string | undefined): string | undefined =>
-  key !== undefined && Object.hasOwn(messages.html, key)
-    ? messages.html[key as HtmlKey]
-    : undefined;
+const htmlText = (texts: PageTexts, key: string | undefined): string | undefined => {
+  const text = key !== undefined && Object.hasOwn(texts, key) ? texts[key] : undefined;
+  return typeof text === 'string' ? text : undefined;
+};
 
 /**
  * Puts the static text of `root` into `messages`' language: `data-t` sets the text, `data-t-label`
- * the aria-label, `data-t-title` the tooltip, `data-t-placeholder` the placeholder. An unknown key
- * keeps the English text of index.html (a test checks that every key exists).
+ * the aria-label, `data-t-title` the tooltip, `data-t-placeholder` the placeholder. The keys come
+ * from `texts` (the panel's `html` unless a page brings its own). An unknown key keeps the page's
+ * English text (a test checks that every key exists).
  */
-export function translatePage(root: Document, messages: Messages, language: Language): void {
+export function translatePage(
+  root: Document,
+  messages: Messages,
+  language: Language,
+  texts: PageTexts = messages.html,
+): void {
   root.documentElement.lang = language;
   for (const element of root.querySelectorAll<HTMLElement>('[data-t]')) {
-    const text = htmlText(messages, element.dataset.t);
+    const text = htmlText(texts, element.dataset.t);
     if (text !== undefined) element.textContent = text;
   }
   const attributes = [
@@ -40,7 +47,7 @@ export function translatePage(root: Document, messages: Messages, language: Lang
   for (const [data, attribute] of attributes) {
     const selector = `[data-t-${attribute === 'aria-label' ? 'label' : attribute}]`;
     for (const element of root.querySelectorAll<HTMLElement>(selector)) {
-      const text = htmlText(messages, element.dataset[data]);
+      const text = htmlText(texts, element.dataset[data]);
       if (text !== undefined) element.setAttribute(attribute, text);
     }
   }
