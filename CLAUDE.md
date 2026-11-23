@@ -26,7 +26,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - License: **Apache-2.0** (hackathon requirement: public repo with visible open-source license).
 - Languages: the rule checks cover emails in en, de, fr, es, it, pt. The panel and the AI's
   answers come in en, de, fr, es, it, pt (decided 22 Nov 2026): "Automatic" (Chrome's language,
-  else English) until the user picks one under Settings; the choice is kept in the panel's
+  else English) until the user picks one with the flag button (decided 23 Nov 2026) or under
+  Settings (the only way back to "Automatic"); the choice is kept in the panel's
   local storage and switching reloads the panel. Whatever the email's language, the AI answers
   in the panel's language. Text lives in `src/i18n/` (`en.ts` is the master copy; TypeScript and
   `tests/i18n.test.ts` keep the others complete); `index.html` marks its text with `data-t`.

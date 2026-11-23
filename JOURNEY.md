@@ -1100,3 +1100,9 @@ _To fill in near the submission._
   opens the side panel directly: Chrome allows that only in response to the click, so the page
   looks up its window when it loads and the click waits for nothing. Translations into German,
   French, Spanish, Italian and Portuguese are not checked by a native speaker yet.
+- The line "Languages: en · de · fr · es · it · pt" is now a flag button, in the panel and on the
+  welcome page: it shows the flag of the current language and opens a menu with every language
+  as its flag and its own name. Flags stand for countries, not languages, so English got the
+  United Kingdom and Portuguese got Portugal (our texts are European Portuguese). The flags are
+  small SVG files shown as CSS backgrounds: flag emoji do not show on Windows. The menu is
+  Chrome's own popover, placed with CSS anchor positioning, so closing it needs no code.
