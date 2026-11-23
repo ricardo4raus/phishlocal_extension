@@ -334,6 +334,10 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
 - Firebase SDKs call each other: Auth asks App Check for a token on every request, so an App
   Check provider that needs an Auth sign-in loops on the same Firebase app. A second app for the
   sign-in, without App Check, breaks the loop.
+- A bitmap trace stacks one full-canvas layer per colour, so its size says little about the
+  picture: most of a 2.6 MB trace was background noise. Redraw the flat parts by hand, keep the
+  trace only where the detail is the design, and compare the result with the original pixel by
+  pixel.
 
 ## Accomplishments we're proud of
 
@@ -1072,3 +1076,18 @@ _To fill in near the submission._
 - The bulb's glow still cut off while fading out, also as a single glow: Chrome did not blend a
   `filter: drop-shadow()` whose colour fades. The halo is now its own layer behind the bulb (a
   soft radial gradient) and only its opacity animates, which always fades smoothly.
+
+### Mon 23 Nov 2026
+
+- New logo: a navy rounded square with a white house and a smiling koi with orange glitter and
+  diamond teeth (Ricardo's design). Its Inkscape trace was 2.6 MB: 71 % of it was two navy
+  shades of the background that nobody can tell apart (compression noise in the PNG), and the
+  corners were black instead of transparent. The background, the house (every edge fitted to
+  the original's pixels), the mouth's border and the top of the head are now redrawn as clean
+  paths; the glitter and the teeth are kept as traced, cut to the fish's outline. That brings it
+  to 197 KB (`design/logo.svg`), closer to the original than the trace was.
+- The SVG never ships: the extension icons (16 to 128 px) and the panel's top-bar logo (56 px,
+  shown at 28 px as a CSS background) are PNGs rendered from it, 15 KB together. The old blue
+  shield logo and its icon are gone.
+- The README shows the full logo (the SVG) at the top. That and Devpost are where the glitter
+  can be seen: in Chrome the icons are 16 to 48 px.
