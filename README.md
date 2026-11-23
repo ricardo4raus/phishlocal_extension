@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="design/logo.svg" alt="PhishLocal logo: a smiling koi inside a house" width="160">
+  <img src="design/logo.svg" alt="PhishLocal logo: a smiling koi inside a house" width="320">
 </p>
 
 # PhishLocal
