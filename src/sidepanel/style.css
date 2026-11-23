@@ -294,9 +294,6 @@
     block-size: 22px;
   }
 
-  .icon[data-icon='shield-check'] {
-    mask-image: url(./icons/shield-check.svg);
-  }
   .icon[data-icon='refresh'] {
     mask-image: url(./icons/refresh.svg);
   }
@@ -397,15 +394,13 @@
     font-weight: 700;
   }
 
+  /* A 56 px PNG rendered from design/logo.svg (2x for sharp screens); the SVG is too large to
+     ship. A background, so the DOM holds no <img>. */
   .logo {
-    display: grid;
-    place-items: center;
     flex: none;
     inline-size: 28px;
     block-size: 28px;
-    border-radius: 7px;
-    background: var(--color-accent);
-    color: var(--color-on-accent);
+    background: url(./logo.png) center / contain no-repeat;
   }
 
   /* The model pill: grey, the word says the state and the mark repeats it; only the ready dot is

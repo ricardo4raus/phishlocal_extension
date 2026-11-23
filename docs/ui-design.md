@@ -78,7 +78,8 @@ model; "Gemini Nano" appears only in the empty, loading and download texts and i
 
 Every part is its own component (see "How to build it"); the page sets the spacing between them.
 
-1. **Top bar** (always): logo, "PhishLocal", and the model pill on the right. The pill is
+1. **Top bar** (always): logo (a 56 px PNG of `design/logo.svg`, shown at 28 px as a CSS
+   background), "PhishLocal", and the model pill on the right. The pill is
    grey in every state, with a green dot when ready (decided 22 Nov 2026: users read a grey dot
    as "not ready"; a soft green halo swells and fades around it every 2.4 s, the dot keeps its
    colour, and it stands still with reduced motion), a grey spinner while loading or downloading, a small "!" when the AI is

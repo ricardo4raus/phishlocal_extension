@@ -6,7 +6,6 @@ import { revealOverrides } from '../rules/unicode';
 
 /** The icons in `icons/`, drawn through CSS masks (see `.icon` in style.css). */
 export type IconName =
-  | 'shield-check'
   | 'refresh'
   | 'lock'
   | 'cloud'
