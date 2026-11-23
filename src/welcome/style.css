@@ -53,6 +53,11 @@
     line-height: var(--leading-l);
   }
 
+  /* The panel's info box, read left to right inside the centred hero. */
+  .welcome__note {
+    text-align: start;
+  }
+
   /* The step's number, in the place where the privacy points have their icon. */
   .welcome__step {
     display: grid;

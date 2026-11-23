@@ -88,6 +88,8 @@ export const de: Messages = {
   welcome: {
     title: 'Willkommen bei PhishLocal',
     lead: 'PhishLocal prüft deine E-Mails auf Phishing, mit der KI, die in Chrome eingebaut ist, und erklärt jedes Warnzeichen. Deine E-Mails verlassen deinen Browser nie.',
+    madeFor:
+      'Gemacht für Gmail im Browser. E-Mails aus anderen Mail-Programmen kannst du in die Seitenleiste einfügen.',
     openPanel: 'Seitenleiste öffnen',
     openGmail: 'Gmail öffnen',
     startTitle: 'So fängst du an',

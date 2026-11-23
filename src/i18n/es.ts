@@ -90,6 +90,7 @@ export const es: Messages = {
   welcome: {
     title: 'Te damos la bienvenida a PhishLocal',
     lead: 'PhishLocal revisa tus correos en busca de phishing con la IA integrada en Chrome y explica cada señal de alerta. Tus correos nunca salen de tu navegador.',
+    madeFor: 'Hecho para Gmail en la web. Desde otras apps de correo, pega el correo en el panel.',
     openPanel: 'Abrir el panel',
     openGmail: 'Abrir Gmail',
     startTitle: 'Cómo empezar',

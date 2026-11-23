@@ -95,6 +95,7 @@ export const en = {
   welcome: {
     title: 'Welcome to PhishLocal',
     lead: 'PhishLocal checks your emails for phishing with the AI built into Chrome and explains every red flag. Your emails never leave your browser.',
+    madeFor: 'Made for Gmail on the web. From other mail apps, paste an email into the panel.',
     openPanel: 'Open the panel',
     openGmail: 'Open Gmail',
     startTitle: 'How to start',

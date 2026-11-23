@@ -90,6 +90,8 @@ export const fr: Messages = {
   welcome: {
     title: 'Bienvenue dans PhishLocal',
     lead: 'PhishLocal repère l’hameçonnage dans vos e-mails avec l’IA intégrée à Chrome et explique chaque signal d’alerte. Vos e-mails ne quittent jamais votre navigateur.',
+    madeFor:
+      'Conçu pour Gmail sur le web. Depuis une autre messagerie, collez l’e-mail dans le panneau.',
     openPanel: 'Ouvrir le panneau',
     openGmail: 'Ouvrir Gmail',
     startTitle: 'Pour commencer',
