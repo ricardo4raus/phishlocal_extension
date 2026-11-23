@@ -10,7 +10,7 @@
     --leading-2xl: 36px;
     --space-6: 40px;
     --welcome-width: 600px;
-    --welcome-logo: 160px;
+    --welcome-logo: 200px;
   }
 }
 
@@ -34,7 +34,7 @@
 }
 
 @layer components {
-  /* A 320 px PNG of design/logo.svg (2x for sharp screens); the SVG is too large to ship. */
+  /* A 400 px PNG of design/logo.svg (2x for sharp screens); the SVG is too large to ship. */
   .welcome__logo {
     display: block;
     inline-size: var(--welcome-logo);
