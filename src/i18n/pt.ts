@@ -86,6 +86,22 @@ export const pt: Messages = {
     languageHint: 'Define o idioma do painel e das respostas da IA. O painel reinicia para mudar.',
   },
 
+  welcome: {
+    title: 'Boas-vindas ao PhishLocal',
+    lead: 'O PhishLocal verifica os seus e-mails à procura de phishing com a IA integrada no Chrome e explica cada sinal de alerta. Os seus e-mails nunca saem do seu navegador.',
+    openPanel: 'Abrir o painel',
+    openGmail: 'Abrir o Gmail',
+    startTitle: 'Como começar',
+    pinLead: 'Afixe o PhishLocal',
+    pinText:
+      'Clique na peça de puzzle na barra de ferramentas do Chrome e depois no pin ao lado do PhishLocal. O ícone dele abre o painel.',
+    gmailLead: 'Abra um e-mail no Gmail',
+    gmailText:
+      'Enquanto o painel está aberto, o PhishLocal verifica cada e-mail que abre, neste dispositivo.',
+    resultLead: 'Leia o resultado',
+    resultText: 'Um veredicto, cada sinal de alerta em palavras simples e o que fazer a seguir.',
+  },
+
   automatic: (name) => `Automático (${name})`,
   languageNames: {
     en: 'inglês',

@@ -1,0 +1,69 @@
+/*
+ * The welcome page: the side panel's tokens and components (../sidepanel/style.css, loaded
+ * first), plus a wider, centred page with the big logo. Same layers and rules as the panel.
+ */
+@layer tokens, base, layout, components, utilities;
+
+@layer tokens {
+  :root {
+    --text-2xl: 28px;
+    --leading-2xl: 36px;
+    --space-6: 40px;
+    --welcome-width: 600px;
+    --welcome-logo: 160px;
+  }
+}
+
+@layer layout {
+  /* One centred column; the hero is centred, the cards below read left to right. */
+  .welcome {
+    max-inline-size: var(--welcome-width);
+    margin-inline: auto;
+    padding: var(--space-6) var(--space-4);
+  }
+
+  .welcome__hero {
+    align-items: center;
+    text-align: center;
+  }
+
+  .welcome__actions {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+@layer components {
+  /* A 320 px PNG of design/logo.svg (2x for sharp screens); the SVG is too large to ship. */
+  .welcome__logo {
+    display: block;
+    inline-size: var(--welcome-logo);
+    block-size: var(--welcome-logo);
+    background: url(./logo.png) center / contain no-repeat;
+  }
+
+  .welcome__title {
+    font-size: var(--text-2xl);
+    line-height: var(--leading-2xl);
+    font-weight: 700;
+  }
+
+  .welcome__lead {
+    font-size: var(--text-l);
+    line-height: var(--leading-l);
+  }
+
+  /* The step's number, in the place where the privacy points have their icon. */
+  .welcome__step {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: 24px;
+    block-size: 24px;
+    border-radius: var(--radius-pill);
+    background: var(--color-accent-tint);
+    color: var(--color-accent-text);
+    font-size: var(--text-s);
+    font-weight: 700;
+  }
+}

@@ -87,6 +87,23 @@ export const fr: Messages = {
       'Définit la langue du panneau et des réponses de l’IA. Le panneau redémarre pour changer.',
   },
 
+  welcome: {
+    title: 'Bienvenue dans PhishLocal',
+    lead: 'PhishLocal repère l’hameçonnage dans vos e-mails avec l’IA intégrée à Chrome et explique chaque signal d’alerte. Vos e-mails ne quittent jamais votre navigateur.',
+    openPanel: 'Ouvrir le panneau',
+    openGmail: 'Ouvrir Gmail',
+    startTitle: 'Pour commencer',
+    pinLead: 'Épinglez PhishLocal',
+    pinText:
+      'Cliquez sur la pièce de puzzle dans la barre d’outils de Chrome, puis sur l’épingle à côté de PhishLocal. Son icône ouvre le panneau.',
+    gmailLead: 'Ouvrez un e-mail dans Gmail',
+    gmailText:
+      'Tant que le panneau est ouvert, PhishLocal vérifie chaque e-mail que vous ouvrez, sur cet appareil.',
+    resultLead: 'Lisez le résultat',
+    resultText:
+      'Un verdict, chaque signal d’alerte en mots simples, et ce qu’il faut faire ensuite.',
+  },
+
   automatic: (name) => `Automatique (${name})`,
   languageNames: {
     en: 'anglais',

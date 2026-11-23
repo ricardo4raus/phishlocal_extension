@@ -9,6 +9,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { basename, extname, join, posix } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { WELCOME_PAGE } from '../src/welcome/open';
 import {
   type Manifest,
   contentScriptMatches,
@@ -149,6 +150,11 @@ describe('dist/ build output', () => {
         : !existsInDist(ref),
     );
     expect(missing).toEqual([]);
+  });
+
+  it('has the welcome page that the background opens after an install', () => {
+    // Not named in the manifest: built as an extra input (vite.config.ts).
+    expect(existsInDist(WELCOME_PAGE)).toBe(true);
   });
 
   it('has the same permissions and content-script matches as the source manifest', () => {
