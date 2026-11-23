@@ -11,6 +11,3 @@ coverage
 # "Pack extension" in chrome://extensions writes a private key and a package
 *.pem
 *.crx
-
-# Logo drafts and the full-size trace (2.6 MB); design/logo.svg is the master
-design/logo-draft/
