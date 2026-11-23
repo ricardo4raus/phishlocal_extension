@@ -85,6 +85,25 @@ export const de: Messages = {
       'Legt die Sprache der Seitenleiste und der Antworten der KI fest. Die Seitenleiste startet neu, um zu wechseln.',
   },
 
+  welcome: {
+    title: 'Willkommen bei PhishLocal',
+    lead: 'PhishLocal prüft deine E-Mails auf Phishing, mit der KI, die in Chrome eingebaut ist, und erklärt jedes Warnzeichen. Deine E-Mails verlassen deinen Browser nie.',
+    madeFor:
+      'Gemacht für Gmail im Browser. E-Mails aus anderen Mail-Programmen kannst du in die Seitenleiste einfügen.',
+    openPanel: 'Seitenleiste öffnen',
+    openGmail: 'Gmail öffnen',
+    startTitle: 'So fängst du an',
+    pinLead: 'PhishLocal anheften',
+    pinText:
+      'Klicke in der Symbolleiste von Chrome auf das Puzzleteil und dann auf die Stecknadel neben PhishLocal. Sein Symbol öffnet die Seitenleiste.',
+    gmailLead: 'Öffne eine E-Mail in Gmail',
+    gmailText:
+      'Solange die Seitenleiste offen ist, prüft PhishLocal jede E-Mail, die du öffnest, auf diesem Gerät.',
+    resultLead: 'Lies das Ergebnis',
+    resultText:
+      'Eine Einschätzung, jedes Warnzeichen in einfachen Worten und was du jetzt tun kannst.',
+  },
+
   automatic: (name) => `Automatisch (${name})`,
   languageNames: {
     en: 'Englisch',

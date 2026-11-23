@@ -170,6 +170,11 @@ explain every red flag, and work offline, with a cloud only as fallback."
   test checks that). To look at a state without loading the extension, fill the page's HTML in
   a scratch file and screenshot it with headless Chrome at 380 px (`--force-device-scale-factor=1`,
   its window is at least 500 px wide).
+- Welcome page (23 Nov 2026, `src/welcome/`, spec in `docs/ui-design.md`): opened once in a tab
+  after the first install (`openWelcome()`, never after updates), with the big logo, how to
+  start and the privacy points. It reuses the panel's stylesheet and language; its own texts are
+  the `welcome` section of each dictionary. Not in the manifest: Vite builds it as an extra
+  input (`vite.config.ts`).
 - The GitHub repo is public (see "Privacy and contest rules").
 
 ## Timetable and workflow

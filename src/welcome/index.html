@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-t="title">Welcome to PhishLocal</title>
+    <link rel="stylesheet" href="../sidepanel/style.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!-- Shown once, after the first install (src/welcome/open.ts). The panel's tokens and
+         components, with a wider page; the logo is a CSS background, so the DOM holds no <img>. -->
+    <main class="welcome stack stack--loose">
+      <header class="welcome__hero stack">
+        <span class="welcome__logo" aria-hidden="true"></span>
+        <h1 class="welcome__title" data-t="title">Welcome to PhishLocal</h1>
+        <p class="welcome__lead text-secondary" data-t="lead">
+          PhishLocal checks your emails for phishing with the AI built into Chrome and explains
+          every red flag. Your emails never leave your browser.
+        </p>
+        <p class="note welcome__note">
+          <span class="icon" data-icon="info" aria-hidden="true"></span>
+          <span data-t="madeFor"
+            >Made for Gmail on the web. From other mail apps, paste an email into the panel.</span
+          >
+        </p>
+        <div class="welcome__actions row">
+          <button id="open-panel" type="button" class="btn btn--primary" data-t="openPanel">
+            Open the panel
+          </button>
+          <button id="open-gmail" type="button" class="btn" data-t="openGmail">Open Gmail</button>
+        </div>
+      </header>
+
+      <section class="card card--pad stack" aria-labelledby="start-title">
+        <h2 id="start-title" class="section-title" data-t="startTitle">How to start</h2>
+        <ol class="stack">
+          <li class="point">
+            <span class="welcome__step" aria-hidden="true">1</span>
+            <p>
+              <span class="point__lead" data-t="pinLead">Pin PhishLocal</span><br />
+              <span class="text-secondary" data-t="pinText"
+                >Click the puzzle piece in Chrome's toolbar, then the pin next to PhishLocal. Its
+                icon opens the panel.</span
+              >
+            </p>
+          </li>
+          <li class="point">
+            <span class="welcome__step" aria-hidden="true">2</span>
+            <p>
+              <span class="point__lead" data-t="gmailLead">Open an email in Gmail</span><br />
+              <span class="text-secondary" data-t="gmailText"
+                >While the panel is open, PhishLocal checks every email you open, on this
+                device.</span
+              >
+            </p>
+          </li>
+          <li class="point">
+            <span class="welcome__step" aria-hidden="true">3</span>
+            <p>
+              <span class="point__lead" data-t="resultLead">Read the result</span><br />
+              <span class="text-secondary" data-t="resultText"
+                >A verdict, every red flag in plain words, and what to do next.</span
+              >
+            </p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="card card--pad stack" aria-labelledby="privacy-title">
+        <h2 id="privacy-title" class="section-title" data-t="privacyTitle">
+          How your privacy is kept
+        </h2>
+        <ul class="stack">
+          <li class="point">
+            <span class="icon icon--m point__icon" data-icon="device" aria-hidden="true"></span>
+            <p>
+              <span class="point__lead" data-t="pointDeviceLead">Checked on this device</span><br />
+              <span class="text-secondary" data-t="pointDeviceText"
+                >Basic checks plus Gemini Nano, the AI built into Chrome. Works offline.</span
+              >
+            </p>
+          </li>
+          <li class="point">
+            <span class="icon icon--m point__icon" data-icon="eye-off" aria-hidden="true"></span>
+            <p>
+              <span class="point__lead" data-t="pointSavedLead">No email is saved</span><br />
+              <span class="text-secondary" data-t="pointSavedText"
+                >Close the panel and all reading stops.</span
+              >
+            </p>
+          </li>
+          <li class="point">
+            <span class="icon icon--m point__icon" data-icon="cloud" aria-hidden="true"></span>
+            <p>
+              <span class="point__lead" data-t="pointCloudLead">Cloud only if you ask</span><br />
+              <span class="text-secondary" data-t="pointCloudText"
+                >Personal data is removed first, and you see what is sent.</span
+              >
+            </p>
+          </li>
+        </ul>
+      </section>
+
+      <p class="row text-muted">
+        <span class="grow" data-t="languages">Languages: en · de · fr · es · it · pt</span>
+        <button
+          id="how-it-works"
+          type="button"
+          class="btn btn--plain text-muted"
+          data-t="howItWorks"
+        >
+          How it works
+        </button>
+      </p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

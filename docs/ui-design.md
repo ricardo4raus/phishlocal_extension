@@ -179,6 +179,27 @@ without sideways scrolling.
 - **Failure:** "The deep check did not work (short reason). The result above still applies." The
   card stays open with the data, so the same consent can be sent again.
 
+### The welcome page
+
+A tab of its own (`src/welcome/`), opened once after the first install, not after updates or
+reloads (decided 23 Nov 2026). It is where the logo is seen big: in Chrome the icons are 16 to
+48 px. Top to bottom, in one centred column of at most 600 px:
+
+1. The logo (200 px, a 400 px PNG of `design/logo.svg`), "Welcome to PhishLocal", one sentence
+   on what it does, an info box "Made for Gmail on the web. From other mail apps, paste an email
+   into the panel.", and two buttons: "Open the panel" (filled; Chrome opens the side panel only
+   within the click, so the page looks up its window on load and hides the button without one)
+   and "Open Gmail" (outlined).
+2. **How to start** (a card): three numbered steps: pin PhishLocal (Chrome hides new extensions
+   under the puzzle piece), open an email in Gmail, read the result.
+3. **How your privacy is kept** (a card): the empty state's three points, same text.
+4. The languages line and "How it works", as in the empty state.
+
+It uses the panel's stylesheet, tokens and components, plus its own `style.css` for the wider
+page, and the panel's language (same origin, same saved choice). Its own texts are the
+`welcome` section of each dictionary. Like the panel, its DOM holds no `<svg>`, `<a>` or
+`<img>`.
+
 ## Wording
 
 Tier-1 texts. The same thing has the same name everywhere. These are the English words; the

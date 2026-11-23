@@ -91,6 +91,23 @@ export const en = {
       "Sets the language of the panel and of the AI's answers. The panel restarts to switch.",
   },
 
+  /** The welcome page's own text (src/welcome/index.html), by `data-t` key; it also uses `html`. */
+  welcome: {
+    title: 'Welcome to PhishLocal',
+    lead: 'PhishLocal checks your emails for phishing with the AI built into Chrome and explains every red flag. Your emails never leave your browser.',
+    madeFor: 'Made for Gmail on the web. From other mail apps, paste an email into the panel.',
+    openPanel: 'Open the panel',
+    openGmail: 'Open Gmail',
+    startTitle: 'How to start',
+    pinLead: 'Pin PhishLocal',
+    pinText:
+      "Click the puzzle piece in Chrome's toolbar, then the pin next to PhishLocal. Its icon opens the panel.",
+    gmailLead: 'Open an email in Gmail',
+    gmailText: 'While the panel is open, PhishLocal checks every email you open, on this device.',
+    resultLead: 'Read the result',
+    resultText: 'A verdict, every red flag in plain words, and what to do next.',
+  },
+
   /** The language menu. */
   automatic: (name: string) => `Automatic (${name})`,
   /** The languages' names in this language, for sentences ("answers in Italian"). */

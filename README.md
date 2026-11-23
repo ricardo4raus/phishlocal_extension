@@ -15,7 +15,8 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 
 ## What it does today
 
-- **Side panel** (Chrome Manifest V3): click the toolbar icon to open it.
+- **Side panel** (Chrome Manifest V3): click the toolbar icon to open it. After the first install
+  a welcome page opens once: how to start, and how your privacy is kept.
 - **Six languages:** the panel and the AI's answers in English, German, French, Spanish, Italian
   or Portuguese. "Automatic" follows Chrome's language; Settings at the bottom of the panel picks
   another one, which is remembered in this browser.

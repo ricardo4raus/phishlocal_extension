@@ -338,6 +338,9 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   picture: most of a 2.6 MB trace was background noise. Redraw the flat parts by hand, keep the
   trace only where the detail is the design, and compare the result with the original pixel by
   pixel.
+- `chrome.sidePanel.open()` may only be called in response to a user gesture. Waiting for another
+  API in the click handler first (e.g. to find the window) risks losing it, so the page looks the
+  window up beforehand.
 
 ## Accomplishments we're proud of
 
@@ -1091,3 +1094,9 @@ _To fill in near the submission._
   shield logo and its icon are gone.
 - The README shows the full logo (the SVG) at the top. That and Devpost are where the glitter
   can be seen: in Chrome the icons are 16 to 48 px.
+- Welcome page: after the first install (not after updates), PhishLocal opens a tab with the big
+  logo, three steps to start (pin it under Chrome's puzzle piece, open an email in Gmail, read
+  the result) and the panel's three privacy points, in the panel's language. "Open the panel"
+  opens the side panel directly: Chrome allows that only in response to the click, so the page
+  looks up its window when it loads and the click waits for nothing. Translations into German,
+  French, Spanish, Italian and Portuguese are not checked by a native speaker yet.

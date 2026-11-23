@@ -23,6 +23,10 @@ export default defineConfig(({ mode }) => {
   }
   return {
     plugins: [crx({ manifest })],
-    build: { outDir: mode === JUDGES_MODE ? JUDGES_OUT_DIR : 'dist' },
+    build: {
+      outDir: mode === JUDGES_MODE ? JUDGES_OUT_DIR : 'dist',
+      // Pages that manifest.json does not name: the welcome page (src/welcome/open.ts).
+      rollupOptions: { input: { welcome: 'src/welcome/index.html' } },
+    },
   };
 });

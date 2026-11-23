@@ -25,9 +25,7 @@ import { setUpPaste } from './paste-view';
 import { setUpLanguage, translatePage } from './language-view';
 import { countElapsed, seconds } from './ui';
 import { watchActiveTab } from './watch';
-
-/** Where "How it works" leads: the README of the public repository. */
-const HOW_IT_WORKS_URL = 'https://github.com/ricardo4raus/phishlocal_extension#readme';
+import { HOW_IT_WORKS_URL } from '../links';
 
 function byId<T extends HTMLElement>(id: string): T {
   const element = document.querySelector<T>(`#${id}`);
