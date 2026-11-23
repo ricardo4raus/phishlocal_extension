@@ -91,9 +91,12 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    (text only). It never replaces the email below it.
 3. **Empty state** (only without an email): heading, text, the outlined button "Paste an
    email", then "How your privacy is kept" with three points (icon, bold lead, one sentence), then
-   the footer line "Languages: en · de · fr · es · it · pt" and a "How it works" button that opens
-   the README. Left-aligned, no illustration: the panel is too narrow for a hero, and the logo is
-   already in the top bar.
+   a footer with the flag button on the left and "How it works" (opens the README) on the right.
+   The flag button shows the flag of the panel's language and opens the language menu above it
+   (a popover: Esc or a click outside closes it): every language as its flag and its own name,
+   the current one marked; choosing another saves it and reloads the panel (decided 23 Nov 2026,
+   in place of the line "Languages: en · de · fr · es · it · pt"). Left-aligned, no
+   illustration: the panel is too narrow for a hero, and the logo is already in the top bar.
 4. **Email strip** (with an email): subject (one line, cut with "…"), then the sender: the
    address domain first and bold, the display name after it in grey, the full address on its own
    line, wrapping, never cut. Third line, the sender status: "Sender confirmed by Gmail" (DMARC
@@ -193,7 +196,7 @@ reloads (decided 23 Nov 2026). It is where the logo is seen big: in Chrome the i
 2. **How to start** (a card): three numbered steps: pin PhishLocal (Chrome hides new extensions
    under the puzzle piece), open an email in Gmail, read the result.
 3. **How your privacy is kept** (a card): the empty state's three points, same text.
-4. The languages line and "How it works", as in the empty state.
+4. The flag button with the language menu and "How it works", as in the empty state.
 
 It uses the panel's stylesheet, tokens and components, plus its own `style.css` for the wider
 page, and the panel's language (same origin, same saved choice). Its own texts are the
@@ -279,7 +282,9 @@ side bars, no gradients, no shadows, no emoji. **Colour:** one accent (blue) for
 things only, the three semantic colours only for a real state, grey for everything else.
 **Icons:** one set, one stroke width (2 px on a 24 px grid), drawn as SVG files and shown
 through CSS `mask-image`, so the panel's DOM holds no `<svg>` and email text can never become
-one.
+one. **Flags** (`src/sidepanel/flags/`) are colour, so they are CSS backgrounds instead, shown at
+3:2 (21 × 14 px) with a 1 px edge: United Kingdom for English, Germany, France, Spain, Italy and
+Portugal (our Portuguese is European Portuguese), without coats of arms.
 
 | Token          | Light     | Dark      | Use                                   |
 | -------------- | --------- | --------- | ------------------------------------- |

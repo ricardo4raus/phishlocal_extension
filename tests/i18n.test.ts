@@ -14,7 +14,7 @@ import {
   saveChoice,
 } from '../src/i18n/languages';
 import type { RuleId } from '../src/rules/types';
-import { setUpLanguage, translatePage } from '../src/sidepanel/language-view';
+import { setUpLanguage, setUpLanguageMenu, translatePage } from '../src/sidepanel/language-view';
 
 const RULES = Object.keys(MESSAGES.en.titles) as RuleId[];
 
@@ -248,6 +248,74 @@ describe('the language menu', () => {
     });
     select.value = 'de';
     select.dispatchEvent(new Event('change'));
+    expect(reload).not.toHaveBeenCalled();
+    setItem.mockRestore();
+  });
+});
+
+/** The flag button and its menu in the loaded panel. */
+function languageParts() {
+  const button = document.querySelector<HTMLButtonElement>('#language-button');
+  const menu = document.querySelector<HTMLElement>('#language-menu');
+  if (!button || !menu) throw new Error('no flag button or menu');
+  return { button, menu, items: () => [...menu.querySelectorAll<HTMLButtonElement>('button')] };
+}
+
+describe('the flag button', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    loadPanel();
+  });
+
+  it("shows the page language's flag and names it for screen readers", () => {
+    const { button } = languageParts();
+    setUpLanguageMenu(button, languageParts().menu, MESSAGES.de, 'de', () => {});
+    expect(button.querySelector<HTMLElement>('.lang-flag')?.dataset.flag).toBe('de');
+    expect(button.getAttribute('aria-label')).toBe('Sprache: Deutsch');
+    expect(button.title).toBe('Sprache: Deutsch');
+    expect(button.getAttribute('popovertarget')).toBe('language-menu');
+  });
+
+  it('lists every language with its flag and its own name, the current one marked', () => {
+    const { button, menu, items } = languageParts();
+    setUpLanguageMenu(button, menu, MESSAGES.en, 'it', () => {});
+    expect(items().map((item) => item.textContent)).toEqual([
+      'English',
+      'Deutsch',
+      'Français',
+      'Español',
+      'Italiano',
+      'Português',
+    ]);
+    expect(items().map((item) => item.lang)).toEqual([...LANGUAGES]);
+    expect(
+      items().map((item) => item.querySelector<HTMLElement>('.lang-flag')?.dataset.flag),
+    ).toEqual([...LANGUAGES]);
+    const current = items().filter((item) => item.getAttribute('aria-current') === 'true');
+    expect(current.map((item) => item.lang)).toEqual(['it']);
+    expect(menu.querySelectorAll('a, img, svg')).toHaveLength(0);
+  });
+
+  it('saves another language and reloads; the current one changes nothing', () => {
+    const { button, menu, items } = languageParts();
+    const reload = vi.fn<() => void>();
+    setUpLanguageMenu(button, menu, MESSAGES.en, 'en', reload);
+    items()[0]?.click(); // English, the current language
+    expect(reload).not.toHaveBeenCalled();
+    expect(localStorage.getItem(LANGUAGE_KEY)).toBeNull();
+    items()[3]?.click(); // Español
+    expect(localStorage.getItem(LANGUAGE_KEY)).toBe('es');
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reload when the choice cannot be saved', () => {
+    const { button, menu, items } = languageParts();
+    const reload = vi.fn<() => void>();
+    setUpLanguageMenu(button, menu, MESSAGES.en, 'en', reload);
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota');
+    });
+    items()[1]?.click();
     expect(reload).not.toHaveBeenCalled();
     setItem.mockRestore();
   });

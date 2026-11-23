@@ -1082,7 +1082,7 @@ _To fill in near the submission._
 
 ### Mon 23 Nov 2026
 
-- New logo: a navy rounded square with a white house and a smiling koi with orange glitter and
+- New logo (PR #35): a navy rounded square with a white house and a smiling koi with orange glitter and
   diamond teeth (Ricardo's design). Its Inkscape trace was 2.6 MB: 71 % of it was two navy
   shades of the background that nobody can tell apart (compression noise in the PNG), and the
   corners were black instead of transparent. The background, the house (every edge fitted to
@@ -1094,9 +1094,15 @@ _To fill in near the submission._
   shield logo and its icon are gone.
 - The README shows the full logo (the SVG) at the top. That and Devpost are where the glitter
   can be seen: in Chrome the icons are 16 to 48 px.
-- Welcome page: after the first install (not after updates), PhishLocal opens a tab with the big
+- Welcome page (PR #36): after the first install (not after updates), PhishLocal opens a tab with the big
   logo, three steps to start (pin it under Chrome's puzzle piece, open an email in Gmail, read
   the result) and the panel's three privacy points, in the panel's language. "Open the panel"
   opens the side panel directly: Chrome allows that only in response to the click, so the page
   looks up its window when it loads and the click waits for nothing. Translations into German,
   French, Spanish, Italian and Portuguese are not checked by a native speaker yet.
+- The line "Languages: en · de · fr · es · it · pt" is now a flag button (PR #37), in the panel and on the
+  welcome page: it shows the flag of the current language and opens a menu with every language
+  as its flag and its own name. Flags stand for countries, not languages, so English got the
+  United Kingdom and Portuguese got Portugal (our texts are European Portuguese). The flags are
+  small SVG files shown as CSS backgrounds: flag emoji do not show on Windows. The menu is
+  Chrome's own popover, placed with CSS anchor positioning, so closing it needs no code.

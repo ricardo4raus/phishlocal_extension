@@ -18,8 +18,8 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
 - **Side panel** (Chrome Manifest V3): click the toolbar icon to open it. After the first install
   a welcome page opens once: how to start, and how your privacy is kept.
 - **Six languages:** the panel and the AI's answers in English, German, French, Spanish, Italian
-  or Portuguese. "Automatic" follows Chrome's language; Settings at the bottom of the panel picks
-  another one, which is remembered in this browser.
+  or Portuguese. "Automatic" follows Chrome's language; the flag button (or Settings, which also
+  offers "Automatic" again) picks another one, which is remembered in this browser.
 - **Automatic check in Gmail:** while the side panel is open, every email you open in Gmail is
   read and checked at once: sender, subject, visible text, and every link with its text and real
   target. Its headers (SPF, DKIM, DMARC, Reply-To) are loaded in the background from Gmail's own

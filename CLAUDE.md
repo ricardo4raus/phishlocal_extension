@@ -26,7 +26,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - License: **Apache-2.0** (hackathon requirement: public repo with visible open-source license).
 - Languages: the rule checks cover emails in en, de, fr, es, it, pt. The panel and the AI's
   answers come in en, de, fr, es, it, pt (decided 22 Nov 2026): "Automatic" (Chrome's language,
-  else English) until the user picks one under Settings; the choice is kept in the panel's
+  else English) until the user picks one with the flag button (decided 23 Nov 2026, PR #37) or under
+  Settings (the only way back to "Automatic"); the choice is kept in the panel's
   local storage and switching reloads the panel. Whatever the email's language, the AI answers
   in the panel's language. Text lives in `src/i18n/` (`en.ts` is the master copy; TypeScript and
   `tests/i18n.test.ts` keep the others complete); `index.html` marks its text with `data-t`.
@@ -170,7 +171,7 @@ explain every red flag, and work offline, with a cloud only as fallback."
   test checks that). To look at a state without loading the extension, fill the page's HTML in
   a scratch file and screenshot it with headless Chrome at 380 px (`--force-device-scale-factor=1`,
   its window is at least 500 px wide).
-- Welcome page (23 Nov 2026, `src/welcome/`, spec in `docs/ui-design.md`): opened once in a tab
+- Welcome page (23 Nov 2026, PR #36, `src/welcome/`, spec in `docs/ui-design.md`): opened once in a tab
   after the first install (`openWelcome()`, never after updates), with the big logo, how to
   start and the privacy points. It reuses the panel's stylesheet and language; its own texts are
   the `welcome` section of each dictionary. Not in the manifest: Vite builds it as an extra
