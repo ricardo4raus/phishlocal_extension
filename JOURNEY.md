@@ -1089,3 +1089,5 @@ _To fill in near the submission._
 - The SVG never ships: the extension icons (16 to 128 px) and the panel's top-bar logo (56 px,
   shown at 28 px as a CSS background) are PNGs rendered from it, 15 KB together. The old blue
   shield logo and its icon are gone.
+- The README shows the full logo (the SVG) at the top. That and Devpost are where the glitter
+  can be seen: in Chrome the icons are 16 to 48 px.

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="design/logo.svg" alt="PhishLocal logo: a smiling koi inside a house" width="160">
+</p>
+
 # PhishLocal
 
 Chrome extension that checks emails for phishing on-device with Gemini Nano, using the cloud only
