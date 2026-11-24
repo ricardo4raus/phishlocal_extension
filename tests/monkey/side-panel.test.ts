@@ -577,6 +577,11 @@ function checkPanelOnce(): void {
   // The model banner shows only in the states that need the user.
   const pillState = get('model-pill').dataset.state ?? '';
   reached.add(`model: ${pillState}`);
+  // The band says the model is loading: the pill must not say it is ready.
+  const loadingText = MESSAGES[caseLanguage].aiCheck.loading(false).slice(0, 12);
+  if ((get('ai-status').textContent ?? '').startsWith(loadingText)) {
+    expect(pillState, 'pill "ready" while the check waits for the model').not.toBe('ready');
+  }
   expect(get('model-banner').hidden, `banner for state ${pillState}`).toBe(
     !['not-downloaded', 'downloading', 'unavailable', 'failed'].includes(pillState),
   );

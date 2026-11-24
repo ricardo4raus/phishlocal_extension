@@ -16,7 +16,7 @@ import { appCheckEnabled } from '../firebase';
 import type { Email } from '../email';
 import { loadSettings } from '../remote-config';
 import { checkEmail } from '../rules';
-import { createAiCheck } from './ai-view';
+import { createAiCheck, LOADING_HINT_MS } from './ai-view';
 import { createDeepCheck } from './deep-check-view';
 import { showEmail } from './email-view';
 import { createGmailView, type EmptyReason } from './gmail-view';
@@ -64,6 +64,8 @@ byId<HTMLElement>('dev-tools').hidden = !isDev;
 /** On-device model state, set by the warm-up. `failed`: the warm-up threw; a prompt retries it. */
 type ModelState = WarmUpResult['state'] | 'loading' | 'downloading' | 'failed';
 let modelState: ModelState = 'loading';
+/** Model loads (`modelReady`) that took longer than LOADING_HINT_MS and have not ended yet. */
+let slowLoads = 0;
 
 const modelPill = byId<HTMLElement>('model-pill');
 const modelStatus = byId<HTMLElement>('model-status');
@@ -96,7 +98,9 @@ const BANNERS: Partial<Record<ModelState, Banner>> = {
  * Shows the model state in the pill and the banner. `note` is a sentence put in front of the
  * banner's text (e.g. why a download failed).
  */
-function setModelState(state: ModelState, note = ''): void {
+function setModelState(wanted: ModelState, note = ''): void {
+  // A check still waits for Chrome to load the model: not "ready" yet, whoever says so.
+  const state = wanted === 'ready' && slowLoads > 0 ? 'loading' : wanted;
   modelState = state;
   modelPill.dataset.state = state;
   modelStatus.textContent = PILL_WORDS[state];
@@ -126,12 +130,27 @@ function setDownloadProgress(loaded: number): void {
 }
 
 /**
- * Waits for the model like `ensureModelLoaded()`, and tells the pill when a load after a failed
- * warm-up succeeded (the warm-up is the only other thing that sets the state).
+ * Waits for the model like `ensureModelLoaded()`, and keeps the pill true meanwhile. A loaded
+ * model is there in about 0 s; a longer wait means Chrome is loading it (again: it can unload it
+ * while the panel is open), so the pill says "loading" until it is there, or "not loaded" if it
+ * never came. A load after a failed warm-up turns the pill to "ready".
  */
 async function modelReady(answerIn: string): Promise<boolean> {
-  const ready = await ensureModelLoaded(answerIn);
+  let slow = false;
+  const hint = setTimeout(() => {
+    slow = true;
+    slowLoads++;
+    if (modelState === 'ready' || modelState === 'failed') setModelState('loading');
+  }, LOADING_HINT_MS);
+  let ready = false;
+  try {
+    ready = await ensureModelLoaded(answerIn);
+  } finally {
+    clearTimeout(hint);
+    if (slow) slowLoads--;
+  }
   if (ready && (modelState === 'failed' || modelState === 'loading')) setModelState('ready');
+  else if (!ready && slow && slowLoads === 0 && modelState === 'loading') setModelState('failed');
   return ready;
 }
 
