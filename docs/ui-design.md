@@ -56,7 +56,7 @@ mockup artboard where one exists.
 | Model unavailable          | –                                                                       | Pill "AI not available"; banner "On-device AI is not available on this computer. Emails get the basic checks only."                                                            |
 | Model failed to load       | –                                                                       | Pill "AI not loaded"; the band shows "Not checked by AI" for every email until a check loads it                                                                                |
 | Checking, no red flags yet | `Checking`                                                              | Band grey "Checking…", line "Basic checks done, AI check running"                                                                                                              |
-| Checking, rules found some | –                                                                       | Band already yellow or red with the rules' verdict; the line says the AI check is still running                                                                                |
+| Checking, rules found some | –                                                                       | Band grey "Checking…" too; the red flags list shows the findings. After 10 s, or as soon as Chrome loads the model, the band shows the rules' verdict while the check goes on  |
 | Dangerous                  | `Dangerous`                                                             | "Dangerous", "This looks like phishing."; the advice box says what to do                                                                                                       |
 | Suspicious                 | –                                                                       | "Suspicious", "Be careful: some signs of phishing."; the advice box says what to do                                                                                            |
 | Looks safe                 | `Safe`                                                                  | "Looks safe", "No signs of phishing found."                                                                                                                                    |
@@ -374,6 +374,16 @@ green, decided 22 Nov 2026).
 10. **The panel in six languages** (en, de, fr, es, it, pt), chosen under Settings, "Automatic"
     by default. The language is fixed per page load and a change reloads the panel, so no part
     needs to redraw itself and every text switches at once.
+11. **One verdict, no flicker** (24 Nov 2026): the band stays grey "Checking…" until the AI
+    answers, also when the rules found something; it used to show the rules' colour first and
+    then the AI's verdict a few seconds later, often in another colour. The red flags list shows
+    the findings meanwhile. A check that takes longer than 10 s (`VERDICT_WAIT_MS`), or one that
+    waits for Chrome to load the model, shows the rules' verdict while it goes on: a warning must
+    not wait minutes. "No red flags" stays grey until the AI answers.
+12. **The pill follows every model load** (24 Nov 2026): when a check waits for the model longer
+    than 1 s, Chrome is loading it again (it can unload it while the panel is open), and the pill
+    says "On-device AI loading" until the model is there. It used to say "ready" from the warm-up
+    on, while the band said the AI was loading.
 
 ## Mockup review
 

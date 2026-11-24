@@ -588,8 +588,18 @@ function checkPanelOnce(): void {
       `AI: ${(get('ai-status').textContent ?? '').replace(/[\d.]+ s/g, 'N s').slice(0, 40)}`,
     );
     const rules = listedRuleRisk();
-    if (risk === 'pending' || risk === 'unchecked') expect(rules).toBe('safe');
-    else {
+    const aiStatus = get('ai-status').textContent ?? '';
+    if (risk === 'unchecked') expect(rules).toBe('safe');
+    else if (risk === 'pending') {
+      // "Checking…" hides rule findings only while a check runs and the model is not loading.
+      if (rules !== 'safe') {
+        const ai = MESSAGES[caseLanguage].aiCheck;
+        expect(
+          [ai.starting, ai.waitingHeaders, ai.running(false), ai.running(true), ai.waitingPrevious],
+          'grey with rule findings, but no check running (or the model loading)',
+        ).toContain(aiStatus);
+      }
+    } else {
       expect(RISKS).toContain(risk);
       expect(LEVEL[risk as Risk], 'verdict below the rules').toBeGreaterThanOrEqual(LEVEL[rules]);
     }

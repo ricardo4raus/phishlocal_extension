@@ -247,6 +247,15 @@ export const MAX_REMEMBERED = 20;
 export const LOADING_HINT_MS = 1_000;
 
 /**
+ * How long the band stays grey ("Checking…") while the AI works, even when the rules found
+ * something. A normal check answers in about 5 s, and its verdict then shows without first
+ * flashing the rules' colour (decided 24 Nov 2026). A check that takes longer, or a model that
+ * Chrome really has to load (see LOADING_HINT_MS), shows the rules' verdict meanwhile: a warning
+ * must not wait minutes.
+ */
+export const VERDICT_WAIT_MS = 10_000;
+
+/**
  * Errors not worth a second try: the input is too large for Chrome (comes back the same), or the
  * run reached the time limit (a hung model would most likely hang again, and the second try's
  * wait for the model has no limit). A crash ends with an error of its own and is retried.
@@ -288,6 +297,8 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   let current: Request | undefined;
   let waiting: Request | undefined;
   let ticker: ReturnType<typeof setInterval> | undefined;
+  /** Shows the rules' verdict of a check that takes long (VERDICT_WAIT_MS). */
+  let revealTimer: ReturnType<typeof setTimeout> | undefined;
   /**
    * Recent AI answers by request key. An email shown again (Gmail renders it anew, or the user
    * goes back to it) gets its answer at once instead of a new run and a grey light. Only in
@@ -309,12 +320,10 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     if (current?.id === shownId && !current.cancelled) {
       const elapsed = now - current.since;
       const second = current.attempt === 2;
-      set(
-        elements.status,
-        current.phase === 'model' && elapsed >= LOADING_HINT_MS
-          ? m.aiCheck.loading(second)
-          : m.aiCheck.running(second),
-      );
+      const loading = current.phase === 'model' && elapsed >= LOADING_HINT_MS;
+      set(elements.status, loading ? m.aiCheck.loading(second) : m.aiCheck.running(second));
+      // Chrome is loading the model, which can take minutes: the rules' verdict shows meanwhile.
+      if (loading) revealRules(current.findings);
       set(elements.time, clock(elapsed));
       elements.stop.hidden = false;
     } else if (waiting?.id === shownId && current) {
@@ -338,21 +347,40 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   };
 
   /**
-   * The band before the AI has answered. While the AI check is still to come, "no red flags" is
-   * grey ("Checking…"): the AI may still raise it, and the user should not act on it yet.
+   * The band before the AI has answered: grey ("Checking…"), whatever the rules found, so a
+   * normal check shows one verdict and no colour change. The red flags list shows the rules'
+   * findings meanwhile. A check that takes long shows the rules' verdict (`revealRules`).
    */
   function showPending(request: Request, line: string): void {
-    const risk = rulesRisk(request.findings);
+    clearTimeout(revealTimer);
     elements.verdict.hidden = false;
-    setState(risk === 'safe' ? 'pending' : risk);
-    set(elements.overall, WORD[risk === 'safe' ? 'pending' : risk]);
+    setState('pending');
+    set(elements.overall, WORD.pending);
     set(elements.status, line);
     elements.reasons.replaceChildren();
-    set(elements.advice, risk === 'safe' ? '' : ADVICE[risk]);
+    set(elements.advice, '');
     set(elements.source, '');
     set(elements.time, '');
     elements.stop.hidden = false;
     set(elements.detail, '');
+    const { id, findings } = request;
+    revealTimer = setTimeout(() => {
+      if (id === shownId) revealRules(findings);
+    }, VERDICT_WAIT_MS);
+  }
+
+  /**
+   * The AI check of the shown email takes long: its band shows the rules' verdict while the check
+   * goes on (the status line and Stop stay). "No red flags" stays grey: only the AI may make it
+   * green. Does nothing once the band shows an answer.
+   */
+  function revealRules(findings: Finding[] | undefined): void {
+    clearTimeout(revealTimer);
+    const risk = rulesRisk(findings);
+    if (elements.verdict.dataset.risk !== 'pending' || risk === 'safe') return;
+    setState(risk);
+    set(elements.overall, WORD[risk]);
+    set(elements.advice, ADVICE[risk]);
   }
 
   /**
@@ -363,6 +391,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   function showUnchecked(request: Request, detail: string): void {
     const risk = rulesRisk(request.findings);
     const state: BandState = risk === 'safe' ? 'unchecked' : risk;
+    clearTimeout(revealTimer);
     elements.verdict.hidden = false;
     setState(state);
     set(elements.overall, WORD[state]);
@@ -382,6 +411,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     }
     const { verdict } = result;
     const judged = judge(verdict, request.findings, request.email, m.judge.theAi);
+    clearTimeout(revealTimer);
     elements.verdict.hidden = false;
     setState(judged.overall);
     set(elements.overall, WORD[judged.overall]);
@@ -617,6 +647,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     },
     hidden() {
       clearTimeout(timer);
+      clearTimeout(revealTimer);
       last = undefined;
       shownId++;
       waiting = undefined;

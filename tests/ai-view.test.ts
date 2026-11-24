@@ -13,6 +13,7 @@ import {
   MAX_REMEMBERED,
   STABLE_MS,
   STOP_GRACE_MS,
+  VERDICT_WAIT_MS,
 } from '../src/sidepanel/ai-view';
 import { DEFAULT_SETTINGS } from '../src/settings';
 
@@ -51,6 +52,8 @@ let check: AiCheck;
 
 const get = (id: string) => document.getElementById(id) as HTMLElement;
 const text = (id: string): string => get(id).textContent ?? '';
+/** The verdict band's state (`data-risk`). */
+const band = (): string | undefined => get('verdict').dataset.risk;
 const reasons = (): string[] =>
   [...document.querySelectorAll('#reasons li')].map((item) => item.textContent ?? '');
 
@@ -119,9 +122,10 @@ afterEach(() => {
 });
 
 describe('AI check view', () => {
-  it('shows the rules at once, then the AI verdict in the user language', async () => {
+  it('shows "Checking…" until the AI answers, then its verdict in the user language', async () => {
     check.shown(email, [finding('warning')], true);
-    expect(text('overall')).toBe('Suspicious');
+    expect(get('verdict').dataset.risk).toBe('pending');
+    expect(text('overall')).toBe('Checking…');
     expect(text('status')).toBe('AI check starting…');
     await vi.advanceTimersByTimeAsync(STABLE_MS);
     expect(prompts[0]).toMatch(/advice in German/);
@@ -415,10 +419,10 @@ describe('AI check view', () => {
     await answer(verdict('safe'));
     expect(risk()).toBe('safe');
 
-    // Rule warnings show their colour at once: the AI can only raise them.
+    // Rule warnings wait in grey too, so the band does not change colour twice.
     check.shown({ ...email, subject: 'Warned' }, [finding('warning')], true);
-    expect(risk()).toBe('suspicious');
-    expect(text('advice')).toMatch(/^Don't enter passwords/);
+    expect(risk()).toBe('pending');
+    expect(text('advice')).toBe('');
     await vi.advanceTimersByTimeAsync(STABLE_MS);
     await answer(verdict('dangerous', 'Delete it.'));
     expect(risk()).toBe('dangerous');
@@ -428,6 +432,70 @@ describe('AI check view', () => {
     await show({ ...email, subject: 'No model' });
     expect(risk()).toBe('unchecked');
     expect(text('overall')).toBe('No red flags found');
+  });
+
+  describe('the rules while the AI check takes long', () => {
+    it('show after VERDICT_WAIT_MS while the check goes on, and give way to the answer', async () => {
+      await show(email, [finding('danger')]);
+      await vi.advanceTimersByTimeAsync(VERDICT_WAIT_MS - STABLE_MS - 1);
+      expect(band()).toBe('pending');
+      await vi.advanceTimersByTimeAsync(1);
+      expect(band()).toBe('dangerous');
+      expect(text('overall')).toBe('Dangerous');
+      expect(text('advice')).toMatch(/^Don't click links/);
+      // The check still runs and can still be stopped.
+      expect(text('status')).toBe('AI check running…');
+      expect(get('stop').hidden).toBe(false);
+      await answer(verdict('dangerous', 'Delete it.'));
+      expect(reasons()).toEqual(['AI reason (dangerous)']);
+      expect(text('advice')).toBe('Delete it.');
+      expect(get('stop').hidden).toBe(true);
+    });
+
+    it('show at once when Chrome really loads the model', async () => {
+      let loaded: ((ready: boolean) => void) | undefined;
+      modelReady = () =>
+        new Promise((resolve) => {
+          loaded = resolve;
+        });
+      await show(email, [finding('warning')]);
+      expect(band()).toBe('pending');
+      await vi.advanceTimersByTimeAsync(LOADING_HINT_MS);
+      expect(text('status')).toMatch(/^On-device AI loading/);
+      expect(band()).toBe('suspicious');
+      loaded?.(true);
+      await vi.advanceTimersByTimeAsync(0);
+      await answer(verdict('suspicious'));
+      expect(reasons()).toEqual(['AI reason (suspicious)']);
+    });
+
+    it('stay grey when they found nothing: only the AI may make it green', async () => {
+      await show(email, []);
+      await vi.advanceTimersByTimeAsync(2 * VERDICT_WAIT_MS);
+      expect(band()).toBe('pending');
+      expect(text('overall')).toBe('Checking…');
+    });
+
+    it('never replace an answer, or the band of the next email', async () => {
+      await show(email, [finding('danger')]);
+      await answer(verdict('dangerous', 'Delete it.'));
+      await vi.advanceTimersByTimeAsync(VERDICT_WAIT_MS);
+      expect(text('advice')).toBe('Delete it.');
+
+      // A left email's timer does not colour the next one.
+      await show({ ...email, subject: 'A' }, [finding('danger')]);
+      await vi.advanceTimersByTimeAsync(VERDICT_WAIT_MS / 2);
+      await show({ ...email, subject: 'B' }, []);
+      await vi.advanceTimersByTimeAsync(VERDICT_WAIT_MS / 2 + 1);
+      expect(band()).toBe('pending');
+
+      // Nor does it fire after the email was hidden.
+      await show({ ...email, subject: 'C' }, [finding('danger')]);
+      check.hidden();
+      await vi.advanceTimersByTimeAsync(VERDICT_WAIT_MS);
+      expect(band()).toBeUndefined();
+      expect(get('verdict').hidden).toBe(true);
+    });
   });
 
   it('shows a recent answer again at once when the same email comes back', async () => {
