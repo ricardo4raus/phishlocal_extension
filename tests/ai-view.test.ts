@@ -469,6 +469,37 @@ describe('AI check view', () => {
       expect(reasons()).toEqual(['AI reason (suspicious)']);
     });
 
+    it('keep counting and stay shown when Gmail sends the same email again', async () => {
+      let loaded: ((ready: boolean) => void) | undefined;
+      modelReady = () =>
+        new Promise((resolve) => {
+          loaded = resolve;
+        });
+      // Shown without headers, then again with them (more findings) while the model loads.
+      check.shown(email, [finding('warning')], false);
+      await vi.advanceTimersByTimeAsync(HEADERS_WAIT_MS);
+      await vi.advanceTimersByTimeAsync(LOADING_HINT_MS);
+      expect(band()).toBe('suspicious');
+      check.shown(email, [finding('danger')], true);
+      // No grey step in between: the rules' verdict of the new findings shows at once.
+      expect(band()).toBe('dangerous');
+      // The new findings need a new run; the model is there now.
+      modelReady = async () => true;
+      loaded?.(true);
+      await vi.advanceTimersByTimeAsync(STABLE_MS);
+      expect(band()).toBe('dangerous');
+      await answer(verdict('dangerous', 'Delete it.'));
+      expect(text('advice')).toBe('Delete it.');
+
+      // A slow run: shown again after 6 s, the rules' verdict still comes 10 s after the first.
+      const other = { ...email, subject: 'Slow' };
+      await show(other, [finding('warning')]);
+      await vi.advanceTimersByTimeAsync(6_000 - STABLE_MS);
+      check.shown(other, [finding('warning')], true);
+      await vi.advanceTimersByTimeAsync(VERDICT_WAIT_MS - 6_000);
+      expect(band()).toBe('suspicious');
+    });
+
     it('stay grey when they found nothing: only the AI may make it green', async () => {
       await show(email, []);
       await vi.advanceTimersByTimeAsync(2 * VERDICT_WAIT_MS);

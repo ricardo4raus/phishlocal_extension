@@ -84,6 +84,12 @@ const ownAddresses = (email: Email): ReadonlySet<string> =>
       .map((address) => address.toLowerCase()),
   );
 
+/**
+ * Which email a band is for, across the times Gmail sends it again (with headers, re-rendered):
+ * the rules' findings may change in between, the sender and subject do not.
+ */
+const emailOf = (email: Email): string => JSON.stringify([email.sender.address, email.subject]);
+
 /** The sender's domain is confirmed by the receiving server (DMARC pass). */
 const senderConfirmed = (email: Email): boolean => email.headers?.auth?.dmarc === 'pass';
 
@@ -300,6 +306,11 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
   /** Shows the rules' verdict of a check that takes long (VERDICT_WAIT_MS). */
   let revealTimer: ReturnType<typeof setTimeout> | undefined;
   /**
+   * The email whose band waits for the AI: since when, and whether the rules' verdict already
+   * shows. Cleared when the band shows an answer or nothing.
+   */
+  let pendingFor: { email: string; since: number; revealed: boolean } | undefined;
+  /**
    * Recent AI answers by request key. An email shown again (Gmail renders it anew, or the user
    * goes back to it) gets its answer at once instead of a new run and a grey light. Only in
    * memory: closing the panel forgets them.
@@ -353,6 +364,13 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
    */
   function showPending(request: Request, line: string): void {
     clearTimeout(revealTimer);
+    // Gmail sends the same email again (with its headers, or re-rendered): its wait goes on, and
+    // a verdict already shown stays, so the band does not turn grey again.
+    const email = emailOf(request.email);
+    const now = performance.now();
+    if (!pendingFor || pendingFor.email !== email) {
+      pendingFor = { email, since: now, revealed: false };
+    }
     elements.verdict.hidden = false;
     setState('pending');
     set(elements.overall, WORD.pending);
@@ -364,9 +382,16 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     elements.stop.hidden = false;
     set(elements.detail, '');
     const { id, findings } = request;
-    revealTimer = setTimeout(() => {
-      if (id === shownId) revealRules(findings);
-    }, VERDICT_WAIT_MS);
+    if (pendingFor.revealed) {
+      revealRules(findings);
+      return;
+    }
+    revealTimer = setTimeout(
+      () => {
+        if (id === shownId) revealRules(findings);
+      },
+      Math.max(0, VERDICT_WAIT_MS - (now - pendingFor.since)),
+    );
   }
 
   /**
@@ -378,6 +403,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     clearTimeout(revealTimer);
     const risk = rulesRisk(findings);
     if (elements.verdict.dataset.risk !== 'pending' || risk === 'safe') return;
+    if (pendingFor) pendingFor.revealed = true;
     setState(risk);
     set(elements.overall, WORD[risk]);
     set(elements.advice, ADVICE[risk]);
@@ -392,6 +418,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     const risk = rulesRisk(request.findings);
     const state: BandState = risk === 'safe' ? 'unchecked' : risk;
     clearTimeout(revealTimer);
+    pendingFor = undefined;
     elements.verdict.hidden = false;
     setState(state);
     set(elements.overall, WORD[state]);
@@ -412,6 +439,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     const { verdict } = result;
     const judged = judge(verdict, request.findings, request.email, m.judge.theAi);
     clearTimeout(revealTimer);
+    pendingFor = undefined;
     elements.verdict.hidden = false;
     setState(judged.overall);
     set(elements.overall, WORD[judged.overall]);
@@ -648,6 +676,7 @@ export function createAiCheck(elements: AiElements, deps: AiCheckDeps): AiCheck 
     hidden() {
       clearTimeout(timer);
       clearTimeout(revealTimer);
+      pendingFor = undefined;
       last = undefined;
       shownId++;
       waiting = undefined;
