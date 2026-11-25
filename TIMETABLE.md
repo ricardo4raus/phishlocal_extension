@@ -72,7 +72,9 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
       users, daily limits in Firestore (done Sun 22.11., PR #29: deployed to europe-west6, deep
       check tested in Chrome with a release build; Gemini API spend cap 5 CHF a month, 4 CHF of
       Gemini credit, auto-reload off)
-- [ ] Tue 24.11. – Collect test emails (phishing samples + normal emails; private only, no company data)
+- [x] Tue 24.11. – Collect test emails (phishing samples + normal emails; private only, no company data)
+      (done Tue 24.11: 53 emails outside the repo, 23 phishing and 30 real, all six languages;
+      rules-only dry run and a 4-email AI dry run; PR #39 fixed the verdict flicker and the pill)
 - [ ] Wed 25.11. – Test and tune prompt/thresholds; note results
 - [ ] Thu 26.11. – Fix bugs; test in a fresh Chrome profile and the cloud-only path
 
