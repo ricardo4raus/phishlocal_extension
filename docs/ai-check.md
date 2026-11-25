@@ -112,10 +112,12 @@ are its input and its lower limit.
      a payment, a reply with information, pressure); an empty subject or technical content alone
      is no sign; reasons never name SPF, DKIM or DMARC.
 5. **Traffic light:** the verdict is shown as a block above the email details, with a colour, a
-   symbol and a word per level (green ✓, yellow !, red ✕). Until the AI has answered, the rules'
-   verdict shows, except that "no red flags" stays grey ("Checking…"): the AI may still raise it,
-   and nobody should act on an early "safe". Without a model, the rules' verdict stands, green
-   included. If the AI check was meant to run and failed (timeout, error, unreadable answer), the
+   symbol and a word per level (green ✓, yellow !, red ✕). Until the AI has answered, the light
+   is grey ("Checking…"), so a normal check (about 5 s) shows one verdict without a colour change;
+   the red flags list shows the rules' findings meanwhile. A check that takes longer than 10 s, or
+   waits for Chrome to load the model, shows the rules' verdict while it goes on; "no red flags"
+   stays grey even then: nobody should act on an early "safe". Without a model, the rules'
+   verdict stands, green included. If the AI check was meant to run and failed (timeout, error, unreadable answer), the
    light still shows the rules' verdict, but the verdict line says "rule checks only: the AI check
    failed" and the reason is shown in bold: the rules alone miss a well-written scam without
    known tricks. Only the verdict line is a live region for screen readers; the status line with its

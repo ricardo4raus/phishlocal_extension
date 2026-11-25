@@ -8,7 +8,7 @@ import type { AiCheckResult } from '../../src/ai';
 import { RISKS, type Risk, ruleRisk } from '../../src/ai/verdict';
 import type { Email } from '../../src/email';
 import type { Finding } from '../../src/rules';
-import { type AiCheck, createAiCheck } from '../../src/sidepanel/ai-view';
+import { type AiCheck, createAiCheck, VERDICT_WAIT_MS } from '../../src/sidepanel/ai-view';
 import { forEachCase, MONKEY_TIMEOUT_MS, type Rng } from './random';
 
 vi.setConfig({ testTimeout: MONKEY_TIMEOUT_MS });
@@ -89,6 +89,8 @@ let trace: string[];
 let shown: Shown | undefined;
 /** In the end phase the model behaves: everything answers, so the panel must come to rest. */
 let calm: boolean;
+/** When the shown email last got its "Checking…" band (show or recheck). */
+let shownAt = 0;
 let check: AiCheck;
 
 const get = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
@@ -212,9 +214,22 @@ function checkPanelOnce(): void {
     confirmedClean && !['pending', 'safe', 'unchecked'].includes(risk),
     'raised a confirmed sender',
   ).toBe(false);
-  if (risk === 'pending' || risk === 'unchecked') {
-    // Grey only while the rules found nothing.
+  const status = get('status').textContent ?? '';
+  if (risk === 'unchecked') {
+    // "Not checked by AI" is grey only while the rules found nothing.
     expect(rules).toBe('safe');
+  } else if (risk === 'pending') {
+    // "Checking…" hides rule findings only while a normal check runs: not while Chrome loads
+    // the model, and not past VERDICT_WAIT_MS.
+    if (rules !== 'safe') {
+      expect(status, 'grey with rule findings while nothing runs').toMatch(
+        /running|starting|waiting/i,
+      );
+      expect(status, 'grey with rule findings while the model loads').not.toMatch(/loading/i);
+      expect(performance.now() - shownAt, 'grey with rule findings for too long').toBeLessThan(
+        VERDICT_WAIT_MS,
+      );
+    }
   } else {
     expect(RISKS).toContain(risk);
     expect(LEVEL[risk as Risk], 'the verdict is never below the rules').toBeGreaterThanOrEqual(
@@ -283,6 +298,7 @@ describe('monkey: AI check view', () => {
           trace.push(
             `show ${shown.email.subject} rules ${shown.findings ? ruleRisk(shown.findings) : 'failed'}${final ? '' : ' (headers to come)'}`,
           );
+          shownAt = performance.now();
           check.shown(shown.email, shown.findings, final);
         } else if (action === 'hide') {
           trace.push('hide');
@@ -290,6 +306,7 @@ describe('monkey: AI check view', () => {
           check.hidden();
         } else if (action === 'recheck') {
           trace.push('recheck');
+          shownAt = performance.now();
           check.recheck();
         } else if (action === 'stop') {
           // A user can click only what is on screen.
@@ -299,7 +316,9 @@ describe('monkey: AI check view', () => {
           }
         }
         const ms =
-          action === 'wait' ? rng.pick([0, 100, 499, 500, 1_000, 3_000, 61_000, 63_000]) : 0;
+          action === 'wait'
+            ? rng.pick([0, 100, 499, 500, 1_000, 3_000, 9_999, 10_000, 61_000, 63_000])
+            : 0;
         if (ms) trace.push(`wait ${ms} ms`);
         await vi.advanceTimersByTimeAsync(ms);
         checkPanel();
@@ -308,6 +327,7 @@ describe('monkey: AI check view', () => {
       // The model behaves from now on: the shown email must get a final answer, and nothing may
       // keep running (no ticker, no timer) once everything has ended.
       calm = true;
+      shownAt = performance.now();
       if (shown) check.recheck();
       await vi.advanceTimersByTimeAsync(1_000_000);
       checkPanel();
