@@ -108,7 +108,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - Result UI (rebuilt 22 Nov 2026, PRs #22 to #27, spec `docs/ui-design.md`): the verdict band
   (`data-risk` on `#verdict`: `pending`, `safe`, `suspicious`, `dangerous`, `unchecked`) shows a
   word, one hedged line, the AI's reasons, the advice and a footer ("Checked on this device" or
-  "Basic checks only"). Grey "Checking…" until the AI answers; grey "No red flags found / Not
+  "Basic checks only"). Grey "Checking…" until the AI answers, also with rule findings (their verdict shows after
+  10 s or while Chrome loads the model, PR #39); grey "No red flags found / Not
   checked by AI" when the AI gave no answer: never green without an AI answer. Red flags are rows
   with a plain-word title per rule (`TITLES` in `src/sidepanel/findings-view.ts`), links show the
   real domain, a shortened URL (`src/sidepanel/link-display.ts`) and a badge when a finding names

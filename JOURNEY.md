@@ -177,6 +177,13 @@ _Current state, updated as features land._
   account, and Google closed all four at once without a reason in the console. Only the billing
   support chat named it: a first prepayment of 25 CHF was pending. Then the Gemini API needed a
   second, separate prepayment of its own.
+- **A test set without leaking it:** tuning needs real emails with a known right answer, but real
+  emails hold personal data and must never reach the public repo. The mailbox had almost no
+  phishing (spam and trash were empty for the mail connector), so most phishing comes from a
+  public corpus, and Italian and Portuguese, which neither source had, from made-up emails.
+- **Two messages that contradicted each other:** in the first dry run after a Chrome restart,
+  the band said the AI was loading for over two minutes while the pill said "ready", and with
+  rule findings the band changed colour twice within seconds.
 
 ## What we learned
 
@@ -341,6 +348,15 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
 - `chrome.sidePanel.open()` may only be called in response to a user gesture. Waiting for another
   API in the click handler first (e.g. to find the window) risks losing it, so the page looks the
   window up beforehand.
+- A mail connector that hands an email to an AI as text cannot save it byte for byte: writing
+  the file means typing it out again, and invisible characters or a capital I in `googIe` may
+  not survive. IMAP with Gmail's own message ID (`X-GM-MSGID`) and `BODY.PEEK[]` fetches the
+  exact bytes, read-only, and the password never passes through the AI.
+- The rules alone already decide part of the result: any rule warning is the verdict's lower
+  limit, so a strict rule makes false alarms the AI cannot take back. The rules-only dry run
+  shows them before any prompt tuning.
+- A state shown in two places goes out of sync when only one code path sets it: the pill was
+  set by the warm-up only, while every later check could wait minutes for a new model load.
 
 ## Accomplishments we're proud of
 
@@ -1106,3 +1122,34 @@ _To fill in near the submission._
   United Kingdom and Portuguese got Portugal (our texts are European Portuguese). The flags are
   small SVG files shown as CSS backgrounds: flag emoji do not show on Windows. The menu is
   Chrome's own popover, placed with CSS anchor positioning, so closing it needs no code.
+
+### Tue 24 Nov 2026
+
+- Test set for the tuning (task of the day), kept outside the repo because the emails are real:
+  53 emails, each with the expected verdict written down before PhishLocal saw it.
+  - 30 from the developer's own mailbox: 1 phishing (an own phishing simulation with a
+    lookalike `googIe` link), 19 real emails that look scary (security alerts, verification
+    codes, parcel notices, password resets, a shop that sends from a gmail.com address) and 10
+    plain ones (invoices, receipts, newsletters with pressure words), in de, en, fr and es. The
+    AI searched the mailbox through the mail connector, seeing senders and subjects only; a small
+    read-only IMAP script, run by the developer with an app password deleted afterwards,
+    exported the chosen ones byte for byte.
+  - 16 phishing emails from the Nazario phishing corpus 2025 (CC-BY-4.0, by Jose Nazario),
+    picked by a script that saw only counts, subjects and sender domains: password expiry,
+    mailbox full, fake PayPal in German, a fake fine in Spanish, quarantine in French, DocuSign,
+    delivery, invoices.
+  - 8 made-up emails in Italian and Portuguese (6 phishing, 2 harmless), with invented brands
+    and `.example` domains: neither source had these languages.
+- Rules-only dry run over all 53 (no AI): every email parses. The rules alone give 6 false
+  alarms among the 30 real emails (Reply-To to a support domain, tracking redirects that look
+  like link-text mismatches, one international domain), and any rule warning is a floor the AI
+  cannot lower. They miss 10 of the 23 phishing emails, which the AI then has to find.
+- AI dry run with 4 emails in Chrome: all 4 right (lookalike phishing and the Italian fake bank
+  dangerous, the real Google alert and the gmail.com shop safe), 4.1 to 5.4 s each once the
+  model was loaded; the first load after a Chrome restart took minutes again.
+- That dry run found two UI faults, fixed in PR #39: the band now stays grey ("Checking…") until
+  the AI answers, also with rule findings, instead of showing the rules' colour first and the
+  AI's a few seconds later; the rules' verdict shows early only after 10 s or while Chrome loads
+  the model. The pill now says "loading" whenever a check waits for the model. A second review
+  found that Gmail sending the same email again restarted the wait and flashed the band grey;
+  the wait now belongs to the email.
