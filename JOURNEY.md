@@ -1127,9 +1127,9 @@ _To fill in near the submission._
 
 - Test set for the tuning (task of the day), kept outside the repo because the emails are real:
   53 emails, each with the expected verdict written down before PhishLocal saw it.
-  - 30 from the developer's own mailbox: 1 phishing (an own phishing simulation with a
+  - 29 from the developer's own mailbox: 1 phishing (an own phishing simulation with a
     lookalike `googIe` link), 19 real emails that look scary (security alerts, verification
-    codes, parcel notices, password resets, a shop that sends from a gmail.com address) and 10
+    codes, parcel notices, password resets, a shop that sends from a gmail.com address) and 9
     plain ones (invoices, receipts, newsletters with pressure words), in de, en, fr and es. The
     AI searched the mailbox through the mail connector, seeing senders and subjects only; a small
     read-only IMAP script, run by the developer with an app password deleted afterwards,
