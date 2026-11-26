@@ -189,7 +189,10 @@ are its input and its lower limit.
 7. **Language:** the panel's language (`language` in `src/i18n`: the user's choice under
    Settings, else Chrome's language, else English), whatever the language of the email: the
    prompt says, for example, "Write the reasons and the advice in German, also when the email is
-   in another language." So a result reads in one language. Each answer language gets its own
+   in another language. Address the reader with "du"." The form of address is the panel's
+   (`ADDRESS_FORMS` in `src/ai/prompt.ts`: du, vous, tú, tu, você); without it both models wrote
+   "Sie" next to a panel that says "du" (26 Nov 2026). So a result reads in one language and one
+   voice. Each answer language gets its own
    on-device model with exactly that output language. Gemini Nano marks Italian and Portuguese
    experimental (measured 17 Nov 2026; supported are de, en, es, fr, ja), so the panel says so
    and recommends the deep check. The rules' own messages and the system prompt stay English.
