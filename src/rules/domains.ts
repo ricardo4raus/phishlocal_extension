@@ -79,8 +79,8 @@ export function forwardTarget(url: URL): URL | undefined {
 }
 
 /**
- * The web address in a link's path, e.g. `https://capital.com` in
- * `…awstrack.me/L0/https:%2F%2Fcapital.com/1/…`. Only for services that really redirect there
+ * The web address in a link's path, e.g. `https://shop.example` in
+ * `…awstrack.me/L0/https:%2F%2Fshop.example/1/…`. Only for services that really redirect there
  * (`forwardsByPath`): any other site could put a trusted name in its path.
  */
 export function pathTarget(url: URL): URL | undefined {

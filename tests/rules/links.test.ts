@@ -100,7 +100,7 @@ describe('linksLeaveSender', () => {
 
   it('lets a confirmed platform that sends for shops link to the shop', () => {
     const stripe: Email = {
-      ...mail('invoice@stripe.com', 'https://railway.example/billing'),
+      ...mail('invoice@stripe.com', 'https://shop.example/billing'),
       headers: { replyTo: [], auth: { server: 'mx.google.com', dkim: [], dmarc: 'pass' } },
     };
     expect(linksLeaveSender(stripe)).toBe(false);

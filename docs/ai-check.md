@@ -95,8 +95,8 @@ are its input and its lower limit.
      company: only its own domain counts); a confirmed platform that sends for shops
      (Stripe, Shopify) stays with any link. On the test set (53 emails, AI answers of one run
      replayed offline with the new rules): phishing found 18 → 22 of 23, false alarms 6 → 2 of 30. Still missed: phishing that links only to its own confirmed domain. Still false alarms:
-     a company linking to an unrelated-looking domain of its own (`swls.ch` for Swisslos), and
-     Railway's own click tracker (see `docs/rules.md`).
+     a company linking to an unrelated-looking domain of its own (a short form of the company's name), and
+     a company's own click tracker under another ending (see `docs/rules.md`).
    - **Sent to yourself** (22 Nov 2026): when the headers have no `Authentication-Results` at
      all and the sender is the mailbox the email was delivered to (topmost `Delivered-To`, else
      the only `To`), the email went from the user's own address to themselves. The AI gets only

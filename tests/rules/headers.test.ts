@@ -27,7 +27,7 @@ const rules = (mail: Email): string[] =>
 
 describe('checkHeaders', () => {
   it('calls a Reply-To to the shop a note when a confirmed platform sends for it', () => {
-    const shop = { name: '', address: 'billing@railway.example' };
+    const shop = { name: '', address: 'billing@shop.example' };
     expect(rules(email({ replyTo: [shop] }, 'invoice@stripe.com'))).toEqual([
       'reply-to-mismatch:info',
     ]);

@@ -61,17 +61,17 @@ catch known tricks.
   its final target: the text is compared with it, and the final target gets the IP,
   international-letter and lookalike checks too. Up to 20 parameters per link are read.
 - **Click trackers with the target in the path:** Amazon SES (`awstrack.me`) writes the target
-  into the link's path (`…awstrack.me/L0/https:%2F%2Fcapital.com/1/…`) and redirects there, so
+  into the link's path (`…awstrack.me/L0/https:%2F%2Fshop.example/1/…`) and redirects there, so
   that target counts like a forwarding parameter's. Only for listed services
   (`PATH_FORWARD_DOMAINS` in `services.ts`): any other site could put a trusted name in its path.
-- **The confirmed sender's own sites** (26 Nov 2026): a mismatch is only a note when the sender
-  is confirmed (DMARC pass), the text names exactly the sender's domain, and the link goes to the
-  same name with another ending (DPD's email from `dpd.ch` says `www.dpd.ch` and links to
-  `www.dpd.com`). Only the real sender can name its own domain in a confirmed email. A link
-  through the sender's own click tracker under another ending (Railway: text `railway.com`,
-  link `link.railway.app`, sender `railway.app`) stays a warning: a confirmed attacker domain
-  `dpd.co` with text `dpd.ch` and a link to itself looks exactly the same. Never for a free email
-  provider (`FREE_MAIL_DOMAINS`): from gmail.com, anyone is a confirmed sender.
+- **The confirmed sender's own sites** (26 Nov 2026): a mismatch is only a note when the sender is
+  confirmed (DMARC pass), the text names exactly the sender's domain, and the link goes to the same
+  name with another ending (a parcel service's email from `parcel.ch` says `www.parcel.ch` and links
+  to `www.parcel.com`). Only the real sender can name its own domain in a confirmed email. A link
+  through the sender's own click tracker under another ending (text `shop.example`, link
+  `link.shop.test`, sender `shop.test`) stays a warning: a confirmed attacker domain `parcel.co`
+  with text `parcel.ch` and a link to itself looks exactly the same. Never for a free email provider
+  (`FREE_MAIL_DOMAINS`): from gmail.com, anyone is a confirmed sender.
 - **International letters** count only in a real domain: a broken link such as `https://”` (a
   typographic quote as the whole address) turns into `xn--ivg`, which no browser opens.
 - **Redirect services** (`c.gle`, `t.co`, `bit.ly`, `tinyurl.com`, `ow.ly`, `lnkd.in`, Outlook
