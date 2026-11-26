@@ -10,8 +10,50 @@ as a fallback.
 > Your emails never leave your browser. PhishLocal uses on-device AI to spot phishing, explain
 > every red flag, and work offline, with a cloud only as fallback.
 
-Built for the Firebase #BuildHybridAI hackathon. **Status:** work in progress. The AI check of
-an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
+Built for the Firebase #BuildHybridAI hackathon. **Status:** feature complete; testing and polish
+until the submission (see [`TIMETABLE.md`](TIMETABLE.md)).
+
+## Try it (for judges)
+
+You need no Firebase project and no build: the release build works with PhishLocal's own
+Firebase project.
+
+**Requirements** (Chrome's, for Gemini Nano;
+[details](https://developer.chrome.com/docs/ai/get-started)): Chrome 139 or newer on Windows
+10/11, macOS 13 or newer, Linux or a Chromebook Plus; a GPU with more than 4 GB of video memory,
+or 16 GB of RAM and 4 CPU cores; 22 GB of free disk space for the model download. Without Gemini
+Nano, PhishLocal still shows the rule checks and offers the cloud deep check.
+
+1. **Download** `phishlocal-<version>.zip` from the
+   [latest release](https://github.com/ricardo4raus/phishlocal_extension/releases/latest) and
+   unzip it.
+2. **Enable Gemini Nano:** open `chrome://flags/#prompt-api-for-gemini-nano`, set it to
+   "Enabled Multilingual", and restart Chrome.
+3. **Load the extension:** open `chrome://extensions`, turn on "Developer mode" (top right),
+   click "Load unpacked" and choose the unzipped folder. A welcome page opens.
+4. **Open the side panel:** click the PhishLocal icon in the toolbar (pin it under the puzzle
+   icon first). If the panel shows "Set up on-device AI", click "Download now" (about 4 GB, once).
+   The first model load after a Chrome restart can take a few minutes on some machines; the
+   panel shows the rule checks meanwhile, and the AI verdict appears by itself.
+5. **Check an email:**
+   - **In Gmail:** open Gmail on the web in the same tab and open any email. PhishLocal checks it
+     at once, with the sender checks from Gmail's "Show original" page. If Gmail was open before
+     the install, reload the Gmail tab.
+   - **Without phishing at hand:** open "Check another email" at the bottom of the panel, choose
+     a made-up sample under "Or load a made-up sample" and click "Load". The samples include a
+     forged sender and an email that tries to talk the AI into "safe".
+   - **From any other mail app:** paste the email, or its raw source, into "Check another email".
+6. **Read the result:** the verdict at the top (safe, suspicious, dangerous) with the AI's
+   reasons, then every red flag in plain words and every link with its real target. The footer
+   says where the check ran ("Checked on this device").
+7. **Try the cloud deep check (optional):** click "Deep check in the cloud…". The panel shows
+   what the privacy filter removed on the device and, under "Show what will be sent", the exact
+   data. Nothing leaves the browser until you click "Send to the cloud". The deep check allows 10
+   checks per day per browser profile.
+8. **Other languages:** the flag button at the top switches the panel and the AI's answers
+   between English, German, French, Spanish, Italian and Portuguese.
+
+To build it yourself with your own Firebase project, see [Setup](#setup).
 
 ## What it does today
 
@@ -25,8 +67,8 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   target. Its headers (SPF, DKIM, DMARC, Reply-To) are loaded in the background from Gmail's own
   "Show original" page. When the panel is closed, nothing is read. Nothing leaves the browser.
 - **Paste an email** from any other mail app ("Check another email" at the bottom of the panel).
-  Links keep their real targets from the copied formatting. Development and judges builds also
-  offer five made-up sample emails.
+  Links keep their real targets from the copied formatting. Five made-up sample emails are there
+  too, for a try without phishing at hand.
 - **Sender checks from the headers:** for Gmail automatically; for other mail apps, paste the
   raw source ("View source") and PhishLocal also reads the headers: whether SPF, DKIM and DMARC passed, and where
   replies go. A forged sender whose domain says "not from us" (DMARC failed) is flagged as
@@ -42,7 +84,8 @@ an email comes next; see [`TIMETABLE.md`](TIMETABLE.md).
   are its lower limit, so an email that talks the AI into "safe" still shows as dangerous. How it
   works and how it resists prompt injection: [`docs/ai-check.md`](docs/ai-check.md).
 - **Traffic light at the top:** green, yellow or red, each with its own symbol and word. It stays
-  grey ("Checking…") until the AI has answered, unless the rules already found a warning.
+  grey ("Checking…") until the AI has answered. When the rules found a red flag and the AI takes
+  longer than 10 s, or Chrome is still loading the model, the rules' verdict shows meanwhile.
 - **Links at a glance:** every link shows where it really goes (the domain in bold, also the final
   target of a forwarding link), a shortened URL (the full one as tooltip) and its text. Links
   behind a red flag are marked, and each red flag names its links ("link 2").
