@@ -1191,3 +1191,11 @@ _To fill in near the submission._
   secret (the token server signs App Check tokens), so it can be a GitHub release. Its daily
   limits and the Gemini spend cap keep the cost capped.
 - The five made-up samples now show in every build: a judge's inbox may have no phishing.
+- Fresh-Chrome test of the release zip (a second Chrome with its own data folder, so no flags,
+  no model and no login): the welcome page opened, the rules-only result and the cloud deep
+  check worked without any debug token (6.6 s, through the token server). Chrome 157 offered
+  the Gemini Nano download without a flag, and the flag in our README no longer exists, so the
+  judges' instructions drop it. Download 18 minutes; then a sample in 5.1 s on the device, a
+  Gmail email with the sender checks in 4.1 s, and the language switch worked.
+- Found there: both models wrote "Sie" in German while the panel says "du". The prompt now
+  names the panel's form of address per language.
