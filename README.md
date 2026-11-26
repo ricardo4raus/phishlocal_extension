@@ -48,8 +48,8 @@ Nano, PhishLocal still shows the rule checks and offers the cloud deep check.
    says where the check ran ("Checked on this device").
 7. **Try the cloud deep check (optional):** click "Deep check in the cloud…". The panel shows
    what the privacy filter removed on the device and, under "Show what will be sent", the exact
-   data. Nothing leaves the browser until you click "Send to the cloud". The deep check allows 10
-   checks per day per browser profile.
+   data. Nothing leaves the browser until you click "Send to the cloud". The cloud has daily
+   limits to keep its cost capped; when one is reached, the panel says so and nothing is sent.
 8. **Other languages:** the flag button at the top switches the panel and the AI's answers
    between English, German, French, Spanish, Italian and Portuguese.
 
