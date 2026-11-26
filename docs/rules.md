@@ -60,11 +60,12 @@ catch known tricks.
   `https://www.google.com/url?q=https://evil.example/` (an "open redirect"), is checked against
   its final target: the text is compared with it, and the final target gets the IP,
   international-letter and lookalike checks too. Up to 20 parameters per link are read.
-- **Click trackers with the target in the path:** Amazon SES (`awstrack.me`) writes the target
-  into the link's path (`…awstrack.me/L0/https:%2F%2Fshop.example/1/…`) and redirects there, so
-  that target counts like a forwarding parameter's: the text is compared with it, it gets the
-  IP, international-letter and lookalike checks, and the link list names it (`forwardOf()`). Only for listed services
-  (`PATH_FORWARD_DOMAINS` in `services.ts`): any other site could put a trusted name in its path.
+- **Click trackers with the target in the path:** Amazon SES (`awstrack.me`) writes the target into
+  the link's path (`…awstrack.me/L0/https:%2F%2Fshop.example/1/…`) and redirects there, so that
+  target counts like a forwarding parameter's: the text is compared with it, it gets the IP,
+  international-letter and lookalike checks, and the link list names it (`forwardOf()`). Only for
+  listed services (`PATH_FORWARD_DOMAINS` in `services.ts`): any other site could put a trusted name
+  in its path.
 - **The confirmed sender's own sites** (26 Nov 2026): a mismatch is only a note when the sender is
   confirmed (DMARC pass), the text names exactly the sender's domain, and the link goes to the same
   name with another ending (a parcel service's email from `parcel.ch` says `www.parcel.ch` and links
