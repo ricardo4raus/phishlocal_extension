@@ -594,6 +594,20 @@ describe('AI check view', () => {
     expect(get('verdict').dataset.risk).toBe('safe');
   });
 
+  it("keeps the AI's concern for a confirmed sender whose links lead elsewhere", async () => {
+    // Phishing from an attacker's own domain passes DMARC; its link goes to a shortener.
+    await show({
+      ...email,
+      links: [{ text: 'Renew now', href: 'https://shorturl.at/abc' }],
+      headers: {
+        replyTo: [],
+        auth: { server: 'mx.google.com', spf: 'pass', dkim: [{ result: 'pass' }], dmarc: 'pass' },
+      },
+    });
+    await answer(verdict('dangerous', 'Delete it.'));
+    expect(get('verdict').dataset.risk).toBe('dangerous');
+  });
+
   it("passes the language and the email's own addresses, and marks experimental languages", async () => {
     const calls: [string, ReadonlySet<string>][] = [];
     check = create({

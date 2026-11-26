@@ -86,6 +86,16 @@ are its input and its lower limit.
      (decided 22 Nov 2026, after a green "Looks safe" over five suspicious reasons). Gemini Nano rated a real Google security notice as suspicious
      even with the sender checks in its data. Phishing from a confirmed but hijacked sender
      almost always trips the rules too (requests for identity, log-in or card details, payments).
+     **Only while the links stay with the sender** (26 Nov 2026, `linksLeaveSender()` in
+     `src/rules/links.ts`): phishing from an attacker's own, confirmed domain mostly links to a
+     shortener, a free hosting site or a hijacked, unrelated site. A link counts as staying when
+     its final target is the sender's company (same domain, same name with another ending, or a
+     domain containing the sender's name: `dpdgroup.com` for `dpd.ch`), a social network or app
+     store, or a mailing service's click tracking; a confirmed platform that sends for shops
+     (Stripe, Shopify) stays with any link. On the test set (53 emails, AI answers of one run
+     replayed offline with the new rules): phishing found 18 → 22 of 23, false alarms 6 → 2 of 30. Still missed: phishing that links only to its own confirmed domain. Still false alarms:
+     a company linking to an unrelated-looking domain of its own (`swls.ch` for Swisslos), and
+     Railway's own click tracker (see `docs/rules.md`).
    - **Sent to yourself** (22 Nov 2026): when the headers have no `Authentication-Results` at
      all and the sender is the mailbox the email was delivered to (topmost `Delivered-To`, else
      the only `To`), the email went from the user's own address to themselves. The AI gets only
