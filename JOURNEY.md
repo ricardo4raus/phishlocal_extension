@@ -184,6 +184,11 @@ _Current state, updated as features land._
 - **Two messages that contradicted each other:** in the first dry run after a Chrome restart,
   the band said the AI was loading for over two minutes while the pill said "ready", and with
   rule findings the band changed colour twice within seconds.
+- **A safety exception that hid phishing:** the rule "a confirmed sender cannot be raised by the
+  AI alone" was added against Gemini Nano's false alarms on real security notices. The test set
+  showed its cost: it also hid 5 of 23 phishing emails, because attackers' own domains pass
+  DMARC too. Removing it would have brought back 21 false alarms; narrowing it to senders whose
+  links stay with them kept almost all of its benefit.
 
 ## What we learned
 
@@ -357,6 +362,12 @@ dmarc=pass`. Only the topmost one, which the receiving server adds last, can be 
   shows them before any prompt tuning.
 - A state shown in two places goes out of sync when only one code path sets it: the pill was
   set by the warm-up only, while every later check could wait minutes for a new model load.
+- Measure tuning offline when the slow part is fixed: the AI's answers from one batch run,
+  replayed against changed rules and verdict logic, predicted the next Chrome run exactly
+  (22/23 phishing found, 2/30 false alarms), and every rule change took seconds to measure
+  instead of minutes of model load and a full run.
+- A confirmed sender is only as trustworthy as the domain: from a free email provider, anyone is
+  a confirmed sender, so company-based exceptions must never apply to gmail.com and the like.
 
 ## Accomplishments we're proud of
 
@@ -1153,3 +1164,24 @@ _To fill in near the submission._
   the model. The pill now says "loading" whenever a check waits for the model. A second review
   found that Gmail sending the same email again restarted the wait and flashed the band grey;
   the wait now belongs to the email.
+
+### Wed 25 / Thu 26 Nov 2026
+
+- Batch check (PR #41): a dev-only page that runs a folder of raw emails through the same steps
+  as a pasted email in the panel, with Gemini Nano on the device, and saves the results as CSV.
+  Release builds do not contain it (a dist test checks that). Checking 53 emails by hand would
+  have taken over an hour per run.
+- Run 1 over the 53 test emails: 18 of 23 phishing found, 6 false alarms among 30 real emails,
+  median 5.1 s per email; the first model load after the Chrome restart took 498 s.
+- Causes: all 6 false alarms were rule warnings, four of them rule errors (a broken link read as
+  an international domain, a click tracker's target in the link's path, a company's own sites
+  under another ending, platforms that send for shops). All 5 misses were the confirmed-sender
+  exception: Nano had flagged every one of them.
+- Tuning (PR #42), measured offline first by replaying run 1's AI answers against the changed
+  rules: four rule fixes, and the exception now applies only while the links stay with the
+  sender. A review found that free email senders could abuse both company checks; they now
+  count only their own domain.
+- Run 2 in Chrome confirmed the replay: 22 of 23 phishing found, 2 false alarms, median 4.5 s.
+  Two emails got no AI answer (one time limit, one answer that did not end), most likely the
+  model's randomness. Totals in `docs/test-results.md`; the prompt itself stays unchanged.
+- Docs and tests name no service from the private mailbox: examples use made-up domains.
