@@ -78,6 +78,25 @@ export function forwardTarget(url: URL): URL | undefined {
   return undefined;
 }
 
+/**
+ * The web address in a link's path, e.g. `https://capital.com` in
+ * `…awstrack.me/L0/https:%2F%2Fcapital.com/1/…`. Only for services that really redirect there
+ * (`forwardsByPath`): any other site could put a trusted name in its path.
+ */
+export function pathTarget(url: URL): URL | undefined {
+  for (const segment of url.pathname.split('/').slice(0, MAX_PARAMETERS)) {
+    let decoded = segment;
+    try {
+      decoded = decodeURIComponent(segment);
+    } catch {
+      continue;
+    }
+    const target = /^https?:\/\//i.test(decoded) ? parseUrl(decoded) : undefined;
+    if (target) return target;
+  }
+  return undefined;
+}
+
 /** The host of an email address (`a@bank.example`), if it has a registrable domain. */
 export function hostOfAddress(address: string): Host | undefined {
   const at = address.lastIndexOf('@');

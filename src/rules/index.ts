@@ -4,7 +4,7 @@
  */
 import type { Email } from '../email';
 import { checkHeaders } from './headers';
-import { checkLinks } from './links';
+import { checkLinks, linkSender } from './links';
 import { checkLookalikes } from './lookalike';
 import { checkPhrases } from './phrases';
 import { checkSender } from './sender';
@@ -34,7 +34,7 @@ export function checkEmail(email: Email): Finding[] {
     ...checkHeaders(email),
     ...checkSender(email.sender),
     ...checkLookalikes(email),
-    ...checkLinks(email.links),
+    ...checkLinks(email.links, linkSender(email)),
     ...checkPhrases(email),
     ...checkUnicode(email),
   ];

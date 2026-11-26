@@ -7,6 +7,7 @@
  */
 import type { Email } from '../email';
 import { companyRelation } from './company';
+import { SENDING_PLATFORMS } from './services';
 import { hostOf, hostOfAddress } from './domains';
 import { clip, type Finding } from './types';
 
@@ -19,6 +20,11 @@ export function checkHeaders(email: Email): Finding[] {
   const from = hostOfAddress(email.sender.address);
 
   // Replies to another company: the classic way to collect answers to a fake invoice.
+  // A confirmed platform that sends for shops (Stripe, Shopify) sets Reply-To to the shop.
+  const platform =
+    headers.auth?.dmarc === 'pass' &&
+    from?.domain !== undefined &&
+    SENDING_PLATFORMS.has(from.domain);
   for (const reply of headers.replyTo) {
     const host = hostOfAddress(reply.address);
     if (!host?.domain || !from?.domain) continue;
@@ -26,11 +32,13 @@ export function checkHeaders(email: Email): Finding[] {
     if (relation === 'same') continue;
     findings.push({
       rule: 'reply-to-mismatch',
-      severity: relation === 'other' ? 'warning' : 'info',
+      severity: relation === 'other' && !platform ? 'warning' : 'info',
       message:
-        relation === 'other'
-          ? `Replies go to ${host.domain}, not to the sender's domain ${from.domain}.`
-          : `Replies go to ${host.domain}, the sender is ${from.domain} (same name, other ending).`,
+        relation !== 'other'
+          ? `Replies go to ${host.domain}, the sender is ${from.domain} (same name, other ending).`
+          : platform
+            ? `Replies go to ${host.domain}; the email comes from ${from.domain}, which sends for shops and other businesses.`
+            : `Replies go to ${host.domain}, not to the sender's domain ${from.domain}.`,
       evidence: [clip(reply.address)],
     });
   }

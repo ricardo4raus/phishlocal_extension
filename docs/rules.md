@@ -60,6 +60,19 @@ catch known tricks.
   `https://www.google.com/url?q=https://evil.example/` (an "open redirect"), is checked against
   its final target: the text is compared with it, and the final target gets the IP,
   international-letter and lookalike checks too. Up to 20 parameters per link are read.
+- **Click trackers with the target in the path:** Amazon SES (`awstrack.me`) writes the target
+  into the link's path (`…awstrack.me/L0/https:%2F%2Fcapital.com/1/…`) and redirects there, so
+  that target counts like a forwarding parameter's. Only for listed services
+  (`PATH_FORWARD_DOMAINS` in `services.ts`): any other site could put a trusted name in its path.
+- **The confirmed sender's own sites** (26 Nov 2026): a mismatch is only a note when the sender
+  is confirmed (DMARC pass), the text names exactly the sender's domain, and the link goes to the
+  same name with another ending (DPD's email from `dpd.ch` says `www.dpd.ch` and links to
+  `www.dpd.com`). Only the real sender can name its own domain in a confirmed email. A link
+  through the sender's own click tracker under another ending (Railway: text `railway.com`,
+  link `link.railway.app`, sender `railway.app`) stays a warning: a confirmed attacker domain
+  `dpd.co` with text `dpd.ch` and a link to itself looks exactly the same.
+- **International letters** count only in a real domain: a broken link such as `https://”` (a
+  typographic quote as the whole address) turns into `xn--ivg`, which no browser opens.
 - **Redirect services** (`c.gle`, `t.co`, `bit.ly`, `tinyurl.com`, `ow.ly`, `lnkd.in`, Outlook
   safe links, Proofpoint URL Defense; listed in [`services.ts`](../src/rules/services.ts)) hide
   the final target. Real emails use them (Google's own
@@ -126,6 +139,9 @@ checks count only if the topmost result comes from Gmail's own server, `mx.googl
   `ARC-Authentication-Results`. A raw email from a provider that adds no results of its own can
   still contain a fake one: the messages always name the server that checked.
 - One passing check is enough when there is no DMARC result: forwarding breaks SPF but keeps DKIM.
+- **Platforms that send for shops** (`SENDING_PLATFORMS` in `services.ts`: Stripe, Shopify): a
+  confirmed email from them with Reply-To to the shop is normal, so `reply-to-mismatch` is a
+  note (26 Nov 2026: a Stripe receipt and a Shopify order confirmation were false alarms).
 - Return-Path is shown but not checked: mailing services almost always use their own bounce
   domain, so a rule would mostly produce noise.
 - Two domains of one listed brand, or of the same registrable domain, count as the same company,

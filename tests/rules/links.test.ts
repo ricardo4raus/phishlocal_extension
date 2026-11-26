@@ -1,9 +1,103 @@
 import { describe, expect, it } from 'vitest';
-import { checkLinks } from '../../src/rules/links';
+import type { Email } from '../../src/email';
+import { hostOf } from '../../src/rules/domains';
+import { checkLinks, linksLeaveSender } from '../../src/rules/links';
 import { MAX_EVIDENCE_CHARS } from '../../src/rules/types';
 
 const rulesFor = (text: string, href: string): string[] =>
   checkLinks([{ text, href }]).map((finding) => `${finding.rule}:${finding.severity}`);
+
+describe('checkLinks: what real emails do (test set, 26 Nov 2026)', () => {
+  const confirmed = { host: hostOf('shop.example'), confirmed: true };
+  const ids = (text: string, href: string, sender = confirmed): string[] =>
+    checkLinks([{ text, href }], sender).map((finding) => `${finding.rule}:${finding.severity}`);
+
+  it('does not take a broken link for an international domain', () => {
+    // A typographic quote as the whole href: the URL parser makes it `xn--ivg`.
+    expect(rulesFor('Help', 'https://\u201d')).toEqual([]);
+    expect(rulesFor('Shop', 'https://xn--shp-sna.example/')).toEqual([
+      'international-domain:warning',
+    ]);
+  });
+
+  it("reads the target in a click tracker's path (Amazon SES), and only there", () => {
+    const tracked = 'https://p42.r.eu-west-1.awstrack.me/L0/https:%2F%2Fshop.example%2Fsale/1/abc';
+    expect(rulesFor('shop.example', tracked)).toEqual([]);
+    expect(rulesFor('bank.example', tracked)).toEqual(['link-text-mismatch:warning']);
+    // Any other site could put a trusted name in its path.
+    expect(rulesFor('shop.example', 'https://evil.example/L0/https:%2F%2Fshop.example/')).toEqual([
+      'link-text-mismatch:warning',
+    ]);
+  });
+
+  it("calls the confirmed sender's own sites with another ending a note", () => {
+    expect(ids('www.shop.example', 'https://www.shop.test/ch')).toEqual([
+      'link-text-mismatch:info',
+    ]);
+    // Not confirmed, or the text names another domain than the sender's: still a warning.
+    expect(
+      ids('www.shop.example', 'https://www.shop.test/', { ...confirmed, confirmed: false }),
+    ).toEqual(['link-text-mismatch:warning']);
+    expect(ids('www.shop.test', 'https://www.shop.example/')).toEqual([
+      'link-text-mismatch:warning',
+    ]);
+    expect(ids('www.shop.example', 'https://evil.example/')).toEqual([
+      'link-text-mismatch:warning',
+    ]);
+  });
+});
+
+/** An email from `address` with these links. */
+const mail = (address: string, ...hrefs: string[]): Email => ({
+  sender: { name: '', address },
+  subject: '',
+  bodyText: '',
+  links: hrefs.map((href) => ({ text: 'x', href })),
+  truncated: false,
+});
+
+describe('linksLeaveSender', () => {
+  it("stays with links to the sender's company and to common sites", () => {
+    expect(linksLeaveSender(mail('a@dpd.example'))).toBe(false);
+    expect(
+      linksLeaveSender(
+        mail(
+          'a@dpd.example',
+          'https://www.dpd.example/x',
+          'https://www.dpd.test/', // same name, other ending
+          'https://www.dpdgroup.example/', // contains the name
+          'https://www.instagram.com/dpd',
+          'https://x.us1.list-manage.com/track?u=1', // a mailing service
+          'mailto:help@else.example',
+          'https://\u201d', // broken: no domain
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it('leaves with a link to an unrelated site, a shortener or a free hosting site', () => {
+    expect(
+      linksLeaveSender(mail('a@dpd.example', 'https://dpd.example/', 'https://evil.example/')),
+    ).toBe(true);
+    expect(linksLeaveSender(mail('a@dpd.example', 'https://shorturl.at/abc'))).toBe(true);
+    expect(linksLeaveSender(mail('a@dpd.example', 'https://sites.google.com/view/x'))).toBe(true);
+  });
+
+  it('follows a forwarding link to its target', () => {
+    expect(
+      linksLeaveSender(mail('a@dpd.example', 'https://www.google.com/url?q=https://evil.example/')),
+    ).toBe(true);
+  });
+
+  it('lets a confirmed platform that sends for shops link to the shop', () => {
+    const stripe: Email = {
+      ...mail('invoice@stripe.com', 'https://railway.example/billing'),
+      headers: { replyTo: [], auth: { server: 'mx.google.com', dkim: [], dmarc: 'pass' } },
+    };
+    expect(linksLeaveSender(stripe)).toBe(false);
+    expect(linksLeaveSender({ ...stripe, headers: { replyTo: [] } })).toBe(true);
+  });
+});
 
 describe('checkLinks', () => {
   it.each([
