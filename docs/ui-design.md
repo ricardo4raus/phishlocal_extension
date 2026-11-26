@@ -33,7 +33,7 @@ from this file are listed under "Mockup review" at the end.
   without a known end show elapsed time and a moving bar, never a made-up percentage. One moving
   indicator per wait, not three.
 - **Never colour alone.** Every state has a colour, a symbol and a word. Green fills only the
-  verdict "Looks safe"; elsewhere it is at most the small dot of a ready model. A confirmed sender
+  verdict "Looks safe" and the pill of a ready model (with the word "ready"). A confirmed sender
   and other good news use neutral colours and words.
 - **True claims only.** Every sentence in the panel must hold in every build: no "nothing is
   saved" while a setting is saved, no "Looks safe" when only the rules looked.
@@ -81,10 +81,9 @@ Every part is its own component (see "How to build it"); the page sets the spaci
 
 1. **Top bar** (always): logo (a 56 px PNG of `design/logo.svg`, shown at 28 px as a CSS
    background), "PhishLocal", and the model pill on the right. The pill is
-   grey in every state, with a green dot when ready (decided 22 Nov 2026: users read a grey dot
-   as "not ready"; a soft green halo swells and fades around it every 2.4 s, the dot keeps its
-   colour, and it stands still with reduced motion), a grey spinner while loading or downloading, a small "!" when the AI is
-   missing. Words: "On-device AI ready", "On-device AI loading" (with
+   grey with a grey spinner while loading or downloading and a small "!" when the AI is missing;
+   when the AI is ready, the whole pill turns green (safe tint and text) without a mark (decided
+   26 Nov 2026, replacing a grey pill with a glowing green dot). Words: "On-device AI ready", "On-device AI loading" (with
    the elapsed time, which gives way on panels under 360 px), "On-device AI 42%", "AI not set
    up" (not downloaded), "AI not available", "AI not loaded".
 2. **Model banner** (only when the model needs the user): not downloaded (text and the
@@ -113,7 +112,7 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    who confirmed the sender, the band's footer where it was checked.
 5. **Verdict band:** a tinted head with a round symbol, the verdict word and one status line;
    then the reasons (up to five, as the AI gives them), the "What to do" box (a gold bulb that
-   glows like the ready dot), and the footer
+   glows), and the footer
    "Checked on this device · Done in 1.4 s". While the AI check runs, the footer shows the
    elapsed time and the Stop button instead.
 6. **Red flags** (heading "Red flags (3)", the count as text): one list in one card, one row per
@@ -313,12 +312,11 @@ Portugal (our Portuguese is European Portuguese), without coats of arms.
 | pending        | `#6B737D` | `#8A939D` | "Checking…" and "unchecked" symbol    |
 | pending-tint   | `#F0F2F5` | `#232930` | "Checking…" band, loading pill, chips |
 | tip            | `#D19A00` | `#F5C542` | advice bulb (decorative)              |
-| ready          | `#16A34A` | `#4CC27A` | ready dot (decorative)                |
 
 Every pair is measured before use (text 4.5:1, symbols and meaningful borders 3:1); the
-measurements live as comments in `style.css`. The bulb and the ready dot are decorative marks next to the words
-that carry their meaning, so in light mode they may be lighter than 3:1 (gold-yellow and bright
-green, decided 22 Nov 2026).
+measurements live as comments in `style.css`. The bulb is a decorative mark next to the words that
+carry its meaning, so in light mode it may be lighter than 3:1 (gold-yellow, decided 22 Nov 2026).
+The ready pill uses the safe tint, text and border.
 
 ## How to build it
 
@@ -385,6 +383,8 @@ green, decided 22 Nov 2026).
     than 1 s, Chrome is loading it again (it can unload it while the panel is open), and the pill
     says "On-device AI loading" until the model is there. It used to say "ready" from the warm-up
     on, while the band said the AI was loading.
+13. **A ready model turns the pill green** (26 Nov 2026): the whole pill, not a dot inside a
+    grey one. The word "ready" says what is green, so it is not read as a verdict.
 
 ## Mockup review
 
@@ -398,7 +398,7 @@ What the mockup shows and this file changes, so that nobody builds from the mock
   outlined block; here one outlined button.
 - `Consent` shows the data at once and has no preparing, sending or result state; it also drops
   the email strip.
-- The header pill is green; here grey with a green dot when ready.
+- The header pill is green when ready; here too since 26 Nov 2026, grey in the other states.
 - `Main` says "Nothing is saved"; here "No email is saved".
 - Missing in the mockup: Suspicious, "No red flags found (not checked by AI)", model unavailable,
   model not downloaded, the paste form, the cloud result.

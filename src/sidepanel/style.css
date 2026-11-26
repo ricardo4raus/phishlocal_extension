@@ -48,12 +48,10 @@
     --color-safe-tint: #eaf6ee;
     --color-safe-border: #bfe3cb;
     --color-on-safe: #ffffff;
-    /* The advice bulb and the ready dot: decorative marks, each next to the words that carry
-       their meaning (the advice; "ready"), so they may be lighter than the 3:1 for symbols:
-       gold-yellow 2.3:1 and green 2.9:1 on surface-2 (a small dot looks darker than the
-       verdict's large circle, so it is a shade lighter than --color-safe) (decided 22 Nov 2026). */
+    /* The advice bulb: a decorative mark next to the words that carry its meaning (the advice),
+       so it may be lighter than the 3:1 for symbols: gold-yellow 2.3:1 on surface-2 (decided
+       22 Nov 2026). */
     --color-tip: #d19a00;
-    --color-ready: #16a34a;
     /* Pending (grey): white on fill 4.8, fill on surface 4.8. */
     --color-pending: #6b737d;
     --color-pending-text: #4a525c;
@@ -126,9 +124,8 @@
       --color-safe-tint: #17321f;
       --color-safe-border: #2a5236;
       --color-on-safe: #111418;
-      /* The advice bulb: 9.1:1 on surface-2; the ready dot: the safe green, 6.5:1. */
+      /* The advice bulb: 9.1:1 on surface-2. */
       --color-tip: #f5c542;
-      --color-ready: #4cc27a;
       --color-pending: #8a939d;
       --color-pending-text: #b0b8c1;
       --color-pending-tint: #232930;
@@ -370,17 +367,6 @@
     }
   }
 
-  @keyframes glow {
-    0%,
-    100% {
-      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ready) 0%, transparent);
-    }
-
-    50% {
-      box-shadow: 0 0 4px 2px color-mix(in srgb, var(--color-ready) 60%, transparent);
-    }
-  }
-
   /* ---- Top bar: logo, name, model pill. ---- */
   .topbar {
     display: flex;
@@ -408,8 +394,9 @@
     background: url(./logo.png) center / contain no-repeat;
   }
 
-  /* The model pill: grey, the word says the state and the mark repeats it; only the ready dot is
-     green (--color-ready: 2.9:1 light, a decorative mark next to "ready"; 6.5:1 dark). */
+  /* The model pill: grey while the AI is not ready, the word says the state and the mark repeats
+     it. Ready: the whole pill turns green, without a mark (decided 26 Nov 2026; the safe text on
+     the safe tint: 7.3:1 light, more in dark). */
   .pill {
     display: inline-flex;
     align-items: center;
@@ -440,10 +427,14 @@
     background: var(--color-text-2);
   }
 
-  /* The ready dot glows: a soft green halo swells and fades, the dot itself keeps its colour. */
+  .pill[data-state='ready'] {
+    background: var(--color-safe-tint);
+    color: var(--color-safe-text);
+    box-shadow: inset 0 0 0 1px var(--color-safe-border);
+  }
+
   .pill[data-state='ready'] .pill__mark {
-    background: var(--color-ready);
-    animation: glow 2.4s ease-in-out infinite;
+    display: none;
   }
 
   .pill[data-state='loading'] .pill__mark,
@@ -1080,7 +1071,7 @@
     background: var(--color-surface-2);
   }
 
-  /* The bulb glows like the ready dot: a warm halo behind it fades in and out, the bulb keeps
+  /* The bulb glows: a warm halo behind it fades in and out, the bulb keeps
      its colour. The halo is the wrapper's own layer, because a mask would cut anything drawn
      on the icon itself. */
   .band__bulb {
