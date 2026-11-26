@@ -64,6 +64,28 @@ export const SENDING_PLATFORMS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Free email providers: anyone can send from them, and DMARC confirms only the provider. A
+ * sender there is no company, so no other domain counts as its own (`linksLeaveSender`).
+ */
+export const FREE_MAIL_DOMAINS: ReadonlySet<string> = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'outlook.com',
+  'hotmail.com',
+  'live.com',
+  'yahoo.com',
+  'icloud.com',
+  'aol.com',
+  'proton.me',
+  'protonmail.com',
+  'gmx.ch',
+  'gmx.de',
+  'gmx.net',
+  'web.de',
+  'bluewin.ch',
+]);
+
+/**
  * Domains that real emails of any sender link to besides their own: social networks, app
  * stores, and the click tracking of mailing services. A link there does not take the reader
  * away from the sender in a way that matters for phishing.

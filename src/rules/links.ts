@@ -13,7 +13,13 @@ import {
   parseUrl,
   pathTarget,
 } from './domains';
-import { forwardsByPath, isCommonLinkDomain, isRedirect, SENDING_PLATFORMS } from './services';
+import {
+  FREE_MAIL_DOMAINS,
+  forwardsByPath,
+  isCommonLinkDomain,
+  isRedirect,
+  SENDING_PLATFORMS,
+} from './services';
 import { clip, type Finding } from './types';
 
 /** Who sent the email, for the link rules: its domain, and whether DMARC confirmed it. */
@@ -41,11 +47,14 @@ function finalTarget(url: URL): { host: Host; final?: Host } {
 /**
  * The text names the confirmed sender's own domain, and the link goes to the same name with
  * another ending (dpd.ch says www.dpd.ch, links to www.dpd.com): a company's own sites. Only the
- * real sender can name its own domain in a confirmed email, so a fake cannot use this.
+ * real sender can name its own domain in a confirmed email, so a fake cannot use this (except
+ * from a free email provider, where anyone is a confirmed sender).
  */
 const ownSites = (promised: Host, target: Host, sender: LinkSender): boolean =>
   sender.confirmed &&
   sender.host !== undefined &&
+  // A free email provider confirms only itself, not who wrote the email.
+  !FREE_MAIL_DOMAINS.has(sender.host.domain ?? '') &&
   companyRelation(promised, sender.host) === 'same' &&
   companyRelation(target, sender.host) !== 'other';
 
@@ -171,9 +180,12 @@ const MIN_NAME_LENGTH = 3;
 /**
  * The domain belongs to the sender's company: the same domain, the same name with another
  * ending, or a domain that contains the sender's name (dpd.ch and dpdgroup.com, dhl.com and
- * logistics.dhl). An attacker gains nothing from this: a link to its own domain stays too.
+ * logistics.dhl). An attacker gains nothing from this: a link to its own domain stays too. A
+ * free email provider is no company: only its own domain counts (else `gmail-verify.example`
+ * would belong to a gmail.com sender).
  */
 function ownCompany(target: Host, sender: Host): boolean {
+  if (FREE_MAIL_DOMAINS.has(sender.domain ?? '')) return target.domain === sender.domain;
   if (companyRelation(target, sender) !== 'other') return true;
   const name = sender.label ?? '';
   return name.length >= MIN_NAME_LENGTH && (target.domain ?? '').includes(name);

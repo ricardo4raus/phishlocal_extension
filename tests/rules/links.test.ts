@@ -44,6 +44,9 @@ describe('checkLinks: what real emails do (test set, 26 Nov 2026)', () => {
     expect(ids('www.shop.example', 'https://evil.example/')).toEqual([
       'link-text-mismatch:warning',
     ]);
+    // From a free email provider, anyone is a confirmed sender.
+    const gmail = { host: hostOf('gmail.com'), confirmed: true };
+    expect(ids('gmail.com', 'https://gmail.co/', gmail)).toEqual(['link-text-mismatch:warning']);
   });
 });
 
@@ -81,6 +84,12 @@ describe('linksLeaveSender', () => {
     ).toBe(true);
     expect(linksLeaveSender(mail('a@dpd.example', 'https://shorturl.at/abc'))).toBe(true);
     expect(linksLeaveSender(mail('a@dpd.example', 'https://sites.google.com/view/x'))).toBe(true);
+  });
+
+  it('gives a free email sender no company: only its own domain stays', () => {
+    expect(linksLeaveSender(mail('someone@gmail.com', 'https://gmail-verify.example/'))).toBe(true);
+    expect(linksLeaveSender(mail('someone@gmail.com', 'https://gmail.test/'))).toBe(true);
+    expect(linksLeaveSender(mail('someone@gmail.com', 'https://mail.gmail.com/'))).toBe(false);
   });
 
   it('follows a forwarding link to its target', () => {
