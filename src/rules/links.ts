@@ -195,8 +195,8 @@ function ownCompany(target: Host, sender: Host): boolean {
  * True if a web link takes the reader away from the sender: its final target is neither the
  * sender's company nor a site that real emails of any sender link to (social networks, app
  * stores, mailing services' click tracking). Phishing from an attacker's own, confirmed domain
- * mostly links to a shortener, a free hosting site or a hijacked, unrelated site. Links without
- * a domain (broken ones; an IP address has its own rule) do not count. A confirmed platform that
+ * mostly links to a shortener, a free hosting site or a hijacked, unrelated site. Hosts without
+ * a domain (broken links; an IP address has its own rule) do not count. A confirmed platform that
  * sends for shops (Stripe, Shopify) links to the shop's own site: its links do not count either.
  */
 export function linksLeaveSender(email: Email): boolean {
@@ -208,9 +208,12 @@ export function linksLeaveSender(email: Email): boolean {
   return email.links.slice(0, MAX_LINKS_CHECKED).some((link) => {
     const url = parseUrl(link.href);
     if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) return false;
+    // Every hop must stay: the link's own host and the target it forwards to. Else any site
+    // could add `?ref=https://<sender's domain>` and count as the sender's own.
     const { host, final } = finalTarget(url);
-    const target = final ?? host;
-    if (!target.domain) return false;
-    return !ownCompany(target, sender) && !isCommonLinkDomain(target.domain);
+    return [host, ...(final ? [final] : [])].some(
+      (hop) =>
+        hop.domain !== undefined && !ownCompany(hop, sender) && !isCommonLinkDomain(hop.domain),
+    );
   });
 }

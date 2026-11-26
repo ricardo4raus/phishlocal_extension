@@ -92,6 +92,20 @@ describe('linksLeaveSender', () => {
     expect(linksLeaveSender(mail('someone@gmail.com', 'https://mail.gmail.com/'))).toBe(false);
   });
 
+  it("does not let another site stay by naming the sender's domain in a parameter", () => {
+    expect(
+      linksLeaveSender(
+        mail('a@dpd.example', 'https://evil.example/login?ref=https://dpd.example/'),
+      ),
+    ).toBe(true);
+    // A mailing service's click tracking that forwards to the sender stays.
+    expect(
+      linksLeaveSender(
+        mail('a@dpd.example', 'https://x.list-manage.com/track?u=https://dpd.example/'),
+      ),
+    ).toBe(false);
+  });
+
   it('follows a forwarding link to its target', () => {
     expect(
       linksLeaveSender(mail('a@dpd.example', 'https://www.google.com/url?q=https://evil.example/')),

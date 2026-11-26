@@ -93,7 +93,10 @@ are its input and its lower limit.
      domain containing the sender's name: `dpdgroup.com` for `dpd.ch`), a social network or app
      store, or a mailing service's click tracking (a free email provider such as gmail.com is no
      company: only its own domain counts); a confirmed platform that sends for shops
-     (Stripe, Shopify) stays with any link. On the test set (53 emails, AI answers of one run
+     (Stripe, Shopify) stays with any link. Every hop of a link must stay: its own host and the
+     target it forwards to, so no site can stay by naming the sender's domain in a parameter. Limit: a
+     mailing service's click tracking that hides its target (no readable URL in the link) counts
+     as staying, because real newsletters need it. On the test set (53 emails, AI answers of one run
      replayed offline with the new rules): phishing found 18 → 22 of 23, false alarms 6 → 2 of 30. Still missed: phishing that links only to its own confirmed domain. Still false alarms:
      a company linking to an unrelated-looking domain of its own (a short form of the company's name), and
      a company's own click tracker under another ending (see `docs/rules.md`).
