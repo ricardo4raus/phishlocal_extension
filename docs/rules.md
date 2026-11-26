@@ -70,7 +70,8 @@ catch known tricks.
   `www.dpd.com`). Only the real sender can name its own domain in a confirmed email. A link
   through the sender's own click tracker under another ending (Railway: text `railway.com`,
   link `link.railway.app`, sender `railway.app`) stays a warning: a confirmed attacker domain
-  `dpd.co` with text `dpd.ch` and a link to itself looks exactly the same.
+  `dpd.co` with text `dpd.ch` and a link to itself looks exactly the same. Never for a free email
+  provider (`FREE_MAIL_DOMAINS`): from gmail.com, anyone is a confirmed sender.
 - **International letters** count only in a real domain: a broken link such as `https://”` (a
   typographic quote as the whole address) turns into `xn--ivg`, which no browser opens.
 - **Redirect services** (`c.gle`, `t.co`, `bit.ly`, `tinyurl.com`, `ow.ly`, `lnkd.in`, Outlook

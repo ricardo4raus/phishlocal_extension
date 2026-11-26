@@ -91,7 +91,8 @@ are its input and its lower limit.
      shortener, a free hosting site or a hijacked, unrelated site. A link counts as staying when
      its final target is the sender's company (same domain, same name with another ending, or a
      domain containing the sender's name: `dpdgroup.com` for `dpd.ch`), a social network or app
-     store, or a mailing service's click tracking; a confirmed platform that sends for shops
+     store, or a mailing service's click tracking (a free email provider such as gmail.com is no
+     company: only its own domain counts); a confirmed platform that sends for shops
      (Stripe, Shopify) stays with any link. On the test set (53 emails, AI answers of one run
      replayed offline with the new rules): phishing found 18 → 22 of 23, false alarms 6 → 2 of 30. Still missed: phishing that links only to its own confirmed domain. Still false alarms:
      a company linking to an unrelated-looking domain of its own (`swls.ch` for Swisslos), and
