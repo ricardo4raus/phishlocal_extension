@@ -8,6 +8,7 @@
  */
 import { existsSync, statSync } from 'node:fs';
 import { basename, extname, join, posix } from 'node:path';
+import { type DefaultTreeAdapterTypes, parse } from 'parse5';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { WELCOME_PAGE } from '../src/welcome/open';
 import {
@@ -160,6 +161,20 @@ describe('dist/ build output', () => {
   it('has no dev-only batch check page (dev builds only, vite.config.ts)', () => {
     expect([...relFiles].filter((file) => file.startsWith('src/dev/'))).toEqual([]);
     expect(files.some((file) => readText(file).includes('Batch check (dev only)'))).toBe(false);
+  });
+
+  it('shows the made-up samples (release builds too, for judges without phishing at hand)', () => {
+    const html = readText(join(distDir, 'src/sidepanel/index.html'));
+    const stack: DefaultTreeAdapterTypes.ChildNode[] = [...parse(html).childNodes];
+    let row: DefaultTreeAdapterTypes.Element | undefined;
+    while (!row && stack.length > 0) {
+      const node = stack.pop();
+      if (!node || !('tagName' in node)) continue;
+      if (node.attrs.some((attr) => attr.name === 'id' && attr.value === 'sample-row')) row = node;
+      stack.push(...('content' in node ? node.content.childNodes : node.childNodes));
+    }
+    expect(row).toBeDefined();
+    expect(row?.attrs.map((attr) => attr.name)).not.toContain('hidden');
   });
 
   it('has the same permissions and content-script matches as the source manifest', () => {
