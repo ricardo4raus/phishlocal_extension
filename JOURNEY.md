@@ -1185,3 +1185,9 @@ _To fill in near the submission._
   Two emails got no AI answer (one time limit, one answer that did not end), most likely the
   model's randomness. Totals in `docs/test-results.md`; the prompt itself stays unchanged.
 - Docs and tests name no service from the private mailbox: examples use made-up domains.
+- README: a "Try it (for judges)" section at the top: requirements, the release zip, the Gemini
+  Nano flag, loading the extension, checking an email in Gmail or with a sample, and the cloud
+  deep check. Judges get a public release build instead of the private judges build: it holds no
+  secret (the token server signs App Check tokens), so it can be a GitHub release. Its daily
+  limits and the Gemini spend cap keep the cost capped.
+- The five made-up samples now show in every build: a judge's inbox may have no phishing.

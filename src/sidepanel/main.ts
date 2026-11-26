@@ -48,13 +48,10 @@ byId<HTMLElement>('app').removeAttribute('inert');
 byId<HTMLElement>('panel-starting').remove();
 
 /* ------------------------------------------------------------------------------------------------
- * Parts that exist only in some builds: the sample row (dev and judges builds, for the demo and
- * for judges without phishing in their inbox) and the developer tools (dev builds).
+ * Parts that exist only in dev builds: the developer tools.
  * --------------------------------------------------------------------------------------------- */
 
 const isDev = import.meta.env.DEV;
-const isJudges = import.meta.env.MODE === 'judges';
-byId<HTMLElement>('sample-row').hidden = !(isDev || isJudges);
 byId<HTMLElement>('dev-tools').hidden = !isDev;
 
 /* ------------------------------------------------------------------------------------------------
@@ -429,7 +426,7 @@ const watch = watchActiveTab({
 readEmailButton.addEventListener('click', () => watch.scan());
 
 /* ------------------------------------------------------------------------------------------------
- * Paste: the fallback for other mail apps (and, in dev and judges builds, the samples).
+ * Paste: the fallback for other mail apps, and the made-up samples.
  * --------------------------------------------------------------------------------------------- */
 
 const pasteFold = byId<HTMLDetailsElement>('paste');

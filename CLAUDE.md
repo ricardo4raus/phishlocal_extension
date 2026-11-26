@@ -34,7 +34,7 @@ explain every red flag, and work offline, with a cloud only as fallback."
   On-device answers in it and pt are experimental (Chrome: "output quality cannot be
   guaranteed"; supported are de, en, es, fr, ja; measured 17 Nov 2026), and the panel says so.
   No translation has been checked by a native speaker yet. English on purpose: dev-only parts
-  (developer tools, sample labels), the rules' own messages (the prompt and the English panel
+  (developer tools), the sample labels, the rules' own messages (the prompt and the English panel
   use them; other languages show the dictionary's sentence per rule), and an SDK's own error
   message in tier 3 (our engine reasons go through `localDetail()`).
 - Privacy is the core selling point: never send email content anywhere without explicit user
@@ -134,7 +134,8 @@ explain every red flag, and work offline, with a cloud only as fallback."
 - "Check another email" (a fold; "Paste an email" on the empty state opens it) is the fallback
   when Gmail can't be read (and for the demo): the pasted text, plus the links from the
   clipboard's HTML (parsed with parse5, a runtime dependency since 16 Nov 2026), and five made-up
-  sample emails (`src/paste/samples.ts`), shown in dev and judges builds only. The test prompt
+  sample emails (`src/paste/samples.ts`), shown in every build since 26 Nov 2026 (judges test a
+  public release build, decided 26 Nov 2026). The test prompt
   ("Developer tools") shows in dev builds only. Both paths show the email the same way.
 - Rule checks (`src/rules/`, `checkEmail()`): pure functions, no DOM, no network. They flag
   dangerous links, link text vs real target (also behind forwarding parameters), lookalike

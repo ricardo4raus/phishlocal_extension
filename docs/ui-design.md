@@ -37,8 +37,9 @@ from this file are listed under "Mockup review" at the end.
   and other good news use neutral colours and words.
 - **True claims only.** Every sentence in the panel must hold in every build: no "nothing is
   saved" while a setting is saved, no "Looks safe" when only the rules looked.
-- **Own emails only.** Users check the emails they receive. Sample emails exist only in dev and
-  judges builds (for the demo video and for judges whose inbox has no phishing).
+- **Own emails first.** Users check the emails they receive. The made-up sample emails sit
+  folded under "Check another email" in every build (since 26 Nov 2026: judges test a public
+  release build, and their inbox may have no phishing).
 
 ## States
 
@@ -138,7 +139,7 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    own level when the rules were stricter, "the AI's notes" for a confirmed sender), Notes (the
    `info` findings), Text.
 10. **"Check another email"** (a `<details>` fold): the paste form (From, Subject, Email text,
-    "Use pasted email", "Clear") and, in dev and judges builds only, the sample row. "Paste an
+    "Use pasted email", "Clear") and the sample row. "Paste an
     email" on the empty card opens this fold and focuses the text field.
 11. **Settings** (a `<details>` fold): "Language", a menu with "Automatic (Deutsch)" first
     (Chrome's language, else English) and then each language in its own name (English, Deutsch,
@@ -359,7 +360,8 @@ green, decided 22 Nov 2026).
 1. **The exact data is folded, what was removed is not.** The user sees the chips and the
    "Never sent" line before consenting; the JSON is one click away. `CLAUDE.md`,
    `docs/ai-check.md` and `JOURNEY.md` say so.
-2. **Sample emails** only in dev and judges builds.
+2. **Sample emails** only in dev and judges builds. Changed 26 Nov 2026: in every build, because
+   judges get a public release build.
 3. **One deep check button** on every result, outlined; filled only when recommended.
 4. **Empty heading** "Open an email in Gmail" stays; two more variants for other tabs and
    unreadable emails.
