@@ -402,7 +402,7 @@ export const de: Messages = {
         'Die E-Mail hat sich geändert, also wurden die vorbereiteten Daten verworfen. Nichts wurde gesendet.',
       sending:
         'Die E-Mail hat sich während der Tiefenprüfung geändert: ihre Daten waren gesendet, die Antwort wurde verworfen.',
-      done: 'Die E-Mail hat sich geändert, also wurde das Ergebnis der Tiefenprüfung entfernt.',
+      done: '',
     },
     waitingModel: 'Warte auf die lokale KI…',
     lookingForNames: 'Suche Namen auf diesem Gerät…',
@@ -419,7 +419,6 @@ export const de: Messages = {
     resultWord: (word) => `Tiefenprüfung: ${word}`,
     source: 'In der Cloud geprüft',
     note: (time) => `Cloud (Gemini über Firebase AI Logic). KI kann sich irren. ${time}.`,
-    sentOnce: 'Einmal gesendet, nur für diese Prüfung.',
     checking: 'Wird in der Cloud geprüft…',
     showFailed: 'Das Ergebnis der Tiefenprüfung konnte nicht angezeigt werden.',
     levelChanged:

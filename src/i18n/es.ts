@@ -392,7 +392,7 @@ export const es: Messages = {
       preview: 'El correo cambió, así que se descartaron los datos preparados. No se envió nada.',
       sending:
         'El correo cambió durante la revisión a fondo: sus datos ya se habían enviado, la respuesta se descartó.',
-      done: 'El correo cambió, así que se borró el resultado de la revisión a fondo.',
+      done: '',
     },
     waitingModel: 'Esperando la IA local…',
     lookingForNames: 'Buscando nombres en este dispositivo…',
@@ -409,7 +409,6 @@ export const es: Messages = {
     resultWord: (word) => `Revisión a fondo: ${word}`,
     source: 'Revisado en la nube',
     note: (time) => `Nube (Gemini mediante Firebase AI Logic). La IA puede equivocarse. ${time}.`,
-    sentOnce: 'Enviado una vez, solo para esta revisión.',
     checking: 'Revisando en la nube…',
     showFailed: 'No se pudo mostrar el resultado de la revisión a fondo.',
     levelChanged:

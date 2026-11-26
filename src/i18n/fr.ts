@@ -398,7 +398,7 @@ export const fr: Messages = {
         'L’e-mail a changé, les données préparées ont donc été écartées. Rien n’a été envoyé.',
       sending:
         'L’e-mail a changé pendant l’analyse approfondie : ses données avaient été envoyées, la réponse a été ignorée.',
-      done: 'L’e-mail a changé, le résultat de l’analyse approfondie a donc été effacé.',
+      done: '',
     },
     waitingModel: 'En attente de l’IA locale…',
     lookingForNames: 'Recherche de noms sur cet appareil…',
@@ -415,7 +415,6 @@ export const fr: Messages = {
     resultWord: (word) => `Analyse approfondie : ${word}`,
     source: 'Vérifié dans le cloud',
     note: (time) => `Cloud (Gemini via Firebase AI Logic). L’IA peut se tromper. ${time}.`,
-    sentOnce: 'Envoyé une fois, pour cette analyse seulement.',
     checking: 'Vérification dans le cloud…',
     showFailed: 'Le résultat de l’analyse approfondie n’a pas pu être affiché.',
     levelChanged:

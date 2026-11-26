@@ -389,7 +389,7 @@ export const en = {
       preview: 'The email changed, so the prepared data was discarded. Nothing was sent.',
       sending:
         'The email changed while the deep check ran: its data had been sent, its answer was dropped.',
-      done: 'The email changed, so the deep check result was cleared.',
+      done: '',
     },
     waitingModel: 'Waiting for the on-device AI…',
     lookingForNames: 'Looking for names on this device…',
@@ -406,7 +406,6 @@ export const en = {
     resultWord: (word: string) => `Deep check: ${word}`,
     source: 'Checked in the cloud',
     note: (time: string) => `Cloud (Gemini via Firebase AI Logic). AI can be wrong. ${time}.`,
-    sentOnce: 'Sent once, for this check only.',
     checking: 'Checking in the cloud…',
     showFailed: 'The deep check result could not be shown.',
     levelChanged:

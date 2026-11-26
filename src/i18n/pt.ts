@@ -392,7 +392,7 @@ export const pt: Messages = {
         'O e-mail mudou, por isso os dados preparados foram descartados. Não foi enviado nada.',
       sending:
         'O e-mail mudou durante a verificação aprofundada: os dados dele já tinham sido enviados, a resposta foi descartada.',
-      done: 'O e-mail mudou, por isso o resultado da verificação aprofundada foi apagado.',
+      done: '',
     },
     waitingModel: 'À espera da IA local…',
     lookingForNames: 'A procurar nomes neste dispositivo…',
@@ -410,7 +410,6 @@ export const pt: Messages = {
     resultWord: (word) => `Verificação aprofundada: ${word}`,
     source: 'Verificado na nuvem',
     note: (time) => `Nuvem (Gemini através do Firebase AI Logic). A IA pode errar. ${time}.`,
-    sentOnce: 'Enviado uma vez, só para esta verificação.',
     checking: 'A verificar na nuvem…',
     showFailed: 'Não foi possível mostrar o resultado da verificação aprofundada.',
     levelChanged:

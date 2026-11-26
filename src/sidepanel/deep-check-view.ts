@@ -197,7 +197,9 @@ type Phase = 'idle' | 'preparing' | 'preview' | 'sending' | 'done';
 
 /**
  * What the user is told when the email changes under a deep check, by phase. Gmail also shows
- * the same email again with new details (its headers), so "changed" covers both.
+ * the same email again with new details (its headers), so "changed" covers both. Nothing after a
+ * finished check: its result leaves with its email, and a note under the next email's button
+ * would talk about an email no longer shown (fresh-Chrome test, 26 Nov 2026).
  */
 const CHANGED: Record<Phase, string> = m.deepCheck.changed;
 
@@ -473,7 +475,8 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
         .filter((part) => part !== '')
         .join(' '),
     );
-    set(elements.status, m.deepCheck.sentOnce);
+    // No status: the consent card above already says "Sent once" (fresh-Chrome test, 26 Nov 2026).
+    set(elements.status, '');
     elements.result.focus();
   }
 

@@ -392,7 +392,7 @@ export const it: Messages = {
         'L’email è cambiata, quindi i dati preparati sono stati scartati. Non è stato inviato nulla.',
       sending:
         'L’email è cambiata durante il controllo approfondito: i suoi dati erano stati inviati, la risposta è stata scartata.',
-      done: 'L’email è cambiata, quindi il risultato del controllo approfondito è stato cancellato.',
+      done: '',
     },
     waitingModel: 'In attesa dell’IA locale…',
     lookingForNames: 'Ricerca di nomi su questo dispositivo…',
@@ -410,7 +410,6 @@ export const it: Messages = {
     resultWord: (word) => `Controllo approfondito: ${word}`,
     source: 'Controllata nel cloud',
     note: (time) => `Cloud (Gemini tramite Firebase AI Logic). L’IA può sbagliare. ${time}.`,
-    sentOnce: 'Inviato una volta, solo per questo controllo.',
     checking: 'Controllo nel cloud…',
     showFailed: 'Non è stato possibile mostrare il risultato del controllo approfondito.',
     levelChanged:

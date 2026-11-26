@@ -67,9 +67,9 @@ mockup artboard where one exists.
 | Consent, preview           | `Consent`                                                               | Level cards, chips of what was removed, "Never sent: …", fold "Show what will be sent", Send, Cancel                                                                           |
 | Consent, names unchecked   | –                                                                       | Same, plus the warning "Some names may still be in the text: read it before you send."                                                                                         |
 | Sending                    | –                                                                       | "Checking in the cloud…" with elapsed time and Stop                                                                                                                            |
-| Cloud result               | –                                                                       | A second band "Deep check: Dangerous / Suspicious / Looks safe" with reasons and advice; "Sent once: the data above."                                                          |
+| Cloud result               | –                                                                       | A second band "Deep check: Dangerous / Suspicious / Looks safe" with reasons and advice; the card above it says "Sent once" (no second line)                                   |
 | Cloud failed               | –                                                                       | "The deep check did not work (short reason). The result above still applies."                                                                                                  |
-| Email changed meanwhile    | –                                                                       | The five messages in `deep-check-view.ts` (`CHANGED`), in the consent's status line                                                                                            |
+| Email changed meanwhile    | –                                                                       | The messages in `deep-check-view.ts` (`CHANGED`), in the consent's status line; none after a finished check (its result leaves with its email)                                 |
 | Dark mode                  | `DangerousDark`                                                         | Same words, dark tokens                                                                                                                                                        |
 
 "Basic checks" is the tier-1 name for the rule checks. "AI" is the tier-1 name for the on-device
@@ -176,8 +176,8 @@ without sideways scrolling.
 - **Sending:** "Checking in the cloud…" with the elapsed time and Stop; Send and Cancel are
   gone; the data stays.
 - **Result:** a second band under the card, "Deep check: …" with the cloud's reasons and advice,
-  the footer "Checked in the cloud · Done in 1.9 s", and the status "Sent once, for this check
-  only." How the cloud and the basic checks were combined goes to a "Deep check" row in Email
+  and the footer "Checked in the cloud · Done in 1.9 s"; no status line, since the card's own
+  "Sent once" line stays above (26 Nov 2026: both showed). How the cloud and the basic checks were combined goes to a "Deep check" row in Email
   details. The card stays open with the data as the record; "Back to the result" closes it and
   keeps the result, and the button "Deep check in the cloud…" is available again.
 - **Failure:** "The deep check did not work (short reason). The result above still applies." The
@@ -228,7 +228,6 @@ other languages live in `src/i18n/` and follow the same tiers (no protocol names
 | Privacy levels              | Standard / High; "Names of people"                                                                                 |
 | Data fold                   | Show what will be sent                                                                                             |
 | Cloud send                  | Send to the cloud / Cancel / Stop                                                                                  |
-| After sending               | Sent once, for this check only.                                                                                    |
 | Paste                       | Paste an email (empty card), Check another email (fold), Use pasted email, Clear                                   |
 | Refresh                     | Check the open email again                                                                                         |
 | Privacy points (empty card) | Checked on this device / No email is saved / Cloud only if you ask                                                 |

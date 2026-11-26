@@ -208,7 +208,8 @@ describe('the deep check', () => {
     expect(text('time')).toBe('Done in 2.0 s');
     expect(get('result').dataset.risk).toBe('dangerous');
     expect(text('advice')).toBe('Cloud advice.');
-    expect(text('status')).toBe('Sent once, for this check only.');
+    // The consent card already says "Sent once": no second line (fresh-Chrome test).
+    expect(text('status')).toBe('');
     expect(get('send').hidden).toBe(true);
     expect(document.activeElement).toBe(get('result'));
     // The data stays as the record of what was sent.
@@ -274,6 +275,18 @@ describe('the deep check', () => {
     nameCalls[0]?.resolve(['Anna Muster']);
     await vi.advanceTimersByTimeAsync(0);
     expect(get('preview').hidden).toBe(true);
+  });
+
+  it('leaves no note under the next email after a finished deep check', async () => {
+    // Fresh-Chrome test: "the deep check result was cleared" stayed under the next email's button.
+    check.shown(email, []);
+    await prepare();
+    click('send');
+    runs[0]?.resolve(answer('dangerous'));
+    await vi.waitFor(() => expect(get('result').hidden).toBe(false));
+    check.shown(other, []);
+    expect(get('result').hidden).toBe(true);
+    expect(text('status')).toBe('');
   });
 
   it('says so when the email changes while the data is on its way', async () => {
