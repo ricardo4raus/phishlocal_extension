@@ -26,6 +26,17 @@ const rules = (mail: Email): string[] =>
   checkHeaders(mail).map((finding) => `${finding.rule}:${finding.severity}`);
 
 describe('checkHeaders', () => {
+  it('calls a Reply-To to the shop a note when a confirmed platform sends for it', () => {
+    const shop = { name: '', address: 'billing@shop.example' };
+    expect(rules(email({ replyTo: [shop] }, 'invoice@stripe.com'))).toEqual([
+      'reply-to-mismatch:info',
+    ]);
+    // Not confirmed: still a warning.
+    expect(
+      rules(email({ replyTo: [shop], auth: { ...PASS, dmarc: 'none' } }, 'invoice@stripe.com')),
+    ).toContain('reply-to-mismatch:warning');
+  });
+
   it('has nothing to say without headers or when every check passes', () => {
     expect(rules(email(undefined))).toEqual([]);
     expect(rules(email({}))).toEqual([]);

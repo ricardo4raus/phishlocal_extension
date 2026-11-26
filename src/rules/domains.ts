@@ -7,6 +7,7 @@
  * phishing pages on exactly such shared hosts.
  */
 import { parse } from 'tldts';
+import { forwardsByPath } from './services';
 import { normalizeText } from './words';
 
 export interface Host {
@@ -77,6 +78,33 @@ export function forwardTarget(url: URL): URL | undefined {
   }
   return undefined;
 }
+
+/**
+ * The web address in a link's path, e.g. `https://shop.example` in
+ * `…awstrack.me/L0/https:%2F%2Fshop.example/1/…`. Only for services that really redirect there
+ * (`forwardsByPath`): any other site could put a trusted name in its path.
+ */
+export function pathTarget(url: URL): URL | undefined {
+  for (const segment of url.pathname.split('/').slice(0, MAX_PARAMETERS)) {
+    let decoded = segment;
+    try {
+      decoded = decodeURIComponent(segment);
+    } catch {
+      continue;
+    }
+    const target = /^https?:\/\//i.test(decoded) ? parseUrl(decoded) : undefined;
+    if (target) return target;
+  }
+  return undefined;
+}
+
+/**
+ * Where a link forwards to: the target in a forwarding parameter, or in the path of a
+ * click-tracking service that redirects there (`forwardsByPath`). Every rule and the link list
+ * use this, so a tracked link's target gets the same checks everywhere.
+ */
+export const forwardOf = (url: URL): URL | undefined =>
+  forwardTarget(url) ?? (forwardsByPath(hostOf(url.hostname).domain) ? pathTarget(url) : undefined);
 
 /** The host of an email address (`a@bank.example`), if it has a registrable domain. */
 export function hostOfAddress(address: string): Host | undefined {

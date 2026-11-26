@@ -39,5 +39,74 @@ export const MAILING_SERVICES: ReadonlySet<string> = new Set([
   'exacttarget.com', // Salesforce Marketing Cloud
   'mjt.lu', // Mailjet
   'klclick.com', // Klaviyo
+  'kmail-lists.com', // Klaviyo (subscription pages)
   'rs6.net', // Constant Contact
 ]);
+
+/**
+ * Click-tracking services that put the real target in the link's path, e.g.
+ * `x.r.eu-west-1.awstrack.me/L0/https:%2F%2Fshop.example/…` (Amazon SES). The service itself
+ * redirects there, so that target counts as the link's final target, like a forwarding parameter.
+ */
+const PATH_FORWARD_DOMAINS: ReadonlySet<string> = new Set(['awstrack.me']);
+
+export const forwardsByPath = (domain: string | undefined): boolean =>
+  domain !== undefined && PATH_FORWARD_DOMAINS.has(domain);
+
+/**
+ * Platforms that send emails for their customers' shops and businesses (invoices, order
+ * confirmations), with Reply-To set to the shop. A Reply-To elsewhere is normal for them when
+ * the platform's own domain is confirmed (DMARC pass).
+ */
+export const SENDING_PLATFORMS: ReadonlySet<string> = new Set([
+  'stripe.com', // Stripe invoices and receipts
+  'shopifyemail.com', // Shopify stores
+]);
+
+/**
+ * Free email providers: anyone can send from them, and DMARC confirms only the provider. A
+ * sender there is no company, so no other domain counts as its own (`linksLeaveSender`).
+ */
+export const FREE_MAIL_DOMAINS: ReadonlySet<string> = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'outlook.com',
+  'hotmail.com',
+  'live.com',
+  'yahoo.com',
+  'icloud.com',
+  'aol.com',
+  'proton.me',
+  'protonmail.com',
+  'gmx.ch',
+  'gmx.de',
+  'gmx.net',
+  'web.de',
+  'bluewin.ch',
+]);
+
+/**
+ * Domains that real emails of any sender link to besides their own: social networks, app
+ * stores, and the click tracking of mailing services. A link there does not take the reader
+ * away from the sender in a way that matters for phishing.
+ */
+const COMMON_LINK_DOMAINS: ReadonlySet<string> = new Set([
+  'facebook.com',
+  'instagram.com',
+  'youtube.com',
+  'linkedin.com',
+  'twitter.com',
+  'x.com',
+  'tiktok.com',
+  'xing.com',
+  'pinterest.com',
+  'reddit.com',
+  'apple.com',
+  'appsflyer.com',
+  'huawei.com',
+]);
+
+export const isCommonLinkDomain = (domain: string): boolean =>
+  COMMON_LINK_DOMAINS.has(domain) ||
+  MAILING_SERVICES.has(domain) ||
+  PATH_FORWARD_DOMAINS.has(domain);

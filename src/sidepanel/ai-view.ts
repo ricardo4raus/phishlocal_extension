@@ -15,6 +15,7 @@ import { answerLanguage, buildUserPrompt, EXPERIMENTAL_LANGUAGES, promptData } f
 import { type AiVerdict, overallRisk, type Risk, RISKS, ruleRisk } from '../ai/verdict';
 import type { Email } from '../email';
 import type { Finding } from '../rules';
+import { linksLeaveSender } from '../rules/links';
 import { localDetail, m } from '../i18n';
 import { en } from '../i18n/en';
 import { clock, seconds } from './ui';
@@ -93,6 +94,14 @@ const emailOf = (email: Email): string => JSON.stringify([email.sender.address, 
 /** The sender's domain is confirmed by the receiving server (DMARC pass). */
 const senderConfirmed = (email: Email): boolean => email.headers?.auth?.dmarc === 'pass';
 
+/**
+ * The confirmed-sender exception applies: the sender is confirmed and its links stay with it.
+ * Phishing from an attacker's own domain passes DMARC too; its links then mostly lead elsewhere
+ * (a shortener, a free hosting site, an unrelated domain), and the AI's concern stands.
+ */
+const confirmedAndStays = (email: Email): boolean =>
+  senderConfirmed(email) && !linksLeaveSender(email);
+
 const set = (element: HTMLElement, text: string): void => {
   element.textContent = text;
 };
@@ -124,7 +133,7 @@ export function judge(
   email: Email,
   ai: string,
 ): { overall: Risk; line: string; advice: string; detail: string; reasons: string[] } {
-  const confirmed = senderConfirmed(email);
+  const confirmed = confirmedAndStays(email);
   const toSelf = email.headers?.sentToSelf === true;
   const overall = overallRisk(verdict.risk, rulesRisk(findings), {
     senderConfirmed: confirmed,
