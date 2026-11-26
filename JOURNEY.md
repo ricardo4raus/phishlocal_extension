@@ -1199,3 +1199,6 @@ _To fill in near the submission._
   Gmail email with the sender checks in 4.1 s, and the language switch worked.
 - Found there: both models wrote "Sie" in German while the panel says "du". The prompt now
   names the panel's form of address per language.
+- Also from the test: "Sent once" showed twice after a deep check, and "the deep check result
+  was cleared" stayed under the next email's button; both lines are gone. The model pill now
+  turns green as a whole when the AI is ready, instead of showing a glowing green dot.
