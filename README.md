@@ -27,15 +27,15 @@ Nano, PhishLocal still shows the rule checks and offers the cloud deep check.
 1. **Download** `phishlocal-<version>.zip` from the
    [latest release](https://github.com/ricardo4raus/phishlocal_extension/releases/latest) and
    unzip it.
-2. **Enable Gemini Nano:** open `chrome://flags/#prompt-api-for-gemini-nano`, set it to
-   "Enabled Multilingual", and restart Chrome.
-3. **Load the extension:** open `chrome://extensions`, turn on "Developer mode" (top right),
+2. **Load the extension:** open `chrome://extensions`, turn on "Developer mode" (top right),
    click "Load unpacked" and choose the unzipped folder. A welcome page opens.
-4. **Open the side panel:** click the PhishLocal icon in the toolbar (pin it under the puzzle
-   icon first). If the panel shows "Set up on-device AI", click "Download now" (about 4 GB, once).
-   The first model load after a Chrome restart can take a few minutes on some machines; the
-   panel shows the rule checks meanwhile, and the AI verdict appears by itself.
-5. **Check an email:**
+3. **Open the side panel:** click the PhishLocal icon in the toolbar (pin it under the puzzle
+   icon first). If the panel shows "Set up on-device AI", click "Download now": Chrome downloads
+   Gemini Nano once (about 4 GB; 18 minutes in our test with a fresh Chrome). No Chrome flag is
+   needed (tested with Chrome 157). The rule checks and the samples work while you wait. The
+   first model load after a Chrome restart can take a few minutes on some machines; the AI
+   verdict then appears by itself.
+4. **Check an email:**
    - **In Gmail:** open Gmail on the web in the same tab and open any email. PhishLocal checks it
      at once, with the sender checks from Gmail's "Show original" page. If Gmail was open before
      the install, reload the Gmail tab.
@@ -43,14 +43,14 @@ Nano, PhishLocal still shows the rule checks and offers the cloud deep check.
      a made-up sample under "Or load a made-up sample" and click "Load". The samples include a
      forged sender and an email that tries to talk the AI into "safe".
    - **From any other mail app:** paste the email, or its raw source, into "Check another email".
-6. **Read the result:** the verdict at the top (safe, suspicious, dangerous) with the AI's
+5. **Read the result:** the verdict at the top (safe, suspicious, dangerous) with the AI's
    reasons, then every red flag in plain words and every link with its real target. The footer
    says where the check ran ("Checked on this device").
-7. **Try the cloud deep check (optional):** click "Deep check in the cloud…". The panel shows
+6. **Try the cloud deep check (optional):** click "Deep check in the cloud…". The panel shows
    what the privacy filter removed on the device and, under "Show what will be sent", the exact
    data. Nothing leaves the browser until you click "Send to the cloud". The cloud has daily
    limits to keep its cost capped; when one is reached, the panel says so and nothing is sent.
-8. **Other languages:** the flag button at the top switches the panel and the AI's answers
+7. **Other languages:** the flag button at the top switches the panel and the AI's answers
    between English, German, French, Spanish, Italian and Portuguese.
 
 To build it yourself with your own Firebase project, see [Setup](#setup).
@@ -193,9 +193,10 @@ To build it yourself with your own Firebase project, see [Setup](#setup).
    revoked after judging. That token passes App Check for the whole Firebase project, so share
    the judges build only privately (Devpost links and uploaded files are public).
 
-4. **Enable Gemini Nano:** open `chrome://flags/#prompt-api-for-gemini-nano`, set it to "Enabled
-   Multilingual", and restart Chrome. If the model is not on the device yet, the side panel shows
-   a banner "Set up on-device AI" with a "Download now" button (about 4 GB, once).
+4. **Gemini Nano:** if the model is not on the device yet, the side panel shows a banner "Set up
+   on-device AI" with a "Download now" button (about 4 GB, once). Chrome 157 needs no flag for
+   this; older versions may need `chrome://flags/#prompt-api-for-gemini-nano` set to "Enabled
+   Multilingual".
 5. **Build:** `npm run dev` (development build that rebuilds on changes) or `npm run build`
    (release build). Both write to `dist/`.
 6. **Load the extension:** open `chrome://extensions`, turn on developer mode, click "Load
