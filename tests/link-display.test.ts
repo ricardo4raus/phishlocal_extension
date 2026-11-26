@@ -53,6 +53,10 @@ describe('linkDisplay', () => {
       domain: 'google.com',
       forwardsTo: 'evil.example',
     });
+    // A click tracker with the target in its path (Amazon SES).
+    expect(
+      linkDisplay('https://p4.r.eu-west-1.awstrack.me/L0/https:%2F%2Fevil.example%2Fx/1/abc'),
+    ).toMatchObject({ domain: 'awstrack.me', forwardsTo: 'evil.example' });
     // Forwarding within the same domain is not worth a note.
     expect(linkDisplay('https://a.shop.example/r?u=https://b.shop.example/')).not.toHaveProperty(
       'forwardsTo',

@@ -2,7 +2,7 @@
  * How a link is shown in the side panel: where it really goes, in a form that is quick to read.
  * Pure functions: no DOM, no network.
  */
-import { forwardTarget, hostOf, hostOfAddress, parseUrl } from '../rules/domains';
+import { forwardOf, hostOf, hostOfAddress, parseUrl } from '../rules/domains';
 
 export interface LinkDisplay {
   /**
@@ -48,7 +48,7 @@ export function linkDisplay(href: string): LinkDisplay {
   }
 
   const domain = domainOf(url.hostname);
-  const target = forwardTarget(url);
+  const target = forwardOf(url);
   const forwardsTo = target && domainOf(target.hostname);
   // The part before an "@" (user name, password) is left out: it is the attacker's decoy.
   const rest = `${url.pathname}${url.search}${url.hash}`;

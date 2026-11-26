@@ -5,21 +5,14 @@ import type { Email, EmailLink } from '../email';
 import { companyRelation } from './company';
 import {
   domainsInText,
-  forwardTarget,
+  forwardOf,
   type Host,
   hostOf,
   hostOfAddress,
   isInternational,
   parseUrl,
-  pathTarget,
 } from './domains';
-import {
-  FREE_MAIL_DOMAINS,
-  forwardsByPath,
-  isCommonLinkDomain,
-  isRedirect,
-  SENDING_PLATFORMS,
-} from './services';
+import { FREE_MAIL_DOMAINS, isCommonLinkDomain, isRedirect, SENDING_PLATFORMS } from './services';
 import { clip, type Finding } from './types';
 
 /** Who sent the email, for the link rules: its domain, and whether DMARC confirmed it. */
@@ -39,9 +32,8 @@ export const linkSender = (email: Email): LinkSender => ({
  * click-tracking service that redirects there; else the link's own host.
  */
 function finalTarget(url: URL): { host: Host; final?: Host } {
-  const host = hostOf(url.hostname);
-  const forward = forwardTarget(url) ?? (forwardsByPath(host.domain) ? pathTarget(url) : undefined);
-  return { host, final: forward && hostOf(forward.hostname) };
+  const forward = forwardOf(url);
+  return { host: hostOf(url.hostname), final: forward && hostOf(forward.hostname) };
 }
 
 /**

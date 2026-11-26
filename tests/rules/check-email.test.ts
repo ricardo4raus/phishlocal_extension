@@ -20,6 +20,25 @@ const sample = (id: string): Email => {
 const rules = (email: Email): string[] =>
   checkEmail(email).map((finding) => `${finding.rule}:${finding.severity}`);
 
+describe('checkEmail: links through a click tracker', () => {
+  it("checks the target in an Amazon SES link's path for lookalikes too", () => {
+    const email: Email = {
+      sender: { name: 'PayPal', address: 'service@paypa1.example' },
+      subject: 'Account',
+      bodyText: '',
+      links: [
+        {
+          text: 'paypa1.com',
+          href: 'https://p4.r.eu-west-1.awstrack.me/L0/https:%2F%2Fpaypa1.com%2Flogin/1/abc',
+        },
+      ],
+      truncated: false,
+    };
+    const found = checkEmail(email).filter((finding) => finding.rule === 'lookalike-domain');
+    expect(found.map((finding) => finding.links)).toContainEqual([0]);
+  });
+});
+
 describe('checkEmail on the samples', () => {
   it('flags the bank phishing sample', () => {
     expect(rules(sample('phishing-bank-en'))).toEqual([
