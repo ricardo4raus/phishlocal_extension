@@ -70,7 +70,7 @@ const decode = (text: string): string => {
 };
 
 /** The email's own addresses (sender, Reply-To): the AI may name them in its reasons. */
-const ownAddresses = (email: Email): ReadonlySet<string> =>
+export const ownAddresses = (email: Email): ReadonlySet<string> =>
   new Set(
     [
       email.sender.address,

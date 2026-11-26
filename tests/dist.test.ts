@@ -157,6 +157,11 @@ describe('dist/ build output', () => {
     expect(existsInDist(WELCOME_PAGE)).toBe(true);
   });
 
+  it('has no dev-only batch check page (dev builds only, vite.config.ts)', () => {
+    expect([...relFiles].filter((file) => file.startsWith('src/dev/'))).toEqual([]);
+    expect(files.some((file) => readText(file).includes('Batch check (dev only)'))).toBe(false);
+  });
+
   it('has the same permissions and content-script matches as the source manifest', () => {
     const keys = [
       'permissions',

@@ -197,6 +197,12 @@ $env:MONKEY_SEED='random'; $env:MONKEY_RUNS='100'; npx vitest run tests/monkey
 
 A failure names its seed and case; set `MONKEY_SEED` and `MONKEY_CASE` to replay it.
 
+**Batch check** (dev builds only, for the prompt tuning): with `npm run dev` loaded in Chrome,
+open `chrome-extension://<extension id>/src/dev/batch/index.html`, pick a folder of raw emails
+(`.eml`) and press Start. Each email goes through the same steps as a pasted one in the panel,
+with the on-device model; "Save results.csv" downloads the verdicts, times and reasons. Nothing
+is sent anywhere, and release builds do not contain the page.
+
 | Path                   | Contents                          |
 | ---------------------- | --------------------------------- |
 | `manifest.json`        | Extension manifest                |
@@ -206,6 +212,7 @@ A failure names its seed and case; set `MONKEY_SEED` and `MONKEY_CASE` to replay
 | `src/ai/`, `src/ai.ts` | AI check (prompt, verdict, model) |
 | `src/raw/`             | Raw email and header parsing      |
 | `src/rules/`           | Rule checks                       |
+| `src/dev/batch/`       | Batch check (dev builds only)     |
 | `src/firebase.ts`      | Firebase and App Check            |
 | `src/token-server.ts`  | Token server client               |
 | `functions/`           | Token server (Cloud Function)     |
