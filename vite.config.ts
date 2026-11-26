@@ -25,8 +25,14 @@ export default defineConfig(({ mode }) => {
     plugins: [crx({ manifest })],
     build: {
       outDir: mode === JUDGES_MODE ? JUDGES_OUT_DIR : 'dist',
-      // Pages that manifest.json does not name: the welcome page (src/welcome/open.ts).
-      rollupOptions: { input: { welcome: 'src/welcome/index.html' } },
+      // Pages that manifest.json does not name: the welcome page (src/welcome/open.ts), and in
+      // dev builds only the batch check for the prompt tuning (src/dev/batch/).
+      rollupOptions: {
+        input: {
+          welcome: 'src/welcome/index.html',
+          ...(mode === 'development' ? { batch: 'src/dev/batch/index.html' } : {}),
+        },
+      },
     },
   };
 });

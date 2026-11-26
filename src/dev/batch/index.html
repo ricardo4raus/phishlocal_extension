@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PhishLocal batch check (dev)</title>
+    <link rel="stylesheet" href="../../sidepanel/style.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!-- Dev builds only (vite.config.ts): checks a folder of .eml files the way the panel checks a
+         pasted email, on this device, and saves the results as CSV. Nothing is sent anywhere. -->
+    <main class="batch stack">
+      <h1>Batch check (dev only)</h1>
+      <p class="text-secondary">
+        Pick a folder with raw emails (.eml). Each one gets the basic checks and the on-device AI
+        check, one after the other, like a pasted email in the panel. Nothing leaves this device.
+      </p>
+      <div class="row">
+        <label for="batch-files" class="field__label">Folder</label>
+        <input id="batch-files" type="file" webkitdirectory multiple />
+      </div>
+      <div class="row">
+        <label for="batch-language" class="field__label">Answer language</label>
+        <select id="batch-language">
+          <option value="en">English</option>
+          <option value="de" selected>Deutsch</option>
+          <option value="fr">Français</option>
+          <option value="es">Español</option>
+          <option value="it">Italiano</option>
+          <option value="pt">Português</option>
+        </select>
+      </div>
+      <div class="row">
+        <button id="batch-start" type="button" class="btn btn--primary" disabled>Start</button>
+        <button id="batch-stop" type="button" class="btn" hidden>Stop</button>
+        <button id="batch-save" type="button" class="btn" hidden>Save results.csv</button>
+      </div>
+      <p id="batch-status" class="status" role="status"></p>
+      <table class="batch__table">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Rules</th>
+            <th>AI</th>
+            <th>Verdict</th>
+            <th>Seconds</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody id="batch-rows"></tbody>
+      </table>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
