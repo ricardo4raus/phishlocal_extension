@@ -48,7 +48,6 @@ export const it: Messages = {
     removesLinkPaths: 'Percorsi dei link (il nome del sito resta)',
     removesStandard: 'Tutto ciò che rimuove Standard',
     removesNames: 'Nomi di persone',
-    removedOnDevice: 'Rimosso su questo dispositivo',
     namesMayRemain:
       'Alcuni nomi potrebbero essere ancora nel testo: leggi cosa verrà inviato prima di inviarlo.',
     showData: 'Mostra cosa verrà inviato',
@@ -372,14 +371,19 @@ export const it: Messages = {
     recommendedExperimental: (language) =>
       `Consigliato: le risposte dell’IA locale in ${language} sono sperimentali.`,
     recommendedUnchecked: 'Consigliato: l’IA locale non ha controllato questa email.',
-    chips: {
+    foundAndRemoved: 'Trovato in questa email e rimosso prima dell’invio:',
+    items: {
       names: (count) => plural(count, 'nome', 'nomi'),
       emails: (count) => plural(count, 'indirizzo email', 'indirizzi email'),
       numbers: (count) => plural(count, 'numero', 'numeri'),
       ibans: (count) => plural(count, 'IBAN', 'IBAN'),
-      links: (count) => plural(count, 'percorso di link', 'percorsi di link'),
-      nothing: 'Nessun dato personale trovato',
-      namesKept: 'Nomi mantenuti',
+      links: (count) =>
+        `${plural(count, 'percorso di link', 'percorsi di link')} (il nome del sito resta)`,
+    },
+    nothingToRemove: {
+      standard:
+        'Non è stato trovato nulla da rimuovere: nessun indirizzo email, numero, IBAN o percorso di link.',
+      high: 'Non è stato trovato nulla da rimuovere: nessun nome, indirizzo email, numero, IBAN o percorso di link.',
     },
     changed: {
       idle: '',

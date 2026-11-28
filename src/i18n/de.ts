@@ -47,7 +47,6 @@ export const de: Messages = {
     removesLinkPaths: 'Link-Pfade (der Name der Website bleibt)',
     removesStandard: 'Alles aus Standard',
     removesNames: 'Namen von Personen',
-    removedOnDevice: 'Auf diesem Gerät entfernt',
     namesMayRemain:
       'Einige Namen können noch im Text stehen: Lies, was gesendet wird, bevor du es sendest.',
     showData: 'Zeigen, was gesendet wird',
@@ -383,14 +382,18 @@ export const de: Messages = {
     recommendedExperimental: (language) =>
       `Empfohlen: Antworten der lokalen KI auf ${language} sind experimentell.`,
     recommendedUnchecked: 'Empfohlen: Die lokale KI hat diese E-Mail nicht geprüft.',
-    chips: {
+    foundAndRemoved: 'In dieser E-Mail gefunden und vor dem Senden entfernt:',
+    items: {
       names: (count) => plural(count, 'Name', 'Namen'),
       emails: (count) => plural(count, 'E-Mail-Adresse', 'E-Mail-Adressen'),
       numbers: (count) => plural(count, 'Nummer', 'Nummern'),
       ibans: (count) => plural(count, 'IBAN', 'IBANs'),
-      links: (count) => plural(count, 'Link-Pfad', 'Link-Pfade'),
-      nothing: 'Keine persönlichen Daten gefunden',
-      namesKept: 'Namen behalten',
+      links: (count) => `${plural(count, 'Link-Pfad', 'Link-Pfade')} (der Name der Website bleibt)`,
+    },
+    nothingToRemove: {
+      standard:
+        'Nichts zum Entfernen gefunden: keine E-Mail-Adressen, Nummern, IBANs oder Link-Pfade.',
+      high: 'Nichts zum Entfernen gefunden: keine Namen, E-Mail-Adressen, Nummern, IBANs oder Link-Pfade.',
     },
     changed: {
       idle: '',

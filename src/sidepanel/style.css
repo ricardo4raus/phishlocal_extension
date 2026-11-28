@@ -59,6 +59,10 @@
     --color-pending-border: #e2e5ea;
     --color-on-pending: #ffffff;
     --color-focus: #1a56db;
+    /* Highlight: the kind chosen in the consent card's list, in the data. Yellow like a text
+       marker, not the warning yellow (that means "suspicious"): text on highlight 14.2. */
+    --color-highlight: #fde68a;
+    --color-highlight-text: #16191d;
 
     /* Type: sizes with line heights on the 4 px grid; weights 400, 600, 700 only. */
     --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -132,6 +136,9 @@
       --color-pending-border: #2c323a;
       --color-on-pending: #ffffff;
       --color-focus: #8ab4ff;
+      /* Highlight text on highlight 6.0. */
+      --color-highlight: #6b5410;
+      --color-highlight-text: #ffe8a3;
     }
   }
 }
@@ -1492,6 +1499,36 @@
     font-weight: 600;
   }
 
+  /* ---- Found and removed: one text button per kind under the heading (the parent stack sets
+     the gap to the heading). The chosen kind is bold and underlined; it is also the yellow one in
+     the data. ---- */
+  .removed {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+    font-size: var(--text-s);
+    line-height: var(--leading-s);
+  }
+
+  .removed__item {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-accent);
+    text-align: start;
+    overflow-wrap: anywhere;
+  }
+
+  .removed__item:hover {
+    text-decoration: underline;
+  }
+
+  .removed__item[aria-current='true'] {
+    font-weight: 700;
+    text-decoration: underline;
+  }
+
   /* Exactly what will be sent: monospace, scrollable, never cut. */
   .data {
     padding: var(--space-2) var(--space-3);
@@ -1505,6 +1542,56 @@
     line-height: var(--leading-s);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+
+  /* A place the privacy filter replaced (a <mark> from the filter's own record of positions):
+     blue; a mark inside a mark (a name in a link's host) keeps its own colour. No padding, so the
+     monospace grid does not shift. The page's :focus-visible ring applies to a focused mark. */
+  .redacted {
+    border-radius: 2px;
+    background: var(--color-accent-tint);
+    color: var(--color-accent-text);
+  }
+
+  /* The kind chosen in the list above: yellow with an underline, so colour is not the only cue. */
+  .data[data-selected-kind='name'] .redacted[data-kind='name'],
+  .data[data-selected-kind='email'] .redacted[data-kind='email'],
+  .data[data-selected-kind='number'] .redacted[data-kind='number'],
+  .data[data-selected-kind='iban'] .redacted[data-kind='iban'],
+  .data[data-selected-kind='link'] .redacted[data-kind='link'] {
+    background: var(--color-highlight);
+    color: var(--color-highlight-text);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+  }
+
+  /* The data's panel places the tooltip: the data itself scrolls, so the tooltip sits next to it. */
+  .data-panel {
+    position: relative;
+  }
+
+  /* The original text of a mark, struck through, on hover or focus (deep-check-view.ts places it
+     above the mark, or below when there is no room). Border only: the panel has no shadow token. */
+  .tip {
+    position: absolute;
+    z-index: 1;
+    box-sizing: border-box;
+    max-inline-size: 100%;
+    max-block-size: 40vh;
+    overflow: auto;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-box);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .tip s {
+    text-decoration: line-through;
   }
 
   /* ---- Developer tools (dev builds only). ---- */

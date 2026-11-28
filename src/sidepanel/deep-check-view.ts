@@ -6,8 +6,12 @@
  * 2. On the device, the privacy filter builds the data (`cloudData()`) at the chosen privacy
  *    level: no full links, addresses, numbers or IBANs, no raw headers; at level High, Gemini
  *    Nano first looks for names, and they go too. Changing the level builds the data again.
- * 3. The card shows what was removed (chips), what is never sent, and, one click away, exactly
- *    the data that goes.
+ * 3. The card lists what the filter found and removed (one item per kind) and, one click away,
+ *    exactly the data that goes. The data marks every place the filter replaced, from the
+ *    filter's own record of positions (`CloudData.spans`), never from a search of the text: an
+ *    attacker can write "[name]" into an email. A click on a list item highlights that kind and
+ *    scrolls to its places; hovering or focusing a mark shows the original text, struck through,
+ *    on the device only.
  * 4. Only "Send to the cloud" sends it, once. Another email, closing the panel, Cancel, Back or
  *    Stop end it.
  *
@@ -27,11 +31,13 @@ import {
   nameSearchText,
   PRIVACY_LEVELS,
   type PrivacyLevel,
+  type RedactedKind,
+  type RedactedSpan,
   type Removed,
 } from '../privacy/redact';
 import type { Finding } from '../rules';
 import { HEADERS_WAIT_MS, judge, LINE, STOP_GRACE_MS, WORD } from './ai-view';
-import { countElapsed, el, seconds } from './ui';
+import { countElapsed, el, seconds, setText } from './ui';
 
 /**
  * How much longer than the cloud request's own limit the panel waits for it: the request's limit
@@ -45,6 +51,17 @@ const STOPPED = Symbol('stopped');
 /** The reason a run is stopped when it reaches its time limit. */
 const TIME_LIMIT = 'time limit';
 
+/** The first tooltip over a marked place in the data waits this long (a pointer passing by). */
+export const TIP_DELAY_MS = 500;
+/** While "warm" (a tooltip showed a moment ago), the next one comes almost at once. */
+export const TIP_QUICK_MS = 50;
+/** The warm phase ends this long after the last tooltip went. */
+export const TIP_WARM_MS = 1000;
+/** A tooltip stays this long after the pointer left its mark: time to move onto the tooltip. */
+export const TIP_HIDE_MS = 150;
+/** The tooltip shows at most this many characters of the original text. */
+export const TIP_MAX_CHARS = 300;
+
 export interface DeepCheckElements {
   section: HTMLElement;
   /** The offer: the button and, under it, one line only when recommended or unavailable. */
@@ -56,14 +73,21 @@ export interface DeepCheckElements {
   /** The privacy level: radio buttons named `deep-check-level`, one per PrivacyLevel. */
   levels: HTMLFieldSetElement;
   preview: HTMLElement;
-  /** What was removed, as chips. */
+  /** "Found in this email and removed before sending:", or the line that nothing was. */
+  removedHeading: HTMLElement;
+  /** The `<ul>` under it: one button per kind of removed data (click: highlight in the data). */
   removed: HTMLElement;
   /** "Some names may still be in the text" (shown when the name search could not finish). */
   warning: HTMLElement;
   /** Opens the exact data ("Show what will be sent"). */
   show: HTMLButtonElement;
+  /** The data's panel: the `<pre>` with the data and marks, and the tooltip positioned in it. */
   dataPanel: HTMLElement;
   data: HTMLElement;
+  /** `role="tooltip"`, hidden; its `<s>` gets the original text of the mark under the pointer. */
+  tip: HTMLElement;
+  /** "Nothing has been sent yet." in the card: gone from the click on Send until the next reset. */
+  nothingYet: HTMLElement;
   send: HTMLButtonElement;
   cancel: HTMLButtonElement;
   /** The status line (a live region), the elapsed time next to it, and Stop. */
@@ -126,19 +150,96 @@ const NOT_AVAILABLE = m.deepCheck.notAvailable;
 const isPrivacyLevel = (value: string | undefined): value is PrivacyLevel =>
   PRIVACY_LEVELS.some((level) => level === value);
 
-/** The chips: what was removed on this device, and what was kept on purpose. */
-export function removedChips(removed: Removed, level: PrivacyLevel): string[] {
-  const text = m.deepCheck.chips;
-  const chips = [
-    removed.names > 0 && text.names(removed.names),
-    removed.emails > 0 && text.emails(removed.emails),
-    removed.numbers > 0 && text.numbers(removed.numbers),
-    removed.ibans > 0 && text.ibans(removed.ibans),
-    removed.links > 0 && text.links(removed.links),
-  ].filter((chip) => chip !== false);
-  if (chips.length === 0) chips.push(text.nothing);
-  if (level === 'standard') chips.push(text.namesKept);
-  return chips;
+/** The kinds in the order the list shows them, with their count in {@link Removed}. */
+const KINDS: readonly { kind: RedactedKind; count: keyof Removed }[] = [
+  { kind: 'name', count: 'names' },
+  { kind: 'email', count: 'emails' },
+  { kind: 'number', count: 'numbers' },
+  { kind: 'iban', count: 'ibans' },
+  { kind: 'link', count: 'links' },
+];
+
+const isKind = (value: string | undefined): value is RedactedKind =>
+  KINDS.some(({ kind }) => kind === value);
+
+/** The list items: one per kind the filter removed, with its count ("2 email addresses"). */
+export function removedItems(removed: Removed): { kind: RedactedKind; text: string }[] {
+  const text = m.deepCheck.items;
+  return KINDS.filter(({ count }) => removed[count] > 0).map(({ kind, count }) => ({
+    kind,
+    text: text[count](removed[count]),
+  }));
+}
+
+/** A mark in the data: the element, what it stands for and the text that stood there. */
+export interface Mark {
+  element: HTMLElement;
+  kind: RedactedKind;
+  original: string;
+}
+
+/** Appends `text` to `parent` as a text node (never markup); nothing for an empty string. */
+function appendText(parent: HTMLElement, text: string): void {
+  if (text !== '') parent.append(document.createTextNode(text));
+}
+
+/**
+ * Fills `pre` with `json` as text and wraps every span in a `<mark class="redacted">`; a span
+ * inside another gives a mark inside a mark. The text stays exactly `json`: the marks only wrap
+ * it. Spans are the filter's record of what it replaced; the text is never searched for
+ * placeholders (an attacker can write "[name]" into an email). A span out of bounds, empty or
+ * crossing another is left out, so a wrong record can only lose a mark, never change the text.
+ * Returns the marks in text order.
+ */
+export function renderRedacted(
+  pre: HTMLElement,
+  json: string,
+  spans: readonly RedactedSpan[],
+): Mark[] {
+  const marks: Mark[] = [];
+  // By start; of two at the same start, the longer (outer) one first.
+  const ordered = [...spans].sort((a, b) => a.start - b.start || b.end - a.end);
+  /** The marks not closed yet, outermost first, each with where its text ends. */
+  const open: { element: HTMLElement; end: number }[] = [];
+  /** The text before this offset is in the DOM. */
+  let pos = 0;
+  const container = (): HTMLElement => open.at(-1)?.element ?? pre;
+  const close = (): void => {
+    const top = open.pop();
+    if (!top) return;
+    appendText(top.element, json.slice(pos, top.end));
+    pos = top.end;
+  };
+  pre.replaceChildren();
+  for (const span of ordered) {
+    const { start, end } = span;
+    if (
+      !Number.isInteger(start) ||
+      !Number.isInteger(end) ||
+      start < 0 ||
+      end > json.length ||
+      end <= start ||
+      !isKind(span.kind)
+    ) {
+      continue;
+    }
+    while (open.length > 0 && (open.at(-1)?.end ?? 0) <= start) close();
+    // Crossing a mark already closed, or reaching past the one around it: not nested, left out.
+    if (start < pos) continue;
+    const outer = open.at(-1);
+    if (outer && end > outer.end) continue;
+    appendText(container(), json.slice(pos, start));
+    pos = start;
+    const element = el('mark', 'redacted');
+    element.dataset.kind = span.kind;
+    element.tabIndex = -1;
+    container().append(element);
+    open.push({ element, end });
+    marks.push({ element, kind: span.kind, original: span.original });
+  }
+  while (open.length > 0) close();
+  appendText(pre, json.slice(pos));
+  return marks;
 }
 
 /** Runs `work` and never throws, also when it throws before returning a promise. */
@@ -218,6 +319,19 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
   let stopCounting: (() => void) | undefined;
   /** Changes whenever the email changes or the user cancels: late results are dropped. */
   let generation = 0;
+  /** The marks in the shown data, in text order. */
+  let marks: Mark[] = [];
+  /** Per kind, which of its marks the list item's next click goes to (they cycle). */
+  let current: Partial<Record<RedactedKind, number>> = {};
+  /** The mark whose original the tooltip shows, while it shows. */
+  let tipFor: Mark | undefined;
+  /** Waits before a hovered mark's tooltip shows. */
+  let tipTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Waits after the pointer left a mark before the tooltip goes (it may land on the tooltip). */
+  let hideTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Ends the warm phase, in which the next tooltip comes almost at once. */
+  let warmTimer: ReturnType<typeof setTimeout> | undefined;
+  let warm = false;
   // The status can take the focus from a button that disappears (not by Tab).
   elements.status.tabIndex = -1;
 
@@ -292,20 +406,153 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     elements.reasons.replaceChildren();
   }
 
+  /* ---- The marks in the data: roving tabindex, the selected kind, the tooltip. ---- */
+
+  const marksOf = (kind: RedactedKind): Mark[] => marks.filter((mark) => mark.kind === kind);
+
+  /** Exactly one mark is reached by Tab (`target`); the arrow keys move between the others. */
+  function setTabbable(target: HTMLElement | undefined): void {
+    for (const { element } of marks) element.tabIndex = element === target ? 0 : -1;
+  }
+
+  /** The mark at (or around) an event's target, if it is one of the data's marks. */
+  function markAt(target: EventTarget | null): Mark | undefined {
+    if (!(target instanceof Element)) return undefined;
+    const element = target.closest('.redacted');
+    return element ? marks.find((mark) => mark.element === element) : undefined;
+  }
+
+  function clearTipTimers(): void {
+    clearTimeout(tipTimer);
+    clearTimeout(hideTimer);
+    clearTimeout(warmTimer);
+    tipTimer = hideTimer = warmTimer = undefined;
+  }
+
+  /**
+   * Places the tooltip above the mark, inside the data panel (its positioning context; the data
+   * itself scrolls, so the tooltip lives next to it, not in it). Below the mark when there is no
+   * room above; never past the panel's edges. Physical offsets, because the rectangles are too.
+   */
+  function placeTip(mark: HTMLElement): void {
+    const { tip } = elements;
+    const panel = elements.dataPanel.getBoundingClientRect();
+    const place = mark.getBoundingClientRect();
+    let top = place.top - panel.top - tip.offsetHeight;
+    if (top < 0) top = place.bottom - panel.top;
+    const left = Math.max(0, Math.min(place.left - panel.left, panel.width - tip.offsetWidth));
+    tip.style.top = `${top}px`;
+    tip.style.left = `${left}px`;
+  }
+
+  /** Shows the original text of `mark`, struck through, at once. */
+  function showTip(mark: Mark): void {
+    clearTipTimers();
+    if (tipFor && tipFor !== mark) tipFor.element.removeAttribute('aria-describedby');
+    tipFor = mark;
+    const { original } = mark;
+    const cut = original.length > TIP_MAX_CHARS ? `${original.slice(0, TIP_MAX_CHARS)}…` : original;
+    // Email text: as text only, with direction overrides revealed.
+    setText(elements.tip.querySelector<HTMLElement>('s') ?? elements.tip, cut);
+    mark.element.setAttribute('aria-describedby', elements.tip.id);
+    elements.tip.hidden = false;
+    placeTip(mark.element);
+  }
+
+  /** Hides the tooltip (and drops a pending one); the next one then comes quickly for a moment. */
+  function hideTip(): void {
+    clearTimeout(tipTimer);
+    clearTimeout(hideTimer);
+    tipTimer = hideTimer = undefined;
+    if (!tipFor) return;
+    tipFor.element.removeAttribute('aria-describedby');
+    tipFor = undefined;
+    elements.tip.hidden = true;
+    warm = true;
+    clearTimeout(warmTimer);
+    warmTimer = setTimeout(() => {
+      warm = false;
+      warmTimer = undefined;
+    }, TIP_WARM_MS);
+  }
+
+  function setDataOpen(open: boolean): void {
+    elements.dataPanel.hidden = !open;
+    elements.show.setAttribute('aria-expanded', String(open));
+    if (!open) hideTip();
+  }
+
+  /**
+   * A click on the list item for `kind`: the data opens, that kind's marks turn yellow (the CSS
+   * reads `data-selected-kind`), and the view scrolls to its first mark; a repeat click goes on
+   * to the next one. From the keyboard the focus moves to that mark too, so the arrow keys and
+   * the tooltip are at hand; a mouse click leaves the focus on the item.
+   */
+  function selectKind(kind: RedactedKind, byKeyboard: boolean): void {
+    const own = marksOf(kind);
+    const same = elements.data.dataset.selectedKind === kind;
+    current[kind] = same && own.length > 0 ? ((current[kind] ?? 0) + 1) % own.length : 0;
+    elements.data.dataset.selectedKind = kind;
+    for (const item of elements.removed.querySelectorAll<HTMLElement>('.removed__item')) {
+      if (item.dataset.kind === kind) item.setAttribute('aria-current', 'true');
+      else item.removeAttribute('aria-current');
+    }
+    setDataOpen(true);
+    const mark = own[current[kind] ?? 0];
+    if (!mark) return;
+    setTabbable(mark.element);
+    // Not in jsdom (the tests), so optional.
+    mark.element.scrollIntoView?.({ block: 'nearest' });
+    if (byKeyboard) mark.element.focus();
+  }
+
+  /** Shows the list of what was removed, and the data with its marks. */
+  function showData(data: CloudData, chosen: PrivacyLevel): void {
+    const items = removedItems(data.removed);
+    set(
+      elements.removedHeading,
+      items.length > 0 ? m.deepCheck.foundAndRemoved : m.deepCheck.nothingToRemove[chosen],
+    );
+    elements.removed.hidden = items.length === 0;
+    elements.removed.replaceChildren(
+      ...items.map(({ kind, text }) => {
+        const button = el('button', 'removed__item', text);
+        button.type = 'button';
+        button.dataset.kind = kind;
+        const item = el('li');
+        item.append(button);
+        return item;
+      }),
+    );
+    marks = renderRedacted(elements.data, data.json, data.spans);
+    current = {};
+    setTabbable(marks[0]?.element);
+  }
+
   function clearPreview(): void {
     prepared = undefined;
     elements.preview.hidden = true;
+    set(elements.removedHeading, '');
     elements.removed.replaceChildren();
-    set(elements.data, '');
+    elements.removed.hidden = false;
+    hideTip();
+    clearTipTimers();
+    warm = false;
+    marks = [];
+    current = {};
+    elements.data.replaceChildren();
+    delete elements.data.dataset.selectedKind;
     elements.warning.hidden = true;
-    elements.dataPanel.hidden = true;
-    elements.show.setAttribute('aria-expanded', 'false');
+    setDataOpen(false);
     elements.send.hidden = false;
     elements.cancel.hidden = false;
   }
 
   /** Back to the start for the shown email: no preview, no result, nothing running. */
   function reset(status = '', { keepResult = false, close = true } = {}): void {
+    // Taken first: a focused mark in the data is removed with the preview (it is then detached).
+    const focused = document.activeElement;
+    const focusInside = focused !== null && elements.section.contains(focused);
     generation++;
     stop?.abort();
     stop = undefined;
@@ -317,13 +564,13 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     elements.status.classList.remove('status--error');
     elements.stop.hidden = true;
     elements.back.disabled = false;
+    elements.nothingYet.hidden = false;
     setLevelsDisabled(!deps.available);
     if (close) setConsent(false);
     showOffer();
-    // Focus on a button that was just hidden (Stop, Send) would be lost: move it to the start, or
-    // to the status while the start waits (found in review round 3).
-    const focused = document.activeElement;
-    if (focused && elements.section.contains(focused) && focused.closest('[hidden]')) {
+    // Focus on a button that was just hidden (Stop, Send) or on a removed mark would be lost: move
+    // it to the start, or to the status while the start waits (found in review round 3).
+    if (focusInside && (!focused.isConnected || focused.closest('[hidden]'))) {
       (elements.start.disabled || elements.start.hidden ? elements.status : elements.start).focus();
     } else if (focused === elements.status && !elements.start.disabled && !elements.start.hidden) {
       elements.start.focus();
@@ -398,10 +645,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
       clearCounter();
       elements.stop.hidden = true;
       setLevelsDisabled(false);
-      elements.removed.replaceChildren(
-        ...removedChips(data.removed, chosen).map((chip) => el('span', 'chip chip--plain', chip)),
-      );
-      set(elements.data, data.json);
+      showData(data, chosen);
       elements.warning.hidden = data.namesChecked;
       elements.preview.hidden = false;
       set(elements.status, '');
@@ -491,6 +735,8 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     elements.send.hidden = true;
     elements.cancel.hidden = true;
     elements.back.disabled = true;
+    // From here on the data may have reached the cloud, also after a failure or a stop.
+    elements.nothingYet.hidden = true;
     running(m.deepCheck.checking);
     elements.stop.focus();
     const controller = new AbortController();
@@ -534,10 +780,91 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
   elements.start.addEventListener('click', () => void prepare());
   elements.send.addEventListener('click', () => void send());
   elements.show.addEventListener('click', () => {
-    const open = elements.dataPanel.hidden;
-    elements.dataPanel.hidden = !open;
-    elements.show.setAttribute('aria-expanded', String(open));
+    const open = elements.dataPanel.hidden !== false;
+    setDataOpen(open);
     if (open) elements.data.focus();
+  });
+  elements.removed.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const kind = target.closest<HTMLElement>('.removed__item')?.dataset.kind;
+    // Enter or Space on the item is a click without a pointer (detail 0).
+    if (isKind(kind)) selectKind(kind, event.detail === 0);
+  });
+  // Inside the data: Escape hides the tooltip; from a mark, the arrow keys, Home and End move
+  // between the marks (the data's own scrolling by arrow keys stays when no mark is focused).
+  elements.data.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      hideTip();
+      return;
+    }
+    const index = marks.findIndex((mark) => mark.element === event.target);
+    if (index < 0) return;
+    const last = marks.length - 1;
+    const to =
+      event.key === 'ArrowRight' || event.key === 'ArrowDown'
+        ? Math.min(index + 1, last)
+        : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+          ? Math.max(index - 1, 0)
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? last
+              : undefined;
+    const mark = to === undefined ? undefined : marks[to];
+    if (!mark) return;
+    event.preventDefault();
+    setTabbable(mark.element);
+    mark.element.focus();
+  });
+  // The tooltip: after a delay for the first hovered mark, almost at once while warm, and at once
+  // for a focused mark. It goes a moment after the pointer leaves (unless it lands on the tooltip),
+  // on blur, Escape, and when the data scrolls (its place would be stale).
+  elements.data.addEventListener('mouseover', (event) => {
+    const mark = markAt(event.target);
+    if (!mark) return;
+    clearTimeout(hideTimer);
+    hideTimer = undefined;
+    if (tipFor === mark) return;
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => showTip(mark), warm || tipFor ? TIP_QUICK_MS : TIP_DELAY_MS);
+  });
+  const leaveTip = (): void => {
+    clearTimeout(tipTimer);
+    clearTimeout(hideTimer);
+    tipTimer = undefined;
+    hideTimer = setTimeout(hideTip, TIP_HIDE_MS);
+  };
+  elements.data.addEventListener('mouseout', (event) => {
+    if (markAt(event.target)) leaveTip();
+  });
+  elements.tip.addEventListener('mouseover', () => {
+    clearTimeout(hideTimer);
+    hideTimer = undefined;
+  });
+  elements.tip.addEventListener('mouseout', (event) => {
+    // Back onto a mark: the data's own handler takes over.
+    if (!markAt(event.relatedTarget)) leaveTip();
+  });
+  elements.data.addEventListener('focusin', (event) => {
+    const mark = markAt(event.target);
+    if (mark) showTip(mark);
+  });
+  elements.data.addEventListener('focusout', (event) => {
+    if (markAt(event.target)) hideTip();
+  });
+  // The data scrolled: a hovered mark's tooltip goes (the pointer is over something else now); a
+  // focused mark's follows it (the focus itself scrolls the mark into view), or goes with it.
+  elements.data.addEventListener('scroll', () => {
+    if (!tipFor) return;
+    const mark = tipFor.element;
+    const place = mark.getBoundingClientRect();
+    const view = elements.data.getBoundingClientRect();
+    if (document.activeElement === mark && place.bottom >= view.top && place.top <= view.bottom) {
+      placeTip(mark);
+    } else {
+      hideTip();
+    }
   });
   elements.levels.addEventListener('change', () => {
     deps.saveLevel?.(level());

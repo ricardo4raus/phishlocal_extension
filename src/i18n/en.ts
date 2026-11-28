@@ -53,7 +53,6 @@ export const en = {
     removesLinkPaths: "Link paths (the website's name stays)",
     removesStandard: 'Everything from Standard',
     removesNames: 'Names of people',
-    removedOnDevice: 'Removed on this device',
     namesMayRemain:
       'Some names may still be in the text: read what will be sent before you send it.',
     showData: 'Show what will be sent',
@@ -372,14 +371,23 @@ export const en = {
     recommendedExperimental: (language: string) =>
       `Recommended: on-device answers in ${language} are experimental.`,
     recommendedUnchecked: 'Recommended: the on-device AI did not check this email.',
-    chips: {
+    /**
+     * The list of what the privacy filter found and removed, one item per kind. Counts are
+     * occurrences: "5 names" is five places in the text, maybe one person.
+     */
+    foundAndRemoved: 'Found in this email and removed before sending:',
+    items: {
       names: (count: number) => plural(count, 'name', 'names'),
       emails: (count: number) => plural(count, 'email address', 'email addresses'),
       numbers: (count: number) => plural(count, 'number', 'numbers'),
       ibans: (count: number) => plural(count, 'IBAN', 'IBANs'),
-      links: (count: number) => plural(count, 'link path', 'link paths'),
-      nothing: 'No personal data found',
-      namesKept: 'Names kept',
+      links: (count: number) =>
+        `${plural(count, 'link path', 'link paths')} (the website's name stays)`,
+    },
+    /** In place of the heading when the list is empty, by privacy level. */
+    nothingToRemove: {
+      standard: 'Nothing found to remove: no email addresses, numbers, IBANs or link paths.',
+      high: 'Nothing found to remove: no names, email addresses, numbers, IBANs or link paths.',
     },
     changed: {
       idle: '',

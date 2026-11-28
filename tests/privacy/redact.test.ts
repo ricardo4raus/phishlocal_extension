@@ -587,40 +587,40 @@ describe('cloudData', () => {
  * original on the device. They must come from the filter's own replacements, never from a search
  * of the data, and the JSON they point into must stay exactly `JSON.stringify(_, null, 2)`.
  * --------------------------------------------------------------------------------------------- */
-describe('cloudData spans', () => {
-  const spansOf = (data: CloudData, kind?: RedactedKind) =>
-    data.spans
-      .filter((span) => kind === undefined || span.kind === kind)
-      .map((span) => [data.json.slice(span.start, span.end), span.original]);
+const spansOf = (data: CloudData, kind?: RedactedKind) =>
+  data.spans
+    .filter((span) => kind === undefined || span.kind === kind)
+    .map((span) => [data.json.slice(span.start, span.end), span.original]);
 
-  /** Every span points at a placeholder of its kind, spans nest or stay apart, the JSON is canonical. */
-  function wellFormed(data: CloudData): void {
-    expect(data.json).toBe(JSON.stringify(JSON.parse(data.json), null, 2));
-    const shape: Record<RedactedKind, RegExp> = {
-      name: /^\[name\]$/,
-      email: /^\[email\](?:@.*)?$/,
-      number: /^\[number\]$/,
-      iban: /^\[iban\]$/,
-      link: /^\[link(?:: .*)?\]$/,
-    };
-    let previous: RedactedSpan | undefined;
-    for (const span of data.spans) {
-      expect(span.start).toBeGreaterThanOrEqual(0);
-      expect(span.end).toBeGreaterThan(span.start);
-      expect(span.end).toBeLessThanOrEqual(data.json.length);
-      expect(data.json.slice(span.start, span.end)).toMatch(shape[span.kind]);
-      if (previous) {
-        expect(span.start).toBeGreaterThanOrEqual(previous.start);
-        // Inside the previous one, or after it: never half in, half out.
-        expect(span.end <= previous.end || span.start >= previous.end).toBe(true);
-      }
-      previous = span;
-    }
-    const counted: Removed = { names: 0, emails: 0, numbers: 0, ibans: 0, links: 0 };
-    for (const span of data.spans) counted[`${span.kind}s`]++;
-    expect(data.removed).toEqual(counted);
+/** Every span points at a placeholder of its kind, spans nest or stay apart, the JSON is canonical. */
+function wellFormed(data: CloudData): void {
+  expect(data.json).toBe(JSON.stringify(JSON.parse(data.json), null, 2));
+  const shape: Record<RedactedKind, RegExp> = {
+    name: /^\[name\]$/,
+    email: /^\[email\](?:@.*)?$/,
+    number: /^\[number\]$/,
+    iban: /^\[iban\]$/,
+    link: /^\[link(?:: .*)?\]$/,
+  };
+  let previous: RedactedSpan | undefined;
+  for (const span of data.spans) {
+    expect(span.start).toBeGreaterThanOrEqual(0);
+    expect(span.end).toBeGreaterThan(span.start);
+    expect(span.end).toBeLessThanOrEqual(data.json.length);
+    expect(data.json.slice(span.start, span.end)).toMatch(shape[span.kind]);
+    // In order, and inside the previous one or after it: never half in, half out.
+    expect(previous === undefined || span.start >= previous.start).toBe(true);
+    expect(previous === undefined || span.end <= previous.end || span.start >= previous.end).toBe(
+      true,
+    );
+    previous = span;
   }
+  const counted: Removed = { names: 0, emails: 0, numbers: 0, ibans: 0, links: 0 };
+  for (const span of data.spans) counted[`${span.kind}s`]++;
+  expect(data.removed).toEqual(counted);
+}
 
+describe('cloudData spans', () => {
   it('records every kind with its original, in JSON offsets', () => {
     const data = cloudData(
       email({

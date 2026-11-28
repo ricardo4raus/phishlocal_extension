@@ -8,6 +8,7 @@ import type { AiCheckResult, CloudCheckResult, PromptResult, WarmUpResult } from
 import { RISKS, type Risk } from '../../src/ai/verdict';
 import { MESSAGES } from '../../src/i18n';
 import type { Language } from '../../src/i18n/languages';
+import type { CloudData } from '../../src/privacy/redact';
 import { GMAIL_SERVER } from '../../src/raw/gmail-original-page';
 import { DEFAULT_SETTINGS, type Settings } from '../../src/settings';
 import body from '../../src/sidepanel/index.html?raw';
@@ -29,6 +30,10 @@ vi.setConfig({ testTimeout: MONKEY_TIMEOUT_MS });
 let rng: Rng;
 /** In the end phase every fake answers, so the panel must come to rest. */
 let calm = false;
+/** What the name search answers in the end phase: by case, names or "could not look". */
+let calmNames: string[] | undefined;
+/** The end phase's cloud request fails in this case (every fourth), so that state is seen too. */
+let calmCloudFails = false;
 /** Broken promises seen inside the fakes or as uncaught errors. */
 let violations: string[] = [];
 let trace: string[] = [];
@@ -51,6 +56,20 @@ const afterConfigure = (what: string): void => {
 let cloudAvailable = true;
 /** The data on screen when the user last clicked "Send to the cloud", if the preview showed. */
 let consent: string | undefined;
+/** The data the privacy filter built last: its JSON and its record of the replaced places. */
+let lastData: CloudData | undefined;
+
+// The real filter, watched: the panel must show exactly its JSON, with a mark per recorded place.
+vi.mock('../../src/privacy/redact', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../src/privacy/redact')>();
+  return {
+    ...real,
+    cloudData: (...args: Parameters<typeof real.cloudData>): CloudData => {
+      lastData = real.cloudData(...args);
+      return lastData;
+    },
+  };
+});
 
 const later = <T>(value: () => T, ms: number): Promise<T> =>
   new Promise((resolve, reject) => {
@@ -191,7 +210,7 @@ vi.mock('../../src/ai', () => ({
     if (language !== caseLanguage) violations.push(`name search in ${language}`);
     return deepWorkFake<string[] | undefined>(
       signal,
-      () => rng.pick([['Anna Muster'], [], ['x'.repeat(100)], undefined]),
+      () => (calm ? calmNames : rng.pick([['Anna Muster'], [], ['x'.repeat(100)], undefined])),
       undefined,
       'name search',
     );
@@ -214,11 +233,18 @@ vi.mock('../../src/ai', () => ({
           verdict: { risk: rng.pick(RISKS), reasons: ['A cloud reason.'], advice: 'Advice.' },
           durationMs: 1_500,
         };
+        const failed: CloudCheckResult = {
+          ok: false,
+          reason: 'failed',
+          detail: 'App Check token invalid',
+        };
         return calm
-          ? answer
+          ? calmCloudFails
+            ? failed
+            : answer
           : rng.pick<CloudCheckResult>([
               answer,
-              { ok: false, reason: 'failed', detail: 'App Check token invalid' },
+              failed,
               { ok: false, reason: 'unreadable-answer' },
               { ok: false, reason: 'limit' },
             ]);
@@ -371,6 +397,10 @@ function typeInto(id: string, text: string): void {
   field.dispatchEvent(new Event('input'));
 }
 
+/** The elements a user can see (none of them inside a hidden one). */
+const visible = <T extends HTMLElement>(list: Iterable<T>): T[] =>
+  [...list].filter((element) => !element.closest('[hidden]'));
+
 function pasteInto(text: string, html: string): void {
   const event = new Event('paste');
   Object.defineProperty(event, 'clipboardData', {
@@ -423,6 +453,52 @@ const MOVES: Record<string, () => void> = {
     button.click();
     // A click that sent nothing (disabled, or nothing prepared) leaves no consent behind.
     consent = undefined;
+  },
+  highlight: () => {
+    // The consent card's list and the marks in the data: an item (with the pointer or the
+    // keyboard), the pointer or the focus on a mark, the arrow keys and Escape from a mark.
+    const pre = get('deep-check-data');
+    const action = rng.pick(['item', 'item', 'hover', 'focus', 'key']);
+    if (action === 'item') {
+      const items = visible(
+        get('deep-check-removed').querySelectorAll<HTMLElement>('.removed__item'),
+      );
+      if (items.length === 0) return;
+      const item = rng.pick(items);
+      const pointer = rng.chance(0.5);
+      trace.push(`${pointer ? 'click' : 'press'} removed item ${item.dataset.kind}`);
+      if (pointer) item.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      else item.click();
+      reached.add('deep: item clicked');
+      return;
+    }
+    const marks = visible(pre.querySelectorAll<HTMLElement>('.redacted'));
+    if (action === 'key') {
+      const focused = document.activeElement;
+      if (!(focused instanceof HTMLElement) || !pre.contains(focused)) return;
+      const key = rng.pick([
+        'ArrowRight',
+        'ArrowLeft',
+        'ArrowDown',
+        'ArrowUp',
+        'Home',
+        'End',
+        'Escape',
+      ]);
+      trace.push(`press ${key} in the data`);
+      focused.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      return;
+    }
+    if (marks.length === 0) return;
+    const mark = rng.pick(marks);
+    if (action === 'focus') {
+      trace.push(`focus mark ${mark.dataset.kind}`);
+      mark.focus();
+    } else {
+      const type = rng.pick(['mouseover', 'mouseover', 'mouseout']);
+      trace.push(`${type} mark ${mark.dataset.kind}`);
+      mark.dispatchEvent(new MouseEvent(type, { bubbles: true }));
+    }
   },
   type: () => {
     const id = rng.pick(['paste-sender', 'paste-subject', 'paste-text', 'paste-text', 'prompt']);
@@ -512,7 +588,9 @@ const STATUS_IDS = [
   'status',
   'progress',
   'deep-check-intro',
+  'deep-check-removed-heading',
   'deep-check-removed',
+  'deep-check-tip',
   'deep-check-status',
   'deep-check-elapsed',
   'deep-check-overall',
@@ -523,6 +601,19 @@ const STATUS_IDS = [
   'deep-check-time',
   'deep-check-detail',
 ];
+
+/**
+ * A mark reads as the placeholder the filter wrote: a name, number or IBAN, an address (with
+ * its domain), or a link with its host. A mark around other marks (a name in an address or a
+ * link's host) holds their placeholders too, so only its start, and a link's end, are checked.
+ */
+function placeholderShaped(mark: HTMLElement): boolean {
+  const text = mark.textContent ?? '';
+  if (mark.querySelector('.redacted')) {
+    return /^\[(?:email|link)/.test(text) && (!text.startsWith('[link') || text.endsWith(']'));
+  }
+  return /^\[(?:name|number|iban|link(?:: [^\]]*)?)\]$|^\[email\](?:@\S*)?$/.test(text);
+}
 
 function checkPanelOnce(): void {
   expect(violations).toEqual([]);
@@ -629,16 +720,55 @@ function checkPanelOnce(): void {
     expect(!preview || cardOpen, 'preview outside the consent card').toBe(true);
     // The tier-2 lists step aside exactly while the consent card is open.
     expect(get('app').dataset.consent === 'open', 'red flags hidden out of step').toBe(cardOpen);
-    // A preview waiting for consent says whether names were kept, and that matches the level.
+    // The marks in the data: only there, one Tab stop at most, each reading as a placeholder (they
+    // come from the filter's record, never from a search of the text). The tooltip only with the
+    // data on screen.
+    const pre = get('deep-check-data');
+    const marks = [...pre.querySelectorAll<HTMLElement>('.redacted')];
+    expect(document.querySelectorAll('.redacted'), 'a mark outside the data').toHaveLength(
+      marks.length,
+    );
+    expect(
+      pre.querySelectorAll('[tabindex="0"]').length,
+      'more than one Tab stop in the data',
+    ).toBeLessThanOrEqual(1);
+    for (const mark of marks) {
+      expect(placeholderShaped(mark), `mark "${mark.textContent}"`).toBe(true);
+    }
+    if (marks.length > 0) reached.add('deep: marks');
+    const tipShown = !get('deep-check-tip').hidden;
+    expect(tipShown && get('deep-check-data-panel').hidden, 'tooltip with the data hidden').toBe(
+      false,
+    );
+    if (tipShown) reached.add('deep: tip shown');
+    // A preview waiting for consent shows exactly the filter's data, with a mark per recorded
+    // place, and a list that matches the level (no names at Standard) and its heading.
     if (preview && !get('deep-check-send').hidden) {
       const standard = get<HTMLInputElement>('deep-check-level-standard').checked;
-      const chips = get('deep-check-removed').textContent ?? '';
-      expect(
-        chips.includes(MESSAGES[caseLanguage].deepCheck.chips.namesKept),
-        'preview matches the level',
-      ).toBe(standard);
+      const dict = MESSAGES[caseLanguage].deepCheck;
       // The exact data is there whenever Send is: never a Send without data to see.
-      expect(get('deep-check-data').textContent, 'Send without data').not.toBe('');
+      expect(pre.textContent, 'Send without data').not.toBe('');
+      expect(pre.textContent, "data differs from the filter's").toBe(lastData?.json);
+      expect(
+        marks.map((mark) => mark.textContent),
+        'marks differ from the recorded places',
+      ).toEqual(lastData?.spans.map((span) => lastData?.json.slice(span.start, span.end)));
+      const items = [...get('deep-check-removed').querySelectorAll<HTMLElement>('.removed__item')];
+      const kinds = items.map((item) => item.dataset.kind);
+      if (standard) expect(kinds, 'names listed at Standard').not.toContain('name');
+      expect(get('deep-check-removed-heading').textContent, 'heading and list differ').toBe(
+        items.length > 0
+          ? dict.foundAndRemoved
+          : dict.nothingToRemove[standard ? 'standard' : 'high'],
+      );
+      expect(get('deep-check-removed').hidden, 'list hidden or shown out of step').toBe(
+        items.length === 0,
+      );
+      const current = items.filter((item) => item.getAttribute('aria-current') === 'true');
+      expect(current.length, 'more than one current item').toBeLessThanOrEqual(1);
+      expect(current[0]?.dataset.kind, 'current item and selected kind differ').toBe(
+        pre.dataset.selectedKind,
+      );
       reached.add(`deep: level ${standard ? 'standard' : 'high'}`);
     }
     // "Looking for names" or "Checking in the cloud" only while that work really runs.
@@ -715,7 +845,12 @@ describe('monkey: side panel', () => {
       deepWork = 0;
       aiConfigured = false;
       consent = undefined;
+      lastData = undefined;
       cloudAvailable = rng.chance(0.8);
+      // The end phase's deep check runs at Standard in even cases and at High in odd ones, where
+      // every other name search "could not look": so each of those states is seen for certain.
+      calmNames = index % 4 === 1 ? undefined : ['Anna Muster'];
+      calmCloudFails = index % 4 === 3;
       vi.clearAllTimers();
       vi.resetModules();
       loadPanel();
@@ -768,8 +903,41 @@ x</pre>`,
       if (!start.closest('[hidden]') && !start.disabled) {
         trace.push('calm: deep check');
         start.click();
+        await vi.advanceTimersByTimeAsync(0);
+        // The level cards are in the card that just opened: the level of this case, if it differs.
+        const wanted = get<HTMLInputElement>(
+          `deep-check-level-${index % 2 === 0 ? 'standard' : 'high'}`,
+        );
+        if (!wanted.checked && !wanted.closest('[hidden]')) {
+          trace.push(`calm: privacy level ${wanted.value}`);
+          wanted.click();
+        }
         await vi.advanceTimersByTimeAsync(1_000_000);
         checkPanel();
+        // A look at the first kind in the list and at a mark, so that is seen in every case too.
+        const item = get('deep-check-removed').querySelector<HTMLElement>('.removed__item');
+        if (item && !item.closest('[hidden]')) {
+          trace.push('calm: removed item');
+          item.click();
+          reached.add('deep: item clicked');
+          const mark = get('deep-check-data').querySelector<HTMLElement>('.redacted');
+          mark?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+          await vi.advanceTimersByTimeAsync(1_000);
+          checkPanel();
+          await vi.advanceTimersByTimeAsync(1_000_000);
+          checkPanel();
+        }
+        // Cancel once ("Nothing was sent."), then prepare again and send, so both are seen.
+        const cancel = get<HTMLButtonElement>('deep-check-cancel');
+        if (!cancel.closest('[hidden]')) {
+          trace.push('calm: cancel, then again');
+          cancel.click();
+          await vi.advanceTimersByTimeAsync(0);
+          checkPanel();
+          start.click();
+          await vi.advanceTimersByTimeAsync(1_000_000);
+          checkPanel();
+        }
         const send = get<HTMLButtonElement>('deep-check-send');
         if (!send.closest('[hidden]') && !send.disabled) {
           consent = get('deep-check-data').textContent ?? '';
@@ -779,6 +947,12 @@ x</pre>`,
           checkPanel();
         }
       }
+      // One Gmail email whose sender checks could not be loaded, so that status is seen in every
+      // case too (the random messages reach it only now and then).
+      port?.receive({ type: 'email', key: 'msg-f:calm-2', email: randomEmail(rng) });
+      port?.receive({ type: 'original-failed', key: 'msg-f:calm-2', reason: 'timeout' });
+      await vi.advanceTimersByTimeAsync(1_000_000);
+      checkPanel();
       for (const id of ['run', 'paste-use', 'sample-load', 'model-download']) {
         expect(get<HTMLButtonElement>(id).disabled, `#${id} stuck disabled`).toBe(false);
       }
@@ -823,6 +997,7 @@ x</pre>`,
           'deep: level high',
           'deep: names may remain',
           'deep: data shown',
+          'deep: item clicked',
           'deep: Nothing was sent',
           'deep: The deep check did not',
           'deep light',

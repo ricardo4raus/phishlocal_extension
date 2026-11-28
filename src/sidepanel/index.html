@@ -246,7 +246,9 @@
                   A larger model in the cloud checks again. Personal data is removed on this device
                   first.
                 </p>
-                <p class="text-secondary" data-t="nothingSentYet">Nothing has been sent yet.</p>
+                <p id="deep-check-nothing-yet" class="text-secondary" data-t="nothingSentYet">
+                  Nothing has been sent yet.
+                </p>
               </div>
               <fieldset id="deep-check-levels" class="levels">
                 <legend class="field__label" data-t="privacyLevel">Privacy level</legend>
@@ -298,9 +300,16 @@
               </fieldset>
 
               <div id="deep-check-preview" class="stack" tabindex="-1" hidden>
+                <!-- What the privacy filter found and removed (deep-check-view.ts fills both):
+                     the heading, or the "nothing" line alone, and one button per kind that
+                     highlights those places in the data below. -->
                 <div class="stack stack--tight">
-                  <p class="field__label" data-t="removedOnDevice">Removed on this device</p>
-                  <div id="deep-check-removed" class="cluster"></div>
+                  <p id="deep-check-removed-heading" class="field__label"></p>
+                  <ul
+                    id="deep-check-removed"
+                    class="removed"
+                    aria-labelledby="deep-check-removed-heading"
+                  ></ul>
                 </div>
                 <p id="deep-check-warning" class="note" hidden>
                   <span class="icon" data-icon="alert" aria-hidden="true"></span>
@@ -320,7 +329,7 @@
                     <span data-t="showData">Show what will be sent</span>
                     <span class="icon icon--s" data-icon="chevron-down" aria-hidden="true"></span>
                   </button>
-                  <div id="deep-check-data-panel" class="stack stack--tight" hidden>
+                  <div id="deep-check-data-panel" class="stack stack--tight data-panel" hidden>
                     <pre
                       id="deep-check-data"
                       class="data"
@@ -328,6 +337,9 @@
                       aria-label="Data that will be sent to the cloud"
                       data-t-label="dataLabel"
                     ></pre>
+                    <!-- The original text of a highlighted place, struck through; shown on hover
+                         or focus, positioned by script inside this panel (the data scrolls). -->
+                    <span id="deep-check-tip" class="tip" role="tooltip" hidden><s></s></span>
                     <p class="text-muted" data-t="dataExactly">
                       Exactly this text goes to the cloud, with PhishLocal's fixed instructions and
                       nothing else.
