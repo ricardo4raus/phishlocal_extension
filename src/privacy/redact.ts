@@ -315,7 +315,7 @@ const COUNTED: Record<RedactedKind, keyof Removed> = {
  */
 function linkPlaceholder(match: string, names: readonly string[], bare = false): Replacement {
   const link = bare || /^www\./iu.test(match) ? `https://${match}` : match;
-  const { host, at, end, written } = trueHostAt(link);
+  const { host, at, end, written, mappable } = trueHostAt(link);
   if (!host) return { kind: 'link', text: '[link]' };
   // An IP address would be read as a number by the next step and turn into "[number]".
   if (IP_ADDRESS.test(host)) return { kind: 'link', text: '[link: IP address]' };
@@ -326,18 +326,22 @@ function linkPlaceholder(match: string, names: readonly string[], bare = false):
     kind: 'link',
     ...concat(prefix, inner, ']'),
     // A character of the written host: where it stands in the cleaned host; null when URL
-    // rewrote the host (kept, place unknown); undefined for the scheme, user name, path and
-    // query, which are gone. The host is the link's slice in lower case, which can be longer
-    // ("İ" becomes two units; review).
+    // rewrote the host (kept, place unknown, mapped by order); undefined for the scheme, user
+    // name, path and query, which are gone, and for a rewritten host whose stand-ins cannot be
+    // told apart. The host is the link's slice in lower case, which can be longer ("İ" becomes
+    // two units; review).
     slotFor: (offset) => {
       const inLink = offset + shift;
       if (inLink < at || inLink >= end) return undefined;
-      if (!written) return null;
+      if (!written) return mappable ? null : undefined;
       const inHost = offsetOf(inner, link.slice(at, inLink).toLowerCase().length);
       return inHost === undefined ? undefined : prefix.length + inHost;
     },
   };
 }
+
+/** How many name stand-ins a text holds. */
+const standIns = (text: string): number => text.split(NAME_STAND_IN).length - 1;
 
 /** An IPv4 address, or an IPv6 address in brackets, as a link's host. */
 const IP_ADDRESS = /^(?:[\d.]+|\[[\da-f:.]+\])$/iu;
@@ -378,23 +382,37 @@ export function trueHost(link: string): string {
 }
 
 /**
- * {@link trueHost}, with where the written host stands in the link (`at`..`end`) and whether
- * that written host is the one used (`written`; else `URL` rewrote it, so no offset in it maps).
+ * {@link trueHost}, with where the written host part stands in the link (`at`..`end`), whether
+ * that written host is the one used (`written`; else `URL` rewrote it, so no offset in it maps)
+ * and, for a rewritten host, whether its name stand-ins can still be told apart by order
+ * (`mappable`): only when nothing of the host `URL` read was cut and it holds exactly as many
+ * stand-ins as the written host part. A host that spells the stand-in's marker itself, or one
+ * whose real stand-in the host rule cut off, fails that, so no name's original can be lent to
+ * a place where it never stood (review rounds 3 and 4).
  */
-function trueHostAt(link: string): { host: string; at: number; end: number; written: boolean } {
+function trueHostAt(link: string): {
+  host: string;
+  at: number;
+  end: number;
+  written: boolean;
+  mappable: boolean;
+} {
   const { host: asWritten, at, end } = linkHostAt(link);
   // A trailing dot is the same host ("müller.example." at the end of a sentence; review round 7).
   const parsed = (parseUrl(plain(link))?.hostname ?? '').replace(/\.+$/u, '');
-  if (!parsed) return { host: asWritten, at, end, written: true };
+  if (!parsed) return { host: asWritten, at, end, written: true, mappable: true };
   if (parseUrl(`https://${plain(asWritten)}`)?.hostname === parsed) {
-    return { host: asWritten, at, end, written: true };
+    return { host: asWritten, at, end, written: true, mappable: true };
   }
   // `URL` also takes punctuation into a host ("evil.example)."): only the host characters count.
+  const kept = linkHost(`https://${parsed}`);
+  const host = kept.replaceAll(STAND_IN_MARK, NAME_STAND_IN);
   return {
-    host: linkHost(`https://${parsed}`).replaceAll(STAND_IN_MARK, NAME_STAND_IN),
+    host,
     at,
     end,
     written: false,
+    mappable: kept === parsed && standIns(host) === standIns(link.slice(at, end)),
   };
 }
 

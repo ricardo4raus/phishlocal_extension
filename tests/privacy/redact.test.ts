@@ -775,6 +775,20 @@ describe('cloudData spans', () => {
     wellFormed(data);
     expect(JSON.parse(data.json)).toMatchObject({ email: { body: 'See [link: [name].example]' } });
     expect(spansOf(data, 'name')).toEqual([]);
+    // Nor when a real name sits in the same host part but the host rule cuts it off (round 4):
+    // the forged "[name]" would otherwise borrow "muster".
+    for (const link of [
+      'https://%7Aqname%7Aq.example_muster/x',
+      'https://%7Aqname%7Aq.example(muster)',
+    ]) {
+      const forged = cloudData(
+        email({ sender: { name: '', address: '' }, bodyText: `See ${link}` }),
+        [],
+        ['Anna Muster'],
+      );
+      wellFormed(forged);
+      expect(spansOf(forged, 'name'), link).toEqual([]);
+    }
     // A name in the user name is gone too, so the host's own names still map.
     const withUser = cloudData(
       email({
