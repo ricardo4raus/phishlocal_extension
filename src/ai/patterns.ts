@@ -71,25 +71,33 @@ function isDate(text: string): boolean {
  * on the safe side.
  */
 export function replacePhoneNumbers(text: string, replacement: string): string {
-  return text.replaceAll(PHONE_NUMBER, (match: string, offset: number) => {
-    if (isDate(match)) return match;
-    const parts = match.split(' ');
-    if (!parts.some(isDate)) return replacement;
-    // A "+" starts only phone numbers, never a date: "+49 30/12/34 56789" holds a date-shaped
-    // group, and the rest alone is too short to read as a number (found by the monkey test). Not
-    // after a time zone: "UTC+1 19.11.2026" is a deadline (found in review).
-    // After a time zone, only the offset and a time ("14" of "14:00") may stand next to the date;
-    // a longer group is a phone number glued to it ("GMT+49 30/12/34 56789"; review round 6).
-    const timeZone =
-      /(?:UTC|GMT)$/iu.test(text.slice(Math.max(0, offset - 3), offset)) &&
-      parts.slice(1).every((part) => isDate(part) || /^\p{Nd}{1,2}$/u.test(part));
-    if (match.startsWith('+') && !timeZone) return replacement;
-    const rest = parts.filter((part) => !isDate(part)).join(' ');
-    const phoneInRest = [...rest.matchAll(new RegExp(PHONE_NUMBER.source, 'gu'))].some(
-      ([number]) => !isDate(number),
-    );
-    return phoneInRest ? replacement : match;
-  });
+  return text.replaceAll(PHONE_NUMBER, (match: string, offset: number) =>
+    isPhoneNumber(match, offset, text) ? replacement : match,
+  );
+}
+
+/**
+ * A {@link PHONE_NUMBER} match at `offset` of `text` is a number to remove, not a date (or a
+ * date with a time zone offset). The privacy filter calls this per match, so it can record where
+ * the number stood.
+ */
+export function isPhoneNumber(match: string, offset: number, text: string): boolean {
+  if (isDate(match)) return false;
+  const parts = match.split(' ');
+  if (!parts.some(isDate)) return true;
+  // A "+" starts only phone numbers, never a date: "+49 30/12/34 56789" holds a date-shaped
+  // group, and the rest alone is too short to read as a number (found by the monkey test). Not
+  // after a time zone: "UTC+1 19.11.2026" is a deadline (found in review).
+  // After a time zone, only the offset and a time ("14" of "14:00") may stand next to the date;
+  // a longer group is a phone number glued to it ("GMT+49 30/12/34 56789"; review round 6).
+  const timeZone =
+    /(?:UTC|GMT)$/iu.test(text.slice(Math.max(0, offset - 3), offset)) &&
+    parts.slice(1).every((part) => isDate(part) || /^\p{Nd}{1,2}$/u.test(part));
+  if (match.startsWith('+') && !timeZone) return true;
+  const rest = parts.filter((part) => !isDate(part)).join(' ');
+  return [...rest.matchAll(new RegExp(PHONE_NUMBER.source, 'gu'))].some(
+    ([number]) => !isDate(number),
+  );
 }
 
 /** Invisible format characters (zero-width, soft hyphen, direction controls). */

@@ -47,8 +47,6 @@ export const de: Messages = {
     removesLinkPaths: 'Link-Pfade (der Name der Website bleibt)',
     removesStandard: 'Alles aus Standard',
     removesNames: 'Namen von Personen',
-    removedOnDevice: 'Auf diesem Gerät entfernt',
-    neverSent: 'Nie gesendet: deine Adresse, die Roh-Header, IP-Adressen von Servern.',
     namesMayRemain:
       'Einige Namen können noch im Text stehen: Lies, was gesendet wird, bevor du es sendest.',
     showData: 'Zeigen, was gesendet wird',
@@ -57,7 +55,6 @@ export const de: Messages = {
       'Genau dieser Text geht an die Cloud, mit den festen Anweisungen von PhishLocal und sonst nichts.',
     send: 'An die Cloud senden',
     cancel: 'Abbrechen',
-    sentOnce: 'Einmal gesendet, nur für diese Prüfung, an Gemini über Firebase AI Logic.',
     emailDetails: 'E-Mail-Details',
     from: 'Von',
     subject: 'Betreff',
@@ -385,14 +382,18 @@ export const de: Messages = {
     recommendedExperimental: (language) =>
       `Empfohlen: Antworten der lokalen KI auf ${language} sind experimentell.`,
     recommendedUnchecked: 'Empfohlen: Die lokale KI hat diese E-Mail nicht geprüft.',
-    chips: {
+    foundAndRemoved: 'In dieser E-Mail gefunden und vor dem Senden entfernt:',
+    items: {
       names: (count) => plural(count, 'Name', 'Namen'),
       emails: (count) => plural(count, 'E-Mail-Adresse', 'E-Mail-Adressen'),
       numbers: (count) => plural(count, 'Nummer', 'Nummern'),
       ibans: (count) => plural(count, 'IBAN', 'IBANs'),
-      links: (count) => plural(count, 'Link-Pfad', 'Link-Pfade'),
-      nothing: 'Keine persönlichen Daten gefunden',
-      namesKept: 'Namen behalten',
+      links: (count) => `${plural(count, 'Link-Pfad', 'Link-Pfade')} (der Name der Website bleibt)`,
+    },
+    nothingToRemove: {
+      standard:
+        'Nichts zum Entfernen gefunden: keine E-Mail-Adressen, Nummern, IBANs oder Link-Pfade.',
+      high: 'Nichts zum Entfernen gefunden: keine Namen, E-Mail-Adressen, Nummern, IBANs oder Link-Pfade.',
     },
     changed: {
       idle: '',
@@ -402,7 +403,7 @@ export const de: Messages = {
         'Die E-Mail hat sich geändert, also wurden die vorbereiteten Daten verworfen. Nichts wurde gesendet.',
       sending:
         'Die E-Mail hat sich während der Tiefenprüfung geändert: ihre Daten waren gesendet, die Antwort wurde verworfen.',
-      done: 'Die E-Mail hat sich geändert, also wurde das Ergebnis der Tiefenprüfung entfernt.',
+      done: '',
     },
     waitingModel: 'Warte auf die lokale KI…',
     lookingForNames: 'Suche Namen auf diesem Gerät…',
@@ -419,7 +420,6 @@ export const de: Messages = {
     resultWord: (word) => `Tiefenprüfung: ${word}`,
     source: 'In der Cloud geprüft',
     note: (time) => `Cloud (Gemini über Firebase AI Logic). KI kann sich irren. ${time}.`,
-    sentOnce: 'Einmal gesendet, nur für diese Prüfung.',
     checking: 'Wird in der Cloud geprüft…',
     showFailed: 'Das Ergebnis der Tiefenprüfung konnte nicht angezeigt werden.',
     levelChanged:

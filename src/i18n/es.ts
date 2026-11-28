@@ -48,9 +48,6 @@ export const es: Messages = {
     removesLinkPaths: 'Rutas de los enlaces (el nombre del sitio se mantiene)',
     removesStandard: 'Todo lo de Estándar',
     removesNames: 'Nombres de personas',
-    removedOnDevice: 'Eliminado en este dispositivo',
-    neverSent:
-      'Nunca se envía: tu dirección, los encabezados sin procesar, las direcciones IP de los servidores.',
     namesMayRemain:
       'Puede que aún queden nombres en el texto: lee lo que se enviará antes de enviarlo.',
     showData: 'Mostrar lo que se enviará',
@@ -59,7 +56,6 @@ export const es: Messages = {
       'Exactamente este texto va a la nube, con las instrucciones fijas de PhishLocal y nada más.',
     send: 'Enviar a la nube',
     cancel: 'Cancelar',
-    sentOnce: 'Se envía una vez, solo para esta revisión, a Gemini mediante Firebase AI Logic.',
     emailDetails: 'Detalles del correo',
     from: 'De',
     subject: 'Asunto',
@@ -377,14 +373,19 @@ export const es: Messages = {
     recommendedExperimental: (language) =>
       `Recomendado: las respuestas de la IA local en ${language} son experimentales.`,
     recommendedUnchecked: 'Recomendado: la IA local no revisó este correo.',
-    chips: {
+    foundAndRemoved: 'Encontrado en este correo y eliminado antes de enviar:',
+    items: {
       names: (count) => plural(count, 'nombre', 'nombres'),
       emails: (count) => plural(count, 'dirección de correo', 'direcciones de correo'),
       numbers: (count) => plural(count, 'número', 'números'),
       ibans: (count) => plural(count, 'IBAN', 'IBAN'),
-      links: (count) => plural(count, 'ruta de enlace', 'rutas de enlace'),
-      nothing: 'No se encontraron datos personales',
-      namesKept: 'Nombres conservados',
+      links: (count) =>
+        `${plural(count, 'ruta de enlace', 'rutas de enlace')} (el nombre del sitio se mantiene)`,
+    },
+    nothingToRemove: {
+      standard:
+        'No se encontró nada que eliminar: ni direcciones de correo, ni números, ni IBAN, ni rutas de enlace.',
+      high: 'No se encontró nada que eliminar: ni nombres, ni direcciones de correo, ni números, ni IBAN, ni rutas de enlace.',
     },
     changed: {
       idle: '',
@@ -392,7 +393,7 @@ export const es: Messages = {
       preview: 'El correo cambió, así que se descartaron los datos preparados. No se envió nada.',
       sending:
         'El correo cambió durante la revisión a fondo: sus datos ya se habían enviado, la respuesta se descartó.',
-      done: 'El correo cambió, así que se borró el resultado de la revisión a fondo.',
+      done: '',
     },
     waitingModel: 'Esperando la IA local…',
     lookingForNames: 'Buscando nombres en este dispositivo…',
@@ -409,7 +410,6 @@ export const es: Messages = {
     resultWord: (word) => `Revisión a fondo: ${word}`,
     source: 'Revisado en la nube',
     note: (time) => `Nube (Gemini mediante Firebase AI Logic). La IA puede equivocarse. ${time}.`,
-    sentOnce: 'Enviado una vez, solo para esta revisión.',
     checking: 'Revisando en la nube…',
     showFailed: 'No se pudo mostrar el resultado de la revisión a fondo.',
     levelChanged:

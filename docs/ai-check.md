@@ -189,7 +189,10 @@ are its input and its lower limit.
 7. **Language:** the panel's language (`language` in `src/i18n`: the user's choice under
    Settings, else Chrome's language, else English), whatever the language of the email: the
    prompt says, for example, "Write the reasons and the advice in German, also when the email is
-   in another language." So a result reads in one language. Each answer language gets its own
+   in another language. Address the reader with "du"." The form of address is the panel's
+   (`ADDRESS_FORMS` in `src/ai/prompt.ts`: du, vous, tú, tu, você); without it both models wrote
+   "Sie" next to a panel that says "du" (26 Nov 2026). So a result reads in one language and one
+   voice. Each answer language gets its own
    on-device model with exactly that output language. Gemini Nano marks Italian and Portuguese
    experimental (measured 17 Nov 2026; supported are de, en, es, fr, ja), so the panel says so
    and recommends the deep check. The rules' own messages and the system prompt stay English.
@@ -278,9 +281,17 @@ reasons in German, 1.9 s, so it stays). Nothing is sent on its own:
    another host ("lumorabank.example%2Eevil.example") shows the real one. **Never:** raw headers (they hold the user's
    address and server IP addresses), the Return-Path (often holds the user's address), full
    links, the user's own address.
-5. **Consent:** the panel shows what was removed (counts per kind, and what is never sent) and,
-   one click away under "Show what will be sent", exactly that data (the JSON that is sent;
-   decided 22 Nov 2026, see [`ui-design.md`](ui-design.md)). Only "Send to the cloud" sends it,
+5. **Consent:** the panel lists what was removed ("Found in this email and removed before
+   sending": one item per kind with its count) and, one click away under "Show what will be
+   sent", exactly that data (the JSON that is sent; decided 22 Nov 2026, see
+   [`ui-design.md`](ui-design.md)). Since 28 Nov 2026 the filter also records where it wrote each
+   placeholder (`CloudData.spans`, built in `src/privacy/tracked.ts`: the passes run through a
+   tracker that applies exactly the matches `replaceAll` would, and the fields enter the JSON as
+   random tokens that are written back escaped piece by piece; the result must equal the plain
+   `JSON.stringify` output, else the canonical JSON goes out without positions). The card marks
+   those places in the data, a click on a list item highlights its kind, and hovering or focusing
+   a mark shows the original, struck through. The spans and originals stay on the device: the
+   prompt is built from `json` alone. Only "Send to the cloud" sends it,
    once per click; "Cancel" sends nothing. After a stop, a time limit or a failure the card stays
    open with the same data, and a new click on Send is a new consent to it (the status says the
    data may already have reached the cloud). Consent is asked
@@ -326,6 +337,12 @@ the server. Builds without a Firebase project say the deep check is not availabl
   than it is read) is found only when it is a whole label ("xn--mller-kva.example"), not inside
   a longer one ("müller-family" in punycode).
 - Amounts written with spaces that reach 9 characters ("4 500 000.00") become "[number]".
+- The highlights in the consent card: a name inside a link's host that `URL` reads differently
+  than it is written gets its mark by order; when the host rule cut anything off the host `URL`
+  read (it stops at the underscore in "anna_muster.example"), or that host holds another number
+  of name stand-ins than the written host part (a host spelling the stand-in's marker itself),
+  those "[name]"s get no mark and no count, because a wrong original would be worse than none.
+  Names in a link's user name, path or query are gone with it and never counted for the host.
 - A single-word name in lower case ("anna" alone, outside an address) stays: matching single
   words in any case would remove ordinary words. The other way round, a short name part also
   removes the same word written with a capital ("Al" in "Al hacer clic").

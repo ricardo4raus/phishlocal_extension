@@ -53,8 +53,6 @@ export const en = {
     removesLinkPaths: "Link paths (the website's name stays)",
     removesStandard: 'Everything from Standard',
     removesNames: 'Names of people',
-    removedOnDevice: 'Removed on this device',
-    neverSent: 'Never sent: your address, the raw headers, server IP addresses.',
     namesMayRemain:
       'Some names may still be in the text: read what will be sent before you send it.',
     showData: 'Show what will be sent',
@@ -63,7 +61,6 @@ export const en = {
       "Exactly this text goes to the cloud, with PhishLocal's fixed instructions and nothing else.",
     send: 'Send to the cloud',
     cancel: 'Cancel',
-    sentOnce: 'Sent once, for this check only, to Gemini through Firebase AI Logic.',
     emailDetails: 'Email details',
     from: 'From',
     subject: 'Subject',
@@ -374,14 +371,23 @@ export const en = {
     recommendedExperimental: (language: string) =>
       `Recommended: on-device answers in ${language} are experimental.`,
     recommendedUnchecked: 'Recommended: the on-device AI did not check this email.',
-    chips: {
+    /**
+     * The list of what the privacy filter found and removed, one item per kind. Counts are
+     * occurrences: "5 names" is five places in the text, maybe one person.
+     */
+    foundAndRemoved: 'Found in this email and removed before sending:',
+    items: {
       names: (count: number) => plural(count, 'name', 'names'),
       emails: (count: number) => plural(count, 'email address', 'email addresses'),
       numbers: (count: number) => plural(count, 'number', 'numbers'),
       ibans: (count: number) => plural(count, 'IBAN', 'IBANs'),
-      links: (count: number) => plural(count, 'link path', 'link paths'),
-      nothing: 'No personal data found',
-      namesKept: 'Names kept',
+      links: (count: number) =>
+        `${plural(count, 'link path', 'link paths')} (the website's name stays)`,
+    },
+    /** In place of the heading when the list is empty, by privacy level. */
+    nothingToRemove: {
+      standard: 'Nothing found to remove: no email addresses, numbers, IBANs or link paths.',
+      high: 'Nothing found to remove: no names, email addresses, numbers, IBANs or link paths.',
     },
     changed: {
       idle: '',
@@ -389,7 +395,7 @@ export const en = {
       preview: 'The email changed, so the prepared data was discarded. Nothing was sent.',
       sending:
         'The email changed while the deep check ran: its data had been sent, its answer was dropped.',
-      done: 'The email changed, so the deep check result was cleared.',
+      done: '',
     },
     waitingModel: 'Waiting for the on-device AI…',
     lookingForNames: 'Looking for names on this device…',
@@ -406,7 +412,6 @@ export const en = {
     resultWord: (word: string) => `Deep check: ${word}`,
     source: 'Checked in the cloud',
     note: (time: string) => `Cloud (Gemini via Firebase AI Logic). AI can be wrong. ${time}.`,
-    sentOnce: 'Sent once, for this check only.',
     checking: 'Checking in the cloud…',
     showFailed: 'The deep check result could not be shown.',
     levelChanged:

@@ -5,7 +5,7 @@ import { buildUserPrompt } from '../../src/ai/prompt';
 import { MAX_AI_TEXT, MAX_REASONS, parseVerdict, RISKS } from '../../src/ai/verdict';
 import { type Email, isEmail } from '../../src/email';
 import { parsePastedEmail, readHtml } from '../../src/paste/parse-pasted-email';
-import { cloudData } from '../../src/privacy/redact';
+import { cloudData, type RedactedKind } from '../../src/privacy/redact';
 import { headersFromOriginalPage, GMAIL_SERVER } from '../../src/raw/gmail-original-page';
 import { looksLikeRawEmail, parseRawEmail, RawEmailError } from '../../src/raw/parse-raw-email';
 import { checkEmail, MAX_FINDINGS } from '../../src/rules';
@@ -265,6 +265,15 @@ const PRIVATE = [
   'secure.quint-bank.example/verify?uid=zqhost',
 ].join(' ');
 
+/** What a span of each kind must point at in the JSON. */
+const PLACEHOLDER_SHAPE: Record<RedactedKind, RegExp> = {
+  name: /^\[name\]$/,
+  email: /^\[email\](?:@[^"]*)?$/,
+  number: /^\[number\]$/,
+  iban: /^\[iban\]$/,
+  link: /^\[link(?:: [^"]*)?\]$/,
+};
+
 describe('monkey: privacy filter in front of the cloud', () => {
   it('lets no planted personal data and no raw header through', async () => {
     await forEachCase(300, (rng) => {
@@ -318,6 +327,44 @@ describe('monkey: privacy filter in front of the cloud', () => {
       expect(data.namesChecked).toBe(high ? nanoLooked : true);
       // At "standard" no name is removed.
       expect(!high && data.removed.names > 0, 'names removed at "standard"').toBe(false);
+      // The positions for the consent card's highlights (28 Nov 2026): every span points at a
+      // placeholder of its kind in a JSON that is exactly the canonical one, spans nest or stay
+      // apart, and the counts are the spans (a lost mapping would show "nothing found").
+      expect(json, 'canonical JSON').toBe(JSON.stringify(JSON.parse(json), null, 2));
+      const counted: Record<RedactedKind, number> = {
+        name: 0,
+        email: 0,
+        number: 0,
+        iban: 0,
+        link: 0,
+      };
+      let previous: (typeof data.spans)[number] | undefined;
+      for (const span of data.spans) {
+        const placeholder = json.slice(span.start, span.end);
+        expect(
+          placeholder,
+          `span ${span.kind} ${span.start}-${span.end} in ${JSON.stringify(json.slice(Math.max(0, span.start - 60), span.end + 60))}; spans ${JSON.stringify(data.spans)}`,
+        ).toMatch(PLACEHOLDER_SHAPE[span.kind]);
+        expect(span.original, 'original').not.toBe('');
+        // In order, and inside the previous span or after it: never half in, half out.
+        expect(previous === undefined || span.start >= previous.start, 'span order').toBe(true);
+        expect(
+          previous === undefined || span.end <= previous.end || span.start >= previous.end,
+          'span overlap',
+        ).toBe(true);
+        counted[span.kind]++;
+        previous = span;
+      }
+      expect(data.removed, 'counts are the spans').toEqual({
+        names: counted.name,
+        emails: counted.email,
+        numbers: counted.number,
+        ibans: counted.iban,
+        links: counted.link,
+      });
+      // The sender address always goes out as "[email]@domain": at least that span exists, so
+      // the mapping never fell back silently.
+      expect(email.sender.address === '' || counted.email > 0, 'mapping fell back').toBe(true);
       // The same email, the same data.
       expect(
         cloudData(email, checkEmail(email), nanoLooked ? ['Zorbald Quint'] : undefined, level),

@@ -56,13 +56,27 @@ describe('buildUserPrompt', () => {
     const prompt = buildUserPrompt(email, findings, 'de', 'a1b2c3d4');
     const lines = prompt.split('\n');
     expect(lines[0]).toBe(
-      'Check this email for phishing. Write the reasons and the advice in German, also when the email is in another language.',
+      'Check this email for phishing. Write the reasons and the advice in German, also when the email is in another language. Address the reader with "du".',
     );
     expect(lines[2]).toBe('<data-a1b2c3d4>');
     expect(lines[4]).toBe('</data-a1b2c3d4>');
     expect(lines).toHaveLength(5);
     // The data line is valid JSON: quotes and line breaks of the email are escaped.
     expect(JSON.parse(lines[3] ?? '')).toEqual(promptData(email, findings));
+  });
+
+  it.each([
+    ['de', ' Address the reader with "du".'],
+    ['fr', ' Address the reader with "vous".'],
+    ['es', ' Address the reader with "tú".'],
+    ['it', ' Address the reader with "tu".'],
+    ['pt', ' Address the reader with "você".'],
+    ['en', ''],
+  ])('addresses the reader in %s like the panel does', (language, address) => {
+    const [first] = buildUserPrompt(email, findings, language, 'a1b2c3d4').split(
+      String.fromCharCode(10),
+    );
+    expect(first?.endsWith(`also when the email is in another language.${address}`)).toBe(true);
   });
 
   it('keeps an injection inside the data block', () => {

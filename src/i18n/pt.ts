@@ -48,9 +48,6 @@ export const pt: Messages = {
     removesLinkPaths: 'Caminhos das ligações (o nome do site fica)',
     removesStandard: 'Tudo o que o Padrão remove',
     removesNames: 'Nomes de pessoas',
-    removedOnDevice: 'Removido neste dispositivo',
-    neverSent:
-      'Nunca enviados: o seu endereço, os cabeçalhos em bruto, os endereços IP dos servidores.',
     namesMayRemain:
       'Alguns nomes podem ainda estar no texto: leia o que vai ser enviado antes de o enviar.',
     showData: 'Mostrar o que vai ser enviado',
@@ -59,7 +56,6 @@ export const pt: Messages = {
       'Exatamente este texto vai para a nuvem, com as instruções fixas do PhishLocal e nada mais.',
     send: 'Enviar para a nuvem',
     cancel: 'Cancelar',
-    sentOnce: 'Enviado uma vez, só para esta verificação, ao Gemini através do Firebase AI Logic.',
     emailDetails: 'Detalhes do e-mail',
     from: 'De',
     subject: 'Assunto',
@@ -375,14 +371,19 @@ export const pt: Messages = {
     recommendedExperimental: (language) =>
       `Recomendado: as respostas da IA local em ${language} são experimentais.`,
     recommendedUnchecked: 'Recomendado: a IA local não verificou este e-mail.',
-    chips: {
+    foundAndRemoved: 'Encontrado neste e-mail e removido antes de enviar:',
+    items: {
       names: (count) => plural(count, 'nome', 'nomes'),
       emails: (count) => plural(count, 'endereço de e-mail', 'endereços de e-mail'),
       numbers: (count) => plural(count, 'número', 'números'),
       ibans: (count) => plural(count, 'IBAN', 'IBAN'),
-      links: (count) => plural(count, 'caminho de ligação', 'caminhos de ligação'),
-      nothing: 'Nenhum dado pessoal encontrado',
-      namesKept: 'Nomes mantidos',
+      links: (count) =>
+        `${plural(count, 'caminho de ligação', 'caminhos de ligação')} (o nome do site fica)`,
+    },
+    nothingToRemove: {
+      standard:
+        'Nada encontrado para remover: nenhum endereço de e-mail, número, IBAN ou caminho de ligação.',
+      high: 'Nada encontrado para remover: nenhum nome, endereço de e-mail, número, IBAN ou caminho de ligação.',
     },
     changed: {
       idle: '',
@@ -392,7 +393,7 @@ export const pt: Messages = {
         'O e-mail mudou, por isso os dados preparados foram descartados. Não foi enviado nada.',
       sending:
         'O e-mail mudou durante a verificação aprofundada: os dados dele já tinham sido enviados, a resposta foi descartada.',
-      done: 'O e-mail mudou, por isso o resultado da verificação aprofundada foi apagado.',
+      done: '',
     },
     waitingModel: 'À espera da IA local…',
     lookingForNames: 'A procurar nomes neste dispositivo…',
@@ -410,7 +411,6 @@ export const pt: Messages = {
     resultWord: (word) => `Verificação aprofundada: ${word}`,
     source: 'Verificado na nuvem',
     note: (time) => `Nuvem (Gemini através do Firebase AI Logic). A IA pode errar. ${time}.`,
-    sentOnce: 'Enviado uma vez, só para esta verificação.',
     checking: 'A verificar na nuvem…',
     showFailed: 'Não foi possível mostrar o resultado da verificação aprofundada.',
     levelChanged:

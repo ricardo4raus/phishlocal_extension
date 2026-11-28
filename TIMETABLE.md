@@ -79,7 +79,9 @@ Mark a task `[x]` as soon as it is done. Keep this file in sync with reality.
       (done Thu 26.11: dev-only batch check (PR #41), two runs over all 53 emails; rules and the
       confirmed-sender exception tuned (PR #42): phishing found 18 → 22 of 23, false alarms 6 → 2
       of 30; prompt unchanged; results in `docs/test-results.md`)
-- [ ] Thu 26.11. – Fix bugs; test in a fresh Chrome profile and the cloud-only path
+- [x] Thu 26.11. – Fix bugs; test in a fresh Chrome profile and the cloud-only path
+      (done Thu 26.11: release zip in a fresh Chrome 157 with its own data folder; cloud-only
+      path and on-device path work; fixed: README flag step, the AI's form of address)
 
 ## Phase 6 · Submission
 

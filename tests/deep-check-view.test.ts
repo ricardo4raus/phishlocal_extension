@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CloudCheckResult } from '../src/ai';
 import type { Email } from '../src/email';
+import type { CloudData, RedactedKind, RedactedSpan } from '../src/privacy/redact';
 import type { Finding } from '../src/rules';
 import { HEADERS_WAIT_MS, STOP_GRACE_MS } from '../src/sidepanel/ai-view';
 import {
@@ -11,13 +12,49 @@ import {
   createDeepCheck,
   type DeepCheck,
   type DeepCheckDeps,
-  removedChips,
+  removedItems,
+  renderRedacted,
+  TIP_DELAY_MS,
+  TIP_HIDE_MS,
+  TIP_MAX_CHARS,
+  TIP_QUICK_MS,
+  TIP_WARM_MS,
 } from '../src/sidepanel/deep-check-view';
 import { SENT_TO_SELF_NOTE } from '../src/ai/prompt';
 import { DEFAULT_SETTINGS } from '../src/settings';
 
 const NAMES_TIMEOUT_MS = DEFAULT_SETTINGS.namesTimeoutMs;
 const CLOUD_LIMIT_MS = DEFAULT_SETTINGS.cloudTimeoutMs + CLOUD_LIMIT_EXTRA_MS;
+
+/**
+ * The real privacy filter, watched: `last` is the data the panel got (its JSON and its record of
+ * replaced places). `alter` changes that data for the few tests that need a made-up record (an
+ * original too long for the tooltip); every other test runs on the filter's own spans.
+ */
+const supplied = vi.hoisted(() => ({
+  alter: undefined as ((data: CloudData) => CloudData) | undefined,
+  last: undefined as CloudData | undefined,
+}));
+
+vi.mock('../src/privacy/redact', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../src/privacy/redact')>();
+  return {
+    ...real,
+    cloudData: (...args: Parameters<typeof real.cloudData>): CloudData => {
+      const data = real.cloudData(...args);
+      supplied.last = supplied.alter ? supplied.alter(data) : data;
+      return supplied.last;
+    },
+  };
+});
+
+/** The personal data in the fixture email, as the filter records it (the tooltips show it). */
+const ORIGINALS = {
+  name: 'Anna Muster',
+  address: 'anna.muster@mail.example',
+  iban: 'CH93 0076 2011 6238 5295 7',
+  phone: '+41 79 123 45 67',
+};
 
 const email: Email = {
   sender: { name: 'Anna Muster', address: 'anna.muster@mail.example' },
@@ -39,10 +76,13 @@ const IDS = [
   'consent',
   'levels',
   'preview',
+  'removedHeading',
   'removed',
   'warning',
   'dataPanel',
   'data',
+  'tip',
+  'nothingYet',
   'status',
   'elapsed',
   'result',
@@ -69,13 +109,25 @@ function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
   const elements = IDS.map((id) => {
     const tag = (BUTTONS as readonly string[]).includes(id)
       ? 'button'
-      : id === 'reasons'
+      : id === 'reasons' || id === 'removed'
         ? 'ul'
         : id === 'levels'
           ? 'fieldset'
-          : 'div';
+          : id === 'removedHeading' || id === 'nothingYet'
+            ? 'p'
+            : id === 'data'
+              ? 'pre'
+              : id === 'tip'
+                ? 'span'
+                : 'div';
     const element = document.createElement(tag);
     element.id = id;
+    // As in index.html: the tooltip is hidden and strikes its text through.
+    if (id === 'tip') {
+      element.setAttribute('role', 'tooltip');
+      element.hidden = true;
+      element.append(document.createElement('s'));
+    }
     // As in index.html: one card with a radio per level; a click on the card chooses it.
     if (element instanceof HTMLFieldSetElement) {
       for (const value of ['standard', 'high']) {
@@ -113,11 +165,14 @@ function create(deps: Partial<DeepCheckDeps> = {}): DeepCheck {
       back: get('back') as HTMLButtonElement,
       levels: get('levels') as HTMLFieldSetElement,
       preview: get('preview'),
+      removedHeading: get('removedHeading'),
       removed: get('removed'),
       warning: get('warning'),
       show: get('show') as HTMLButtonElement,
       dataPanel: get('dataPanel'),
       data: get('data'),
+      tip: get('tip'),
+      nothingYet: get('nothingYet'),
       send: get('send') as HTMLButtonElement,
       cancel: get('cancel') as HTMLButtonElement,
       status: get('status'),
@@ -171,6 +226,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  supplied.alter = undefined;
+  supplied.last = undefined;
   vi.useRealTimers();
 });
 
@@ -208,7 +265,8 @@ describe('the deep check', () => {
     expect(text('time')).toBe('Done in 2.0 s');
     expect(get('result').dataset.risk).toBe('dangerous');
     expect(text('advice')).toBe('Cloud advice.');
-    expect(text('status')).toBe('Sent once, for this check only.');
+    // No status line next to the result (fresh-Chrome test).
+    expect(text('status')).toBe('');
     expect(get('send').hidden).toBe(true);
     expect(document.activeElement).toBe(get('result'));
     // The data stays as the record of what was sent.
@@ -274,6 +332,18 @@ describe('the deep check', () => {
     nameCalls[0]?.resolve(['Anna Muster']);
     await vi.advanceTimersByTimeAsync(0);
     expect(get('preview').hidden).toBe(true);
+  });
+
+  it('leaves no note under the next email after a finished deep check', async () => {
+    // Fresh-Chrome test: "the deep check result was cleared" stayed under the next email's button.
+    check.shown(email, []);
+    await prepare();
+    click('send');
+    runs[0]?.resolve(answer('dangerous'));
+    await vi.waitFor(() => expect(get('result').hidden).toBe(false));
+    check.shown(other, []);
+    expect(get('result').hidden).toBe(true);
+    expect(text('status')).toBe('');
   });
 
   it('says so when the email changes while the data is on its way', async () => {
@@ -601,7 +671,9 @@ describe('the privacy level', () => {
     expect(data).toContain('Dear Anna Muster');
     expect(data).toContain('"name": "Anna Muster"');
     expect(data).not.toMatch(/CH93|123 45 67|pay\?user|anna\.muster@/i);
-    expect(text('removed')).toContain('Names kept');
+    // No "names" item: none were removed at this level.
+    expect(get('removed').querySelector('[data-kind="name"]')).toBeNull();
+    expect(text('removedHeading')).toBe('Found in this email and removed before sending:');
     click('send');
     expect(runs[0]?.prompt).toContain('Dear Anna Muster');
   });
@@ -627,7 +699,7 @@ describe('the privacy level', () => {
     await vi.waitFor(() => expect(nameCalls).toHaveLength(1));
     nameCalls[0]?.resolve(['Anna Muster']);
     await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
-    expect(text('removed')).not.toContain('Names kept');
+    expect(get('removed').querySelector('[data-kind="name"]')).not.toBeNull();
     expect(text('data')).not.toContain('Anna');
   });
 
@@ -683,18 +755,553 @@ describe('the privacy level', () => {
   });
 });
 
-describe('removedChips', () => {
-  it('names only what was removed, and what was kept on purpose', () => {
-    expect(removedChips({ names: 1, emails: 2, numbers: 0, ibans: 1, links: 0 }, 'high')).toEqual([
-      '1 name',
-      '2 email addresses',
-      '1 IBAN',
+describe('removedItems', () => {
+  it('names only what was removed, with its count, in a fixed order', () => {
+    expect(removedItems({ names: 1, emails: 2, numbers: 0, ibans: 1, links: 0 })).toEqual([
+      { kind: 'name', text: '1 name' },
+      { kind: 'email', text: '2 email addresses' },
+      { kind: 'iban', text: '1 IBAN' },
     ]);
-    expect(
-      removedChips({ names: 0, emails: 0, numbers: 0, ibans: 0, links: 3 }, 'standard'),
-    ).toEqual(['3 link paths', 'Names kept']);
-    expect(removedChips({ names: 0, emails: 0, numbers: 0, ibans: 0, links: 0 }, 'high')).toEqual([
-      'No personal data found',
+    expect(removedItems({ names: 0, emails: 0, numbers: 2, ibans: 0, links: 3 })).toEqual([
+      { kind: 'number', text: '2 numbers' },
+      { kind: 'link', text: "3 link paths (the website's name stays)" },
     ]);
+    expect(removedItems({ names: 0, emails: 0, numbers: 0, ibans: 0, links: 0 })).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * The list of what was removed, the marks in the data, and the tooltip, on the real filter's data
+ * and its record of the replaced places.
+ * --------------------------------------------------------------------------------------------- */
+
+const marks = (): HTMLElement[] => [...get('data').querySelectorAll<HTMLElement>('.redacted')];
+const marksOf = (kind: RedactedKind): HTMLElement[] =>
+  marks().filter((mark) => mark.dataset.kind === kind);
+const items = (): HTMLButtonElement[] => [
+  ...get('removed').querySelectorAll<HTMLButtonElement>('.removed__item'),
+];
+const item = (kind: RedactedKind): HTMLButtonElement =>
+  items().find((button) => button.dataset.kind === kind) as HTMLButtonElement;
+const tabbable = (): HTMLElement[] => [
+  ...get('data').querySelectorAll<HTMLElement>('[tabindex="0"]'),
+];
+const struck = (): string => get('tip').querySelector('s')?.textContent ?? '';
+
+/** A click with a pointer (`detail` 1); `element.click()` is one without (Enter or Space). */
+const mouseClick = (element: HTMLElement): void => {
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+};
+const mouse = (element: EventTarget, type: 'mouseover' | 'mouseout', relatedTarget?: Element) => {
+  element.dispatchEvent(new MouseEvent(type, { bubbles: true, relatedTarget }));
+};
+const key = (element: HTMLElement, name: string): void => {
+  element.dispatchEvent(
+    new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }),
+  );
+};
+
+/**
+ * jsdom lays nothing out (every rectangle is 0 by 0): the data box and the marks get rectangles
+ * here. The box is 100 px tall at the top of the page; mark `n` is a 10 px line at `n * 60` px,
+ * so the first two marks are in view and the later ones below the box.
+ */
+const BOX = { top: 0, bottom: 100, height: 100 };
+const MARK_HEIGHT = 10;
+const markTop = (index: number): number => index * 60;
+const rect = (top: number, height: number): DOMRect =>
+  ({
+    top,
+    bottom: top + height,
+    height,
+    left: 0,
+    right: 300,
+    width: 300,
+    x: 0,
+    y: top,
+  }) as DOMRect;
+function layOut(): void {
+  Object.defineProperty(get('data'), 'getBoundingClientRect', {
+    configurable: true,
+    value: () => rect(BOX.top, BOX.height),
+  });
+  marks().forEach((mark, index) => {
+    Object.defineProperty(mark, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(markTop(index) - get('data').scrollTop, MARK_HEIGHT),
+    });
+  });
+}
+/** Where the data must scroll to centre mark `index` (the view's own formula). */
+const centred = (index: number): number => markTop(index) - (BOX.height - MARK_HEIGHT) / 2;
+
+describe('the list of what was removed', () => {
+  it('shows one button per kind with its count, under the heading', async () => {
+    check.shown(email, []);
+    await prepare();
+    expect(text('removedHeading')).toBe('Found in this email and removed before sending:');
+    expect(get('removed').hidden).toBe(false);
+    expect(items().map((button) => [button.dataset.kind, button.textContent])).toEqual([
+      ['name', '2 names'],
+      ['email', '1 email address'],
+      ['number', '1 number'],
+      ['iban', '1 IBAN'],
+    ]);
+    // Real buttons (Enter and Space work), inside list items; no "names kept" anywhere.
+    for (const button of items()) {
+      expect(button.tagName).toBe('BUTTON');
+      expect(button.type).toBe('button');
+      expect(button.parentElement?.tagName).toBe('LI');
+    }
+    expect(get('consent').textContent).not.toMatch(/kept/i);
+  });
+
+  it('says that nothing needed removing, by level, and hides the empty list', async () => {
+    // An email with nothing personal in it: no sender address, no numbers, no links.
+    const bare: Email = {
+      sender: { name: '', address: '' },
+      subject: 'Hello',
+      bodyText: 'Hello there, see you tomorrow.',
+      links: [],
+      truncated: false,
+    };
+    check.shown(bare, []);
+    await prepare([]);
+    expect((supplied.last as CloudData).spans).toEqual([]);
+    expect(text('removedHeading')).toBe(
+      'Nothing found to remove: no names, email addresses, numbers, IBANs or link paths.',
+    );
+    expect(get('removed').hidden).toBe(true);
+    expect(items()).toEqual([]);
+    expect(marks()).toEqual([]);
+
+    check = create({ savedLevel: () => 'standard' });
+    check.shown(bare, []);
+    click('start');
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    expect(text('removedHeading')).toBe(
+      'Nothing found to remove: no email addresses, numbers, IBANs or link paths.',
+    );
+    expect(get('removed').hidden).toBe(true);
+  });
+});
+
+describe('the marks in the data', () => {
+  it('wraps exactly the recorded places, and the text stays the data', async () => {
+    check.shown(email, []);
+    await prepare();
+    const data = supplied.last as CloudData;
+    // The filter's record: the sender's name and address, then the name, IBAN and phone number
+    // in the text.
+    expect(data.spans.map((span) => [span.kind, span.original])).toEqual([
+      ['name', ORIGINALS.name],
+      ['email', ORIGINALS.address],
+      ['name', ORIGINALS.name],
+      ['iban', ORIGINALS.iban],
+      ['number', ORIGINALS.phone],
+    ]);
+    expect(text('data')).toBe(data.json);
+    expect(marks().map((mark) => mark.textContent)).toEqual([
+      '[name]',
+      '[email]@mail.example',
+      '[name]',
+      '[iban]',
+      '[number]',
+    ]);
+    expect(marks().map((mark) => mark.dataset.kind)).toEqual(data.spans.map((span) => span.kind));
+    // Marks only in the data, none in the list; the originals stay on the device: neither the
+    // data nor the prompt holds them.
+    expect(get('removed').querySelector('.redacted')).toBeNull();
+    click('send');
+    expect(runs[0]?.prompt).toContain(data.json);
+    for (const original of Object.values(ORIGINALS)) {
+      expect(text('data')).not.toContain(original);
+      expect(runs[0]?.prompt).not.toContain(original);
+    }
+  });
+
+  it('keeps the originals out of the data and the prompt even when the filter kept them', async () => {
+    // The filter removes the originals from the JSON anyway; this proves the view adds nothing:
+    // a made-up record whose originals are a sentinel shows it only in the tooltip.
+    const sentinel = 'ORIGINAL-SENTINEL';
+    supplied.alter = (data) => ({
+      ...data,
+      spans: data.spans.map((span) => ({ ...span, original: sentinel })),
+    });
+    check.shown(email, []);
+    await prepare();
+    click('show');
+    const [mark] = marks() as [HTMLElement];
+    mark.focus();
+    expect(struck()).toBe(sentinel);
+    // Not in the data's text, and not in any attribute of its markup either.
+    expect(text('data')).not.toContain(sentinel);
+    expect(get('data').outerHTML).not.toContain(sentinel);
+    click('send');
+    expect(runs[0]?.prompt).not.toContain(sentinel);
+  });
+
+  it("marks nothing an attacker wrote to look like a placeholder: only the filter's record counts", async () => {
+    const literal = 'Hi [name] and [email]@x.example, see [link: a.example]';
+    check.shown({ ...email, bodyText: literal }, []);
+    await prepare();
+    // The filter replaced the sender's name and address, nothing in the text: two marks, and the
+    // text's own "[name]" stays plain text.
+    expect(marks().map((mark) => mark.textContent)).toEqual(['[name]', '[email]@mail.example']);
+    expect(text('data')).toContain(literal);
+    const plain = [...get('data').childNodes].filter(
+      (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.includes(literal),
+    );
+    expect(plain).toHaveLength(1);
+    // And with no record at all, no mark at all, whatever the text says.
+    supplied.alter = (data) => ({ ...data, spans: [] });
+    check.shown(other, []);
+    nameCalls = [];
+    await prepare();
+    expect(text('data')).toContain('[name]');
+    expect(marks()).toEqual([]);
+    expect(tabbable()).toEqual([]);
+  });
+
+  it('keeps one mark reachable by Tab and moves between marks with the arrow keys', async () => {
+    check.shown(email, []);
+    await prepare();
+    const all = marks();
+    expect(all.length).toBeGreaterThan(2);
+    expect(tabbable()).toEqual([all[0]]);
+    (all[0] as HTMLElement).focus();
+    key(all[0] as HTMLElement, 'ArrowRight');
+    expect(document.activeElement).toBe(all[1]);
+    expect(tabbable()).toEqual([all[1]]);
+    key(all[1] as HTMLElement, 'ArrowDown');
+    expect(document.activeElement).toBe(all[2]);
+    key(all[2] as HTMLElement, 'ArrowLeft');
+    expect(document.activeElement).toBe(all[1]);
+    key(all[1] as HTMLElement, 'End');
+    expect(document.activeElement).toBe(all.at(-1));
+    // At the ends the focus stays.
+    key(all.at(-1) as HTMLElement, 'ArrowRight');
+    expect(document.activeElement).toBe(all.at(-1));
+    key(all.at(-1) as HTMLElement, 'Home');
+    expect(document.activeElement).toBe(all[0]);
+    key(all[0] as HTMLElement, 'ArrowUp');
+    expect(document.activeElement).toBe(all[0]);
+    expect(tabbable()).toHaveLength(1);
+    // Arrow keys on the data itself (no mark focused) are left to its scrolling.
+    get('data').focus();
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      bubbles: true,
+      cancelable: true,
+    });
+    get('data').dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(get('data'));
+  });
+
+  it('highlights a kind on a click on its item, opens the data and scrolls to its marks in turn', async () => {
+    check.shown(email, []);
+    await prepare();
+    expect(get('dataPanel').hidden).toBe(true);
+    layOut();
+    const data = get('data');
+    // Marks 0 and 2 are the names (the sender's, then the one in the text), mark 1 the address.
+    const names = marksOf('name');
+    expect(names).toEqual([marks()[0], marks()[2]]);
+
+    mouseClick(item('name'));
+    expect(get('dataPanel').hidden).toBe(false);
+    expect(get('show').getAttribute('aria-expanded')).toBe('true');
+    expect(data.dataset.selectedKind).toBe('name');
+    expect(item('name').getAttribute('aria-current')).toBe('true');
+    expect(item('email').hasAttribute('aria-current')).toBe(false);
+    // The first name is in view already: no scrolling.
+    expect(data.scrollTop).toBe(0);
+    // The Tab stop follows the current mark; a mouse click leaves the focus where it is.
+    expect(tabbable()).toEqual([names[0]]);
+    expect(document.activeElement).not.toBe(names[0]);
+
+    // Again: the next mark of that kind, below the box, so the data (and only the data) scrolls
+    // to centre it; then round to the first, back at the top.
+    mouseClick(item('name'));
+    expect(data.scrollTop).toBe(centred(2));
+    expect(tabbable()).toEqual([names[1]]);
+    mouseClick(item('name'));
+    expect(data.scrollTop).toBe(0);
+    expect(tabbable()).toEqual([names[0]]);
+
+    // Another kind: its first mark; the item marks move with it. The address (mark 1) is in
+    // view at the top: no scrolling.
+    mouseClick(item('email'));
+    expect(data.dataset.selectedKind).toBe('email');
+    expect(item('email').getAttribute('aria-current')).toBe('true');
+    expect(item('name').hasAttribute('aria-current')).toBe(false);
+    expect(data.scrollTop).toBe(0);
+    expect(tabbable()).toEqual([marks()[1]]);
+    // The phone number (mark 4) is far below: centred too.
+    mouseClick(item('number'));
+    expect(data.scrollTop).toBe(centred(4));
+    // The CSS colours the marks by the two attributes; nothing else changes on them.
+    expect(marks().every((mark) => mark.classList.contains('redacted'))).toBe(true);
+  });
+
+  it('moves the focus to the mark when the item is activated by keyboard', async () => {
+    check.shown(email, []);
+    await prepare();
+    item('iban').focus();
+    // Enter or Space on a button: a click without a pointer.
+    item('iban').click();
+    const [iban] = marksOf('iban');
+    expect(document.activeElement).toBe(iban);
+    expect(tabbable()).toEqual([iban]);
+    // The focused mark shows its tooltip at once: the IBAN as it stood in the email.
+    expect(get('tip').hidden).toBe(false);
+    expect(struck()).toBe(ORIGINALS.iban);
+  });
+
+  it('closes the data without losing the focus or the tooltip state', async () => {
+    check.shown(email, []);
+    await prepare();
+    item('number').click();
+    expect(get('dataPanel').hidden).toBe(false);
+    expect(get('tip').hidden).toBe(false);
+    click('show');
+    expect(get('dataPanel').hidden).toBe(true);
+    expect(get('tip').hidden).toBe(true);
+    // A new preview starts over: no selection, no marks of the old data.
+    choose('standard');
+    await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
+    expect(get('data').dataset.selectedKind).toBeUndefined();
+    expect(items().every((button) => !button.hasAttribute('aria-current'))).toBe(true);
+    expect(tabbable()).toHaveLength(1);
+  });
+
+  it('moves a focus from a removed mark to the start when the email is left', async () => {
+    check.shown(email, []);
+    await prepare();
+    item('name').click();
+    expect(get('data').contains(document.activeElement)).toBe(true);
+    check.shown(other, []);
+    expect(get('preview').hidden).toBe(true);
+    expect(document.activeElement).toBe(get('start'));
+    expect(get('tip').hidden).toBe(true);
+  });
+});
+
+describe('the tooltip', () => {
+  it('shows the original text, struck through, for a focused mark, and goes on blur or Escape', async () => {
+    check.shown(email, []);
+    await prepare();
+    click('show');
+    const [mark] = marksOf('email');
+    expect(get('tip').hidden).toBe(true);
+    (mark as HTMLElement).focus();
+    expect(get('tip').hidden).toBe(false);
+    expect(struck()).toBe(ORIGINALS.address);
+    expect(mark?.getAttribute('aria-describedby')).toBe('tip');
+    // Only the original, struck through: no label around it.
+    expect(text('tip')).toBe(ORIGINALS.address);
+    // The original is shown on the device and nowhere else.
+    expect(text('data')).not.toContain(ORIGINALS.address);
+    key(mark as HTMLElement, 'Escape');
+    expect(get('tip').hidden).toBe(true);
+    expect(mark?.hasAttribute('aria-describedby')).toBe(false);
+    // Escape holds: the pointer passing over another mark and leaving again does not bring the
+    // focused mark's tooltip back (review round 2), not even after a second Escape on the
+    // hovered mark's tooltip (review round 3).
+    const [passing] = marksOf('name') as [HTMLElement];
+    mouse(passing, 'mouseover');
+    await vi.advanceTimersByTimeAsync(TIP_DELAY_MS);
+    expect(struck()).toBe(ORIGINALS.name);
+    key(mark as HTMLElement, 'Escape');
+    expect(get('tip').hidden).toBe(true);
+    mouse(passing, 'mouseover');
+    await vi.advanceTimersByTimeAsync(TIP_DELAY_MS);
+    mouse(passing, 'mouseout');
+    await vi.advanceTimersByTimeAsync(TIP_HIDE_MS);
+    expect(get('tip').hidden).toBe(true);
+    (mark as HTMLElement).blur();
+    (mark as HTMLElement).focus();
+    expect(get('tip').hidden).toBe(false);
+    get('data').focus();
+    expect(get('tip').hidden).toBe(true);
+  });
+
+  it('waits before the first tooltip, is quick while warm, and waits again after a pause', async () => {
+    check.shown(email, []);
+    await prepare();
+    click('show');
+    const [first, second] = marks() as [HTMLElement, HTMLElement];
+    mouse(first, 'mouseover');
+    await vi.advanceTimersByTimeAsync(TIP_DELAY_MS - 1);
+    expect(get('tip').hidden).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(get('tip').hidden).toBe(false);
+    expect(first.getAttribute('aria-describedby')).toBe('tip');
+    // On to the next mark: a moment after leaving the first, the tooltip goes; the next one comes
+    // almost at once.
+    mouse(first, 'mouseout');
+    mouse(second, 'mouseover');
+    await vi.advanceTimersByTimeAsync(TIP_QUICK_MS);
+    expect(get('tip').hidden).toBe(false);
+    expect(second.getAttribute('aria-describedby')).toBe('tip');
+    expect(first.hasAttribute('aria-describedby')).toBe(false);
+    mouse(second, 'mouseout');
+    await vi.advanceTimersByTimeAsync(TIP_HIDE_MS);
+    expect(get('tip').hidden).toBe(true);
+    // Still warm: the next one is quick.
+    mouse(first, 'mouseover');
+    await vi.advanceTimersByTimeAsync(TIP_QUICK_MS);
+    expect(get('tip').hidden).toBe(false);
+    mouse(first, 'mouseout');
+    await vi.advanceTimersByTimeAsync(TIP_HIDE_MS + TIP_WARM_MS);
+    expect(get('tip').hidden).toBe(true);
+    // Cold again: the full wait.
+    mouse(second, 'mouseover');
+    await vi.advanceTimersByTimeAsync(TIP_QUICK_MS);
+    expect(get('tip').hidden).toBe(true);
+    await vi.advanceTimersByTimeAsync(TIP_DELAY_MS - TIP_QUICK_MS);
+    expect(get('tip').hidden).toBe(false);
+  });
+
+  it('stays while the pointer is on it, and caps a long original', async () => {
+    // A made-up record: the first place stood for a text longer than the tooltip shows.
+    const long = 'x'.repeat(TIP_MAX_CHARS + 50);
+    supplied.alter = (data) => ({
+      ...data,
+      spans: data.spans.map((span, index) => (index === 0 ? { ...span, original: long } : span)),
+    });
+    check.shown(email, []);
+    await prepare();
+    click('show');
+    const [mark] = marks() as [HTMLElement];
+    mouse(mark, 'mouseover');
+    await vi.advanceTimersByTimeAsync(TIP_DELAY_MS);
+    expect(get('tip').hidden).toBe(false);
+    expect(struck()).toBe(`${'x'.repeat(TIP_MAX_CHARS)}…`);
+    // Onto the tooltip: it stays as long as the pointer is there.
+    mouse(mark, 'mouseout', get('tip'));
+    mouse(get('tip'), 'mouseover');
+    await vi.advanceTimersByTimeAsync(TIP_HIDE_MS + TIP_WARM_MS);
+    expect(get('tip').hidden).toBe(false);
+    // And goes a moment after the pointer leaves it.
+    mouse(get('tip'), 'mouseout');
+    await vi.advanceTimersByTimeAsync(TIP_HIDE_MS);
+    expect(get('tip').hidden).toBe(true);
+  });
+
+  it('leaves no tooltip and no timer behind when the preview goes', async () => {
+    check.shown(email, []);
+    await prepare();
+    click('show');
+    const [mark] = marks() as [HTMLElement];
+    mouse(mark, 'mouseover');
+    click('cancel');
+    await vi.advanceTimersByTimeAsync(TIP_WARM_MS);
+    expect(get('tip').hidden).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    // Also with a tooltip on screen, when the email is left.
+    nameCalls = [];
+    await prepare();
+    click('show');
+    const [again] = marks() as [HTMLElement];
+    again.focus();
+    expect(get('tip').hidden).toBe(false);
+    check.hidden();
+    expect(get('tip').hidden).toBe(true);
+    await vi.advanceTimersByTimeAsync(TIP_WARM_MS);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('"Nothing has been sent yet"', () => {
+  it('goes with the click on Send, also when the send fails, and is back after Cancel and for the next email', async () => {
+    check.shown(email, []);
+    await prepare();
+    expect(get('nothingYet').hidden).toBe(false);
+    click('send');
+    expect(get('nothingYet').hidden).toBe(true);
+    runs[0]?.resolve({ ok: false, reason: 'failed', detail: 'no' });
+    await vi.waitFor(() => expect(text('status')).toContain('did not work'));
+    expect(get('nothingYet').hidden).toBe(true);
+    click('cancel');
+    expect(get('nothingYet').hidden).toBe(false);
+    nameCalls = [];
+    await prepare();
+    click('send');
+    runs[1]?.resolve(answer('safe'));
+    await vi.waitFor(() => expect(get('result').hidden).toBe(false));
+    expect(get('nothingYet').hidden).toBe(true);
+    check.shown(other, []);
+    expect(get('nothingYet').hidden).toBe(false);
+  });
+});
+
+/** Renders `json` with `spans` into a fresh <pre>. */
+const render = (json: string, spans: RedactedSpan[]) => {
+  const pre = document.createElement('pre');
+  const result = renderRedacted(pre, json, spans);
+  return { pre, result };
+};
+const span = (start: number, end: number, kind: RedactedKind = 'name'): RedactedSpan => ({
+  start,
+  end,
+  kind,
+  original: `${kind}@${start}`,
+});
+
+describe('renderRedacted', () => {
+  it('wraps each span in a mark and nests a span inside another', () => {
+    const json = 'to [email]@[name].example now';
+    const outer = span(3, 25, 'email');
+    const inner = span(11, 17, 'name');
+    const { pre, result } = render(json, [outer, inner]);
+    expect(pre.textContent).toBe(json);
+    expect(result.map((mark) => mark.element.textContent)).toEqual([
+      '[email]@[name].example',
+      '[name]',
+    ]);
+    expect(result[1]?.element.parentElement).toBe(result[0]?.element);
+    expect(result.map((mark) => mark.original)).toEqual(['email@3', 'name@11']);
+    for (const { element } of result) {
+      expect(element.tagName).toBe('MARK');
+      expect(element.classList.contains('redacted')).toBe(true);
+      expect(element.tabIndex).toBe(-1);
+    }
+    expect(pre.children).toHaveLength(1);
+    // The same with the inner span listed first.
+    expect(render(json, [inner, outer]).pre.textContent).toBe(json);
+    expect(render(json, [inner, outer]).result.map((mark) => mark.kind)).toEqual(['email', 'name']);
+  });
+
+  it('leaves out a span it cannot trust and keeps the text whole', () => {
+    const json = '0123456789';
+    const { pre, result } = render(json, [
+      span(-1, 2),
+      span(8, 11),
+      span(4, 4),
+      span(5, 3),
+      span(2, 5, 'number'),
+      // Crossing the one before it: not nested.
+      span(4, 7),
+      { start: 7, end: 9, kind: 'bogus' as RedactedKind, original: '' },
+      { start: 1.5, end: 3, kind: 'name', original: '' },
+    ]);
+    expect(pre.textContent).toBe(json);
+    expect(result.map((mark) => [mark.element.textContent, mark.kind])).toEqual([
+      ['234', 'number'],
+    ]);
+    // No spans: text only, no mark.
+    expect(render(json, []).pre.childNodes).toHaveLength(1);
+    expect(render('', [span(0, 1)]).pre.textContent).toBe('');
+  });
+
+  it('renders text and never markup', () => {
+    const json = '<img src=x onerror=alert(1)> [name]';
+    const at = json.indexOf('[name]');
+    const { pre } = render(json, [span(at, at + 6)]);
+    expect(pre.textContent).toBe(json);
+    expect(pre.querySelector('img')).toBeNull();
+    expect(pre.querySelectorAll('mark')).toHaveLength(1);
   });
 });

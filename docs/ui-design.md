@@ -33,7 +33,7 @@ from this file are listed under "Mockup review" at the end.
   without a known end show elapsed time and a moving bar, never a made-up percentage. One moving
   indicator per wait, not three.
 - **Never colour alone.** Every state has a colour, a symbol and a word. Green fills only the
-  verdict "Looks safe"; elsewhere it is at most the small dot of a ready model. A confirmed sender
+  verdict "Looks safe" and the pill of a ready model (with the word "ready"). A confirmed sender
   and other good news use neutral colours and words.
 - **True claims only.** Every sentence in the panel must hold in every build: no "nothing is
   saved" while a setting is saved, no "Looks safe" when only the rules looked.
@@ -64,12 +64,12 @@ mockup artboard where one exists.
 | Not checked by AI          | Not checked by AI. The basic checks alone can miss a well-written scam. |
 | Deep check offered         | `Dangerous`                                                             | Button "Deep check in the cloud…", under it one line only when it is recommended or unavailable                                                                                |
 | Consent, preparing         | –                                                                       | "Looking for names on this device…" with elapsed time and Stop; Send is not shown yet                                                                                          |
-| Consent, preview           | `Consent`                                                               | Level cards, chips of what was removed, "Never sent: …", fold "Show what will be sent", Send, Cancel                                                                           |
+| Consent, preview           | `Consent`                                                               | Level cards, the list "Found in this email and removed before sending", fold "Show what will be sent" with the placeholders marked, Send, Cancel                               |
 | Consent, names unchecked   | –                                                                       | Same, plus the warning "Some names may still be in the text: read it before you send."                                                                                         |
 | Sending                    | –                                                                       | "Checking in the cloud…" with elapsed time and Stop                                                                                                                            |
-| Cloud result               | –                                                                       | A second band "Deep check: Dangerous / Suspicious / Looks safe" with reasons and advice; "Sent once: the data above."                                                          |
+| Cloud result               | –                                                                       | A second band "Deep check: Dangerous / Suspicious / Looks safe" with reasons and advice; no status line                                                                        |
 | Cloud failed               | –                                                                       | "The deep check did not work (short reason). The result above still applies."                                                                                                  |
-| Email changed meanwhile    | –                                                                       | The five messages in `deep-check-view.ts` (`CHANGED`), in the consent's status line                                                                                            |
+| Email changed meanwhile    | –                                                                       | The messages in `deep-check-view.ts` (`CHANGED`), in the consent's status line; none after a finished check (its result leaves with its email)                                 |
 | Dark mode                  | `DangerousDark`                                                         | Same words, dark tokens                                                                                                                                                        |
 
 "Basic checks" is the tier-1 name for the rule checks. "AI" is the tier-1 name for the on-device
@@ -81,10 +81,9 @@ Every part is its own component (see "How to build it"); the page sets the spaci
 
 1. **Top bar** (always): logo (a 56 px PNG of `design/logo.svg`, shown at 28 px as a CSS
    background), "PhishLocal", and the model pill on the right. The pill is
-   grey in every state, with a green dot when ready (decided 22 Nov 2026: users read a grey dot
-   as "not ready"; a soft green halo swells and fades around it every 2.4 s, the dot keeps its
-   colour, and it stands still with reduced motion), a grey spinner while loading or downloading, a small "!" when the AI is
-   missing. Words: "On-device AI ready", "On-device AI loading" (with
+   grey with a grey spinner while loading or downloading and a small "!" when the AI is missing;
+   when the AI is ready, the whole pill turns green (safe tint and text) without a mark (decided
+   26 Nov 2026, replacing a grey pill with a glowing green dot). Words: "On-device AI ready", "On-device AI loading" (with
    the elapsed time, which gives way on panels under 360 px), "On-device AI 42%", "AI not set
    up" (not downloaded), "AI not available", "AI not loaded".
 2. **Model banner** (only when the model needs the user): not downloaded (text and the
@@ -113,7 +112,7 @@ Every part is its own component (see "How to build it"); the page sets the spaci
    who confirmed the sender, the band's footer where it was checked.
 5. **Verdict band:** a tinted head with a round symbol, the verdict word and one status line;
    then the reasons (up to five, as the AI gives them), the "What to do" box (a gold bulb that
-   glows like the ready dot), and the footer
+   glows), and the footer
    "Checked on this device · Done in 1.4 s". While the AI check runs, the footer shows the
    elapsed time and the Stop button instead.
 6. **Red flags** (heading "Red flags (3)", the count as text): one list in one card, one row per
@@ -163,21 +162,40 @@ without sideways scrolling.
   - Default Standard, remembered in the browser. Changing the level rebuilds the data at once;
     at High that starts the name search.
 - **While preparing** (High only): the status line "Waiting for the on-device AI…" and then
-  "Looking for names on this device…", the elapsed time next to it and a Stop button; the chips,
+  "Looking for names on this device…", the elapsed time next to it and a Stop button; the list,
   the fold and Send are not shown. Standard needs no search: its data shows at once.
-- **Preview:** chips "1 name", "2 email addresses", "1 number", "1 link path" (or "No personal
-  data found"), the line "Never sent: your address, the raw headers, server IP addresses.", when
-  names could not be checked the warning "Some names may still be in the text: read it before
-  you send.", then the fold **"Show what will be sent"** (a button with `aria-expanded`, closed
-  by default) with the JSON, monospace, scrollable, exactly the text that is sent, no
-  highlighting (a highlight built from the text could mark an attacker's own "[name]" as removed).
+- **Preview** (28 Nov 2026, replacing the chips): the heading **"Found in this email and removed
+  before sending:"** and a list with one item per kind, "2 names", "1 email address",
+  "1 number", "1 IBAN", "1 link path (the website's name stays)"; counts are places, not people
+  ("5 names" can be one person greeted five times). With nothing removed, the heading alone says
+  "Nothing found to remove: no email addresses, numbers, IBANs or link paths." (at High also
+  "names"). No line about names being kept: the level cards say that. When names could not be
+  checked, the warning "Some names may still be in the text: read it before you send." Then the
+  fold **"Show what will be sent"** (a button with `aria-expanded`, closed by default) with the
+  JSON, monospace, scrollable, exactly the text that is sent.
+- **Highlights:** every placeholder the filter wrote is a mark in the JSON, from the filter's own
+  record of its replacements (`CloudData.spans`), never from a search of the text (an email can
+  contain "[name]" itself). Marks are blue (accent tint and text); after a click on a list item
+  that kind is yellow with an underline (`--color-highlight`, never the warning yellow, which
+  means "suspicious") and the item shows `aria-current`. Each list item is a button: a click
+  opens the fold if needed and scrolls to the first mark of its kind, a repeat click to the next;
+  activated by keyboard, it also moves the focus there. Inside the JSON one mark at a time is in
+  the tab order (roving tabindex); the arrow keys, Home and End move between marks.
+- **Tooltip:** hovering or focusing a mark shows what stood there, struck through, nothing else
+  (at most 300 characters). The first tooltip appears after 500 ms; while one was shown in the
+  last second, the next appears at once, so reading along is smooth but a pass of the mouse
+  does not pop up tooltips everywhere. It stays while the pointer is on it, goes on mouse-out,
+  blur and Escape, and when the data scrolls (a focused mark's tooltip moves with it instead,
+  since focusing a mark scrolls it into view). It never leaves the device (the spans are not
+  sent).
 - Buttons: **"Send to the cloud"** (filled, cloud icon), **"Cancel"** (outlined), full width.
-  Below: "Sent once, for this check only, to Gemini through Firebase AI Logic."
+  Nothing below them (28 Nov 2026: the "Sent once…" and "Never sent…" lines were removed; the
+  level cards already say what is removed, and the data fold shows what is sent).
 - **Sending:** "Checking in the cloud…" with the elapsed time and Stop; Send and Cancel are
   gone; the data stays.
 - **Result:** a second band under the card, "Deep check: …" with the cloud's reasons and advice,
-  the footer "Checked in the cloud · Done in 1.9 s", and the status "Sent once, for this check
-  only." How the cloud and the basic checks were combined goes to a "Deep check" row in Email
+  and the footer "Checked in the cloud · Done in 1.9 s"; no status line (26 Nov 2026: it
+  repeated a line of the card). How the cloud and the basic checks were combined goes to a "Deep check" row in Email
   details. The card stays open with the data as the record; "Back to the result" closes it and
   keeps the result, and the button "Deep check in the cloud…" is available again.
 - **Failure:** "The deep check did not work (short reason). The result above still applies." The
@@ -228,7 +246,6 @@ other languages live in `src/i18n/` and follow the same tiers (no protocol names
 | Privacy levels              | Standard / High; "Names of people"                                                                                 |
 | Data fold                   | Show what will be sent                                                                                             |
 | Cloud send                  | Send to the cloud / Cancel / Stop                                                                                  |
-| After sending               | Sent once, for this check only.                                                                                    |
 | Paste                       | Paste an email (empty card), Check another email (fold), Use pasted email, Clear                                   |
 | Refresh                     | Check the open email again                                                                                         |
 | Privacy points (empty card) | Checked on this device / No email is saved / Cloud only if you ask                                                 |
@@ -314,12 +331,13 @@ Portugal (our Portuguese is European Portuguese), without coats of arms.
 | pending        | `#6B737D` | `#8A939D` | "Checking…" and "unchecked" symbol    |
 | pending-tint   | `#F0F2F5` | `#232930` | "Checking…" band, loading pill, chips |
 | tip            | `#D19A00` | `#F5C542` | advice bulb (decorative)              |
-| ready          | `#16A34A` | `#4CC27A` | ready dot (decorative)                |
+| highlight      | `#FDE68A` | `#6B5410` | the chosen kind in the cloud data     |
+| highlight-text | text      | `#FFE8A3` | text on it (14:1 light, 6.0:1 dark)   |
 
 Every pair is measured before use (text 4.5:1, symbols and meaningful borders 3:1); the
-measurements live as comments in `style.css`. The bulb and the ready dot are decorative marks next to the words
-that carry their meaning, so in light mode they may be lighter than 3:1 (gold-yellow and bright
-green, decided 22 Nov 2026).
+measurements live as comments in `style.css`. The bulb is a decorative mark next to the words that
+carry its meaning, so in light mode it may be lighter than 3:1 (gold-yellow, decided 22 Nov 2026).
+The ready pill uses the safe tint, text and border.
 
 ## How to build it
 
@@ -358,7 +376,8 @@ green, decided 22 Nov 2026).
 ## Decisions (22 Nov 2026)
 
 1. **The exact data is folded, what was removed is not.** The user sees the chips and the
-   "Never sent" line before consenting; the JSON is one click away. `CLAUDE.md`,
+   "Never sent" line before consenting (since 28 Nov 2026: the list of what was removed, see
+   decision 14; the "Never sent" line is gone, the level cards say what is removed); the JSON is one click away. `CLAUDE.md`,
    `docs/ai-check.md` and `JOURNEY.md` say so.
 2. **Sample emails** only in dev and judges builds. Changed 26 Nov 2026: in every build, because
    judges get a public release build.
@@ -386,6 +405,14 @@ green, decided 22 Nov 2026).
     than 1 s, Chrome is loading it again (it can unload it while the panel is open), and the pill
     says "On-device AI loading" until the model is there. It used to say "ready" from the warm-up
     on, while the band said the AI was loading.
+13. **A ready model turns the pill green** (26 Nov 2026): the whole pill, not a dot inside a
+    grey one. The word "ready" says what is green, so it is not read as a verdict.
+14. **The consent card lists what was removed and shows where** (28 Nov 2026): a list "Found in
+    this email and removed before sending" instead of chips, clickable to highlight that kind in
+    the data (yellow with underline; other kinds blue), with the original on hover or focus,
+    struck through. Highlights come only from the filter's recorded positions; the text is never
+    searched for placeholders. The "Sent once" and "Never sent" lines are gone: the level cards
+    say what is removed, the data shows what is sent.
 
 ## Mockup review
 
@@ -399,7 +426,7 @@ What the mockup shows and this file changes, so that nobody builds from the mock
   outlined block; here one outlined button.
 - `Consent` shows the data at once and has no preparing, sending or result state; it also drops
   the email strip.
-- The header pill is green; here grey with a green dot when ready.
+- The header pill is green when ready; here too since 26 Nov 2026, grey in the other states.
 - `Main` says "Nothing is saved"; here "No email is saved".
 - Missing in the mockup: Suspicious, "No red flags found (not checked by AI)", model unavailable,
   model not downloaded, the paste form, the cloud result.

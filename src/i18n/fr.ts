@@ -49,8 +49,6 @@ export const fr: Messages = {
     removesLinkPaths: 'Chemins des liens (le nom du site reste)',
     removesStandard: 'Tout ce que retire Standard',
     removesNames: 'Noms de personnes',
-    removedOnDevice: 'Retiré sur cet appareil',
-    neverSent: 'Jamais envoyé : votre adresse, les en-têtes bruts, les adresses IP des serveurs.',
     namesMayRemain:
       'Certains noms peuvent encore figurer dans le texte : lisez ce qui sera envoyé avant de l’envoyer.',
     showData: 'Voir ce qui sera envoyé',
@@ -59,7 +57,6 @@ export const fr: Messages = {
       'Exactement ce texte part vers le cloud, avec les instructions fixes de PhishLocal et rien d’autre.',
     send: 'Envoyer au cloud',
     cancel: 'Annuler',
-    sentOnce: 'Envoyé une fois, pour cette analyse seulement, à Gemini via Firebase AI Logic.',
     emailDetails: 'Détails de l’e-mail',
     from: 'De',
     subject: 'Objet',
@@ -381,14 +378,18 @@ export const fr: Messages = {
     recommendedExperimental: (language) =>
       `Recommandé : les réponses de l’IA locale en ${language} sont expérimentales.`,
     recommendedUnchecked: 'Recommandé : l’IA locale n’a pas vérifié cet e-mail.',
-    chips: {
+    foundAndRemoved: 'Trouvé dans cet e-mail et retiré avant l’envoi :',
+    items: {
       names: (count) => plural(count, 'nom', 'noms'),
       emails: (count) => plural(count, 'adresse e-mail', 'adresses e-mail'),
       numbers: (count) => plural(count, 'numéro', 'numéros'),
       ibans: (count) => plural(count, 'IBAN', 'IBAN'),
-      links: (count) => plural(count, 'chemin de lien', 'chemins de lien'),
-      nothing: 'Aucune donnée personnelle trouvée',
-      namesKept: 'Noms conservés',
+      links: (count) =>
+        `${plural(count, 'chemin de lien', 'chemins de lien')} (le nom du site reste)`,
+    },
+    nothingToRemove: {
+      standard: 'Rien trouvé à retirer : ni adresse e-mail, ni numéro, ni IBAN, ni chemin de lien.',
+      high: 'Rien trouvé à retirer : ni nom, ni adresse e-mail, ni numéro, ni IBAN, ni chemin de lien.',
     },
     changed: {
       idle: '',
@@ -398,7 +399,7 @@ export const fr: Messages = {
         'L’e-mail a changé, les données préparées ont donc été écartées. Rien n’a été envoyé.',
       sending:
         'L’e-mail a changé pendant l’analyse approfondie : ses données avaient été envoyées, la réponse a été ignorée.',
-      done: 'L’e-mail a changé, le résultat de l’analyse approfondie a donc été effacé.',
+      done: '',
     },
     waitingModel: 'En attente de l’IA locale…',
     lookingForNames: 'Recherche de noms sur cet appareil…',
@@ -415,7 +416,6 @@ export const fr: Messages = {
     resultWord: (word) => `Analyse approfondie : ${word}`,
     source: 'Vérifié dans le cloud',
     note: (time) => `Cloud (Gemini via Firebase AI Logic). L’IA peut se tromper. ${time}.`,
-    sentOnce: 'Envoyé une fois, pour cette analyse seulement.',
     checking: 'Vérification dans le cloud…',
     showFailed: 'Le résultat de l’analyse approfondie n’a pas pu être affiché.',
     levelChanged:

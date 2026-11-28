@@ -3,12 +3,15 @@ import { PROMPT_LIMITS } from '../../src/ai/prompt';
 import { type Email, MAX_BODY_CHARS } from '../../src/email';
 import {
   cloudCut,
+  type CloudData,
   cloudData,
   greetingNames,
   modelNames,
   nameSearchText,
   nameVariants,
   redactText,
+  type RedactedKind,
+  type RedactedSpan,
   type Removed,
 } from '../../src/privacy/redact';
 import type { Finding } from '../../src/rules';
@@ -460,7 +463,9 @@ describe('cloudData', () => {
     });
     expect(data.json).not.toMatch(/anna|bounce|mx\.google|raw text/i);
     expect(data.namesChecked).toBe(true);
-    expect(data.removed).toEqual({ names: 2, emails: 0, numbers: 1, ibans: 0, links: 0 });
+    // The sender and Reply-To addresses count too: they go out as "[email]@domain" and the
+    // consent card lists and highlights them (28 Nov 2026).
+    expect(data.removed).toEqual({ names: 2, emails: 2, numbers: 1, ibans: 0, links: 0 });
   });
 
   it('keeps every name at "standard", and removes the rest as at "high"', () => {
@@ -574,5 +579,275 @@ describe('cloudData', () => {
     expect(data.email.body_cut).toBe(true);
     expect(data.email.body.length).toBeLessThanOrEqual(PROMPT_LIMITS.body);
     expect(nameSearchText(long)).toContain(data.email.body);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Positions of the placeholders (28 Nov 2026): the consent card highlights them and shows the
+ * original on the device. They must come from the filter's own replacements, never from a search
+ * of the data, and the JSON they point into must stay exactly `JSON.stringify(_, null, 2)`.
+ * --------------------------------------------------------------------------------------------- */
+const spansOf = (data: CloudData, kind?: RedactedKind) =>
+  data.spans
+    .filter((span) => kind === undefined || span.kind === kind)
+    .map((span) => [data.json.slice(span.start, span.end), span.original]);
+
+/** Every span points at a placeholder of its kind, spans nest or stay apart, the JSON is canonical. */
+function wellFormed(data: CloudData): void {
+  expect(data.json).toBe(JSON.stringify(JSON.parse(data.json), null, 2));
+  const shape: Record<RedactedKind, RegExp> = {
+    name: /^\[name\]$/,
+    email: /^\[email\](?:@.*)?$/,
+    number: /^\[number\]$/,
+    iban: /^\[iban\]$/,
+    link: /^\[link(?:: .*)?\]$/,
+  };
+  let previous: RedactedSpan | undefined;
+  for (const span of data.spans) {
+    expect(span.start).toBeGreaterThanOrEqual(0);
+    expect(span.end).toBeGreaterThan(span.start);
+    expect(span.end).toBeLessThanOrEqual(data.json.length);
+    expect(data.json.slice(span.start, span.end)).toMatch(shape[span.kind]);
+    // In order, and inside the previous one or after it: never half in, half out.
+    expect(previous === undefined || span.start >= previous.start).toBe(true);
+    expect(previous === undefined || span.end <= previous.end || span.start >= previous.end).toBe(
+      true,
+    );
+    previous = span;
+  }
+  const counted: Removed = { names: 0, emails: 0, numbers: 0, ibans: 0, links: 0 };
+  for (const span of data.spans) counted[`${span.kind}s`]++;
+  expect(data.removed).toEqual(counted);
+}
+
+describe('cloudData spans', () => {
+  it('records every kind with its original, in JSON offsets', () => {
+    const data = cloudData(
+      email({
+        sender: { name: 'Anna Muster', address: 'anna.muster@mail.example' },
+        bodyText:
+          'Dear Anna Muster, pay CH93 0076 2011 6238 5295 7, call +41 79 123 45 67, write to ' +
+          'help@shop.example or open https://evil.example/pay?u=1',
+      }),
+      [],
+      ['Anna Muster'],
+    );
+    wellFormed(data);
+    expect(spansOf(data, 'name')).toEqual([
+      ['[name]', 'Anna Muster'],
+      ['[name]', 'Anna Muster'],
+    ]);
+    expect(spansOf(data, 'email')).toEqual([
+      ['[email]@mail.example', 'anna.muster@mail.example'],
+      ['[email]@shop.example', 'help@shop.example'],
+    ]);
+    expect(spansOf(data, 'iban')).toEqual([['[iban]', 'CH93 0076 2011 6238 5295 7']]);
+    expect(spansOf(data, 'number')).toEqual([['[number]', '+41 79 123 45 67']]);
+    expect(spansOf(data, 'link')).toEqual([
+      ['[link: evil.example]', 'https://evil.example/pay?u=1'],
+    ]);
+  });
+
+  it('keeps the offsets right after JSON escaping and surrogate pairs', () => {
+    const body =
+      'He said "hi"\\ and\nwent \u{1F600}anna@x.example\u{1F600} \u2028 \u0007 \u{1F600}+41 79 123 45 67';
+    const data = cloudData(email({ sender: { name: '', address: '' }, bodyText: body }), [], []);
+    wellFormed(data);
+    expect(spansOf(data, 'email')).toEqual([['[email]@x.example', 'anna@x.example']]);
+    expect(spansOf(data, 'number')).toEqual([['[number]', '+41 79 123 45 67']]);
+  });
+
+  it('nests a name or a number found inside a link host or an address domain', () => {
+    const data = cloudData(
+      email({
+        sender: { name: '', address: 'info@0791234567.example' },
+        bodyText: 'Dear Anna, see https://secure.anna-muster.example/x and anna@anna.example',
+      }),
+      [],
+      ['Anna Muster'],
+    );
+    wellFormed(data);
+    expect(spansOf(data)).toEqual([
+      ['[email]@[number].example', 'info@0791234567.example'],
+      ['[number]', '0791234567'],
+      ['[name]', 'Anna'],
+      ['[link: secure.[name]-[name].example]', 'https://secure.anna-muster.example/x'],
+      ['[name]', 'anna'],
+      ['[name]', 'muster'],
+      ['[email]@[name].example', 'anna@anna.example'],
+      ['[name]', 'anna'],
+    ]);
+  });
+
+  it('gives a link whose host URL rewrote its own original, from the host it cleaned', () => {
+    const data = cloudData(email({ bodyText: 'Open https://%41nna.example/x now' }), [], ['Anna']);
+    wellFormed(data);
+    expect(spansOf(data, 'link')).toEqual([['[link: [name].example]', 'https://%41nna.example/x']]);
+    expect(spansOf(data, 'name')).toEqual([['[name]', 'anna']]);
+  });
+
+  it('marks nothing an attacker wrote to look removed, and survives token-shaped text', () => {
+    const body =
+      'Hi [name], mail [email]@x.example or [link: evil.example]; $& $1 $` \uE000abc0\uE000 end';
+    const data = cloudData(email({ sender: { name: '', address: '' }, bodyText: body }), [], []);
+    wellFormed(data);
+    expect(data.spans).toEqual([]);
+    expect(JSON.parse(data.json)).toMatchObject({ email: { body } });
+  });
+
+  it('counts the sender and Reply-To addresses at Standard, and the sender name at High', () => {
+    const data = cloudData(
+      email({
+        sender: { name: 'Anna Muster', address: 'anna@mail.example' },
+        headers: { replyTo: [{ name: '', address: 'collect@evil.example' }] },
+      }),
+      [],
+      undefined,
+      'standard',
+    );
+    wellFormed(data);
+    expect(spansOf(data)).toEqual([
+      ['[email]@mail.example', 'anna@mail.example'],
+      ['[email]@evil.example', 'collect@evil.example'],
+    ]);
+    const high = cloudData(
+      email({ sender: { name: 'Anna Muster', address: 'anna@mail.example' } }),
+      [],
+      undefined,
+      'high',
+    );
+    wellFormed(high);
+    expect(spansOf(high, 'name')).toEqual([['[name]', 'Anna Muster']]);
+  });
+
+  it('keeps the slots right when lower-casing the domain or host makes it longer', () => {
+    // "İ" (U+0130) becomes "i̇" (two units) in lower case: found in review, the second name's slot
+    // landed on the first name, so its tooltip would have shown the wrong original.
+    const data = cloudData(
+      email({
+        sender: { name: '', address: '' },
+        bodyText:
+          'x@\u0130\u0130\u0130-anna-muster.example https://\u0130\u0130-anna-muster.example/p',
+      }),
+      [],
+      ['Anna Muster'],
+    );
+    wellFormed(data);
+    expect(spansOf(data, 'name')).toEqual([
+      ['[name]', 'anna'],
+      ['[name]', 'muster'],
+      ['[name]', 'anna'],
+      ['[name]', 'muster'],
+    ]);
+  });
+
+  it('keeps the names the text pass replaced inside a host that URL rewrote', () => {
+    // Review round 2: with "%41" in the written host, URL rewrites it, so no offset maps the
+    // stand-in the text pass left ("muster"); it is mapped by order (same count) instead of lost.
+    const data = cloudData(
+      email({ sender: { name: '', address: '' }, bodyText: 'See https://%41nna-muster.example/x' }),
+      [],
+      ['Anna Muster'],
+    );
+    wellFormed(data);
+    expect(JSON.parse(data.json)).toMatchObject({
+      email: { body: 'See [link: [name]-[name].example]' },
+    });
+    expect(spansOf(data, 'name')).toEqual([
+      ['[name]', 'anna'],
+      ['[name]', 'muster'],
+    ]);
+    expect(data.removed.names).toBe(2);
+  });
+
+  it('never lends a name from the link path to a host that spells the stand-in marker', () => {
+    // Review round 3: the marker that stands for a name while URL reads the link is a public
+    // word; a host spelling it (percent-encoded) gets a "[name]" that stood for nothing. The
+    // name in the path is gone with the path and must not become that "[name]"'s original.
+    const data = cloudData(
+      email({
+        sender: { name: '', address: '' },
+        bodyText: 'See https://%7Aqname%7Aq.example/hans',
+      }),
+      [],
+      ['Hans Beispiel'],
+    );
+    wellFormed(data);
+    expect(JSON.parse(data.json)).toMatchObject({ email: { body: 'See [link: [name].example]' } });
+    expect(spansOf(data, 'name')).toEqual([]);
+    // Nor when a real name sits in the same host part but the host rule cuts it off (round 4):
+    // the forged "[name]" would otherwise borrow "muster".
+    for (const link of [
+      'https://%7Aqname%7Aq.example_muster/x',
+      'https://%7Aqname%7Aq.example(muster)',
+    ]) {
+      const forged = cloudData(
+        email({ sender: { name: '', address: '' }, bodyText: `See ${link}` }),
+        [],
+        ['Anna Muster'],
+      );
+      wellFormed(forged);
+      expect(spansOf(forged, 'name'), link).toEqual([]);
+    }
+    // A name in the user name is gone too, so the host's own names still map.
+    const withUser = cloudData(
+      email({
+        sender: { name: '', address: '' },
+        bodyText: 'See https://hans@%41nna-muster.example/x',
+      }),
+      [],
+      ['Hans Beispiel', 'Anna Muster'],
+    );
+    wellFormed(withUser);
+    expect(spansOf(withUser, 'name')).toEqual([
+      ['[name]', 'anna'],
+      ['[name]', 'muster'],
+    ]);
+  });
+
+  it('maps no name by order when the rewritten host kept fewer stand-ins than names', () => {
+    // The written host is cut at the underscore, so one stand-in survives for two names: which
+    // one cannot be known, and a wrong original would be worse than none (a known limit).
+    const data = cloudData(
+      email({ sender: { name: '', address: '' }, bodyText: 'See https://anna_muster.example/x' }),
+      [],
+      ['Anna Muster'],
+    );
+    wellFormed(data);
+    expect(JSON.parse(data.json)).toMatchObject({ email: { body: 'See [link: [name]]' } });
+    expect(spansOf(data, 'name')).toEqual([]);
+  });
+
+  it('gives a placeholder that a later match cut into no span of its own', () => {
+    // Found by the monkey test: "www.compte" becomes "[link: www.compte]" first, then the bare
+    // link pattern reads "67.co.uk?[link:" up to the space. The text is as before; only the
+    // whole new placeholder gets a span, the cut piece none.
+    const data = cloudData(
+      email({ sender: { name: '', address: '' }, bodyText: 'See 67.co.uk?www.compte now' }),
+      [],
+      [],
+    );
+    wellFormed(data);
+    expect(JSON.parse(data.json)).toMatchObject({
+      email: { body: 'See [link: 67.co.uk] www.compte] now' },
+    });
+    expect(spansOf(data)).toEqual([['[link: 67.co.uk]', '67.co.uk?www.compte']]);
+  });
+
+  it('handles a placeholder at the start or end of a trimmed text, and an IP link', () => {
+    const data = cloudData(
+      email({
+        sender: { name: '', address: '' },
+        subject: '  +41 79 123 45 67  ',
+        bodyText: 'http://192.0.2.1/x ',
+      }),
+      [],
+      [],
+    );
+    wellFormed(data);
+    expect(spansOf(data)).toEqual([
+      ['[number]', '+41 79 123 45 67'],
+      ['[link: IP address]', 'http://192.0.2.1/x'],
+    ]);
   });
 });

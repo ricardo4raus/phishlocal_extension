@@ -28,6 +28,19 @@ export const AI_LANGUAGES: Readonly<Record<string, string>> = {
  */
 export const EXPERIMENTAL_LANGUAGES: ReadonlySet<string> = new Set(['it', 'pt']);
 
+/**
+ * How the AI addresses the reader: the same form as the panel's dictionary (`src/i18n/`). Without
+ * it, Gemini Nano and the cloud model wrote "Sie" while the German panel says "du" (fresh-Chrome
+ * test, 26 Nov 2026). English has only one form.
+ */
+export const ADDRESS_FORMS: Readonly<Record<string, string>> = {
+  de: 'du',
+  fr: 'vous',
+  es: 'tú',
+  it: 'tu',
+  pt: 'você',
+};
+
 /** The answer language for the panel's language: one of {@link AI_LANGUAGES}, else English. */
 export function answerLanguage(panelLanguage: string): string {
   const code = panelLanguage.toLowerCase().split(/[-_]/)[0] ?? '';
@@ -97,7 +110,7 @@ export const PROMPT_LIMITS = {
   name: 100,
 } as const;
 
-function randomMarker(): string {
+export function randomMarker(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(8));
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
@@ -183,6 +196,9 @@ function fencedPrompt(json: string, language: string, marker: string, sentToSelf
     'Check this email for phishing.',
     ...(sentToSelf ? [SENT_TO_SELF_NOTE] : []),
     `Write the reasons and the advice in ${name}, also when the email is in another language.`,
+    ...(Object.hasOwn(ADDRESS_FORMS, language)
+      ? [`Address the reader with "${ADDRESS_FORMS[language]}".`]
+      : []),
   ].join(' ');
   return [
     task,

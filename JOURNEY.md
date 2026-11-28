@@ -1191,3 +1191,33 @@ _To fill in near the submission._
   secret (the token server signs App Check tokens), so it can be a GitHub release. Its daily
   limits and the Gemini spend cap keep the cost capped.
 - The five made-up samples now show in every build: a judge's inbox may have no phishing.
+- Fresh-Chrome test of the release zip (a second Chrome with its own data folder, so no flags,
+  no model and no login): the welcome page opened, the rules-only result and the cloud deep
+  check worked without any debug token (6.6 s, through the token server). Chrome 157 offered
+  the Gemini Nano download without a flag, and the flag in our README no longer exists, so the
+  judges' instructions drop it. Download 18 minutes; then a sample in 5.1 s on the device, a
+  Gmail email with the sender checks in 4.1 s, and the language switch worked.
+- Found there: both models wrote "Sie" in German while the panel says "du". The prompt now
+  names the panel's form of address per language.
+- Also from the test: "Sent once" showed twice after a deep check, and "the deep check result
+  was cleared" stayed under the next email's button; both lines are gone. The model pill now
+  turns green as a whole when the AI is ready, instead of showing a glowing green dot.
+- Removed the consent card's lines "Sent once, for this check only, to Gemini…" (it read as if
+  the data had already gone) and "Never sent: your address, the raw headers…": the level cards
+  already list what is removed, and "Show what will be sent" shows the exact data.
+- Consent card rebuilt around one question, "what does the cloud get from this email?": a list
+  "Found in this email and removed before sending" with one item per kind, clickable to highlight
+  that kind in the data (yellow with underline, other kinds blue), and the original on hover or
+  focus, struck through. The highlights come from the privacy filter itself: it now runs its
+  passes through a tracker that records where every placeholder went, and the JSON is assembled
+  so that it stays byte for byte what `JSON.stringify` gives (checked on every build; else no
+  highlights, never other data). The random monkeys found two things on the first run: a bare
+  link that read into an earlier "[link:" placeholder (the cut piece had kept a span), fixed, and
+  a phone number that the AI answer reader lets through in one shape, which is older than this
+  change and still open. Four review rounds by an agent followed (a plan review before coding,
+  then the code): a tooltip showing another name's original when lower-casing lengthens a host
+  ("İ"), a keyboard user's tooltip taken away by a passing pointer, a list click scrolling the
+  whole panel, view tests that fabricated the spans by searching the JSON, and, twice narrowed,
+  a crafted host that spells the filter's own stand-in marker and could borrow a real name's
+  original. The last fix gives up a few correct highlights (a host the host rule cuts) rather
+  than ever show a wrong original.

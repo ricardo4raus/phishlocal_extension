@@ -120,7 +120,7 @@ describe('sent to yourself, in the panel and the AI data', () => {
 
   it('says it in the task itself, in front of the data, only when it is true', () => {
     expect(task(buildUserPrompt(email, [], 'de'))).toBe(
-      `Check this email for phishing. ${SENT_TO_SELF_NOTE} Write the reasons and the advice in German, also when the email is in another language.`,
+      `Check this email for phishing. ${SENT_TO_SELF_NOTE} Write the reasons and the advice in German, also when the email is in another language. Address the reader with "du".`,
     );
     expect(buildUserPrompt({ ...email, headers: { replyTo: [] } }, [], 'de')).not.toContain(
       SENT_TO_SELF_NOTE,
