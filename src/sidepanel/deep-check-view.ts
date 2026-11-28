@@ -475,7 +475,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
         .filter((part) => part !== '')
         .join(' '),
     );
-    // No status: the consent card above already says "Sent once" (fresh-Chrome test, 26 Nov 2026).
+    // No status: the result band and the open card say it all (fresh-Chrome test, 26 Nov 2026).
     set(elements.status, '');
     elements.result.focus();
   }

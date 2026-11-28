@@ -1202,3 +1202,6 @@ _To fill in near the submission._
 - Also from the test: "Sent once" showed twice after a deep check, and "the deep check result
   was cleared" stayed under the next email's button; both lines are gone. The model pill now
   turns green as a whole when the AI is ready, instead of showing a glowing green dot.
+- Removed the consent card's lines "Sent once, for this check only, to Gemini…" (it read as if
+  the data had already gone) and "Never sent: your address, the raw headers…": the level cards
+  already list what is removed, and "Show what will be sent" shows the exact data.

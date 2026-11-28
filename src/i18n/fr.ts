@@ -50,7 +50,6 @@ export const fr: Messages = {
     removesStandard: 'Tout ce que retire Standard',
     removesNames: 'Noms de personnes',
     removedOnDevice: 'Retiré sur cet appareil',
-    neverSent: 'Jamais envoyé : votre adresse, les en-têtes bruts, les adresses IP des serveurs.',
     namesMayRemain:
       'Certains noms peuvent encore figurer dans le texte : lisez ce qui sera envoyé avant de l’envoyer.',
     showData: 'Voir ce qui sera envoyé',
@@ -59,7 +58,6 @@ export const fr: Messages = {
       'Exactement ce texte part vers le cloud, avec les instructions fixes de PhishLocal et rien d’autre.',
     send: 'Envoyer au cloud',
     cancel: 'Annuler',
-    sentOnce: 'Envoyé une fois, pour cette analyse seulement, à Gemini via Firebase AI Logic.',
     emailDetails: 'Détails de l’e-mail',
     from: 'De',
     subject: 'Objet',

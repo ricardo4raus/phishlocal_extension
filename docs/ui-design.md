@@ -64,10 +64,10 @@ mockup artboard where one exists.
 | Not checked by AI          | Not checked by AI. The basic checks alone can miss a well-written scam. |
 | Deep check offered         | `Dangerous`                                                             | Button "Deep check in the cloud…", under it one line only when it is recommended or unavailable                                                                                |
 | Consent, preparing         | –                                                                       | "Looking for names on this device…" with elapsed time and Stop; Send is not shown yet                                                                                          |
-| Consent, preview           | `Consent`                                                               | Level cards, chips of what was removed, "Never sent: …", fold "Show what will be sent", Send, Cancel                                                                           |
+| Consent, preview           | `Consent`                                                               | Level cards, chips of what was removed, fold "Show what will be sent", Send, Cancel                                                                                            |
 | Consent, names unchecked   | –                                                                       | Same, plus the warning "Some names may still be in the text: read it before you send."                                                                                         |
 | Sending                    | –                                                                       | "Checking in the cloud…" with elapsed time and Stop                                                                                                                            |
-| Cloud result               | –                                                                       | A second band "Deep check: Dangerous / Suspicious / Looks safe" with reasons and advice; the card above it says "Sent once" (no second line)                                   |
+| Cloud result               | –                                                                       | A second band "Deep check: Dangerous / Suspicious / Looks safe" with reasons and advice; no status line                                                                        |
 | Cloud failed               | –                                                                       | "The deep check did not work (short reason). The result above still applies."                                                                                                  |
 | Email changed meanwhile    | –                                                                       | The messages in `deep-check-view.ts` (`CHANGED`), in the consent's status line; none after a finished check (its result leaves with its email)                                 |
 | Dark mode                  | `DangerousDark`                                                         | Same words, dark tokens                                                                                                                                                        |
@@ -165,18 +165,18 @@ without sideways scrolling.
   "Looking for names on this device…", the elapsed time next to it and a Stop button; the chips,
   the fold and Send are not shown. Standard needs no search: its data shows at once.
 - **Preview:** chips "1 name", "2 email addresses", "1 number", "1 link path" (or "No personal
-  data found"), the line "Never sent: your address, the raw headers, server IP addresses.", when
-  names could not be checked the warning "Some names may still be in the text: read it before
+  data found"), when names could not be checked the warning "Some names may still be in the text: read it before
   you send.", then the fold **"Show what will be sent"** (a button with `aria-expanded`, closed
   by default) with the JSON, monospace, scrollable, exactly the text that is sent, no
   highlighting (a highlight built from the text could mark an attacker's own "[name]" as removed).
 - Buttons: **"Send to the cloud"** (filled, cloud icon), **"Cancel"** (outlined), full width.
-  Below: "Sent once, for this check only, to Gemini through Firebase AI Logic."
+  Nothing below them (28 Nov 2026: the "Sent once…" and "Never sent…" lines were removed; the
+  level cards already say what is removed, and the data fold shows what is sent).
 - **Sending:** "Checking in the cloud…" with the elapsed time and Stop; Send and Cancel are
   gone; the data stays.
 - **Result:** a second band under the card, "Deep check: …" with the cloud's reasons and advice,
-  and the footer "Checked in the cloud · Done in 1.9 s"; no status line, since the card's own
-  "Sent once" line stays above (26 Nov 2026: both showed). How the cloud and the basic checks were combined goes to a "Deep check" row in Email
+  and the footer "Checked in the cloud · Done in 1.9 s"; no status line (26 Nov 2026: it
+  repeated a line of the card). How the cloud and the basic checks were combined goes to a "Deep check" row in Email
   details. The card stays open with the data as the record; "Back to the result" closes it and
   keeps the result, and the button "Deep check in the cloud…" is available again.
 - **Failure:** "The deep check did not work (short reason). The result above still applies." The
@@ -355,7 +355,8 @@ The ready pill uses the safe tint, text and border.
 ## Decisions (22 Nov 2026)
 
 1. **The exact data is folded, what was removed is not.** The user sees the chips and the
-   "Never sent" line before consenting; the JSON is one click away. `CLAUDE.md`,
+   "Never sent" line before consenting (that line removed 28 Nov 2026: the level cards say what
+   is removed); the JSON is one click away. `CLAUDE.md`,
    `docs/ai-check.md` and `JOURNEY.md` say so.
 2. **Sample emails** only in dev and judges builds. Changed 26 Nov 2026: in every build, because
    judges get a public release build.

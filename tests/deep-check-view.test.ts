@@ -208,7 +208,7 @@ describe('the deep check', () => {
     expect(text('time')).toBe('Done in 2.0 s');
     expect(get('result').dataset.risk).toBe('dangerous');
     expect(text('advice')).toBe('Cloud advice.');
-    // The consent card already says "Sent once": no second line (fresh-Chrome test).
+    // No status line next to the result (fresh-Chrome test).
     expect(text('status')).toBe('');
     expect(get('send').hidden).toBe(true);
     expect(document.activeElement).toBe(get('result'));
