@@ -920,6 +920,25 @@ describe('the marks in the data', () => {
     }
   });
 
+  it('keeps the originals out of the data and the prompt even when the filter kept them', async () => {
+    // The filter removes the originals from the JSON anyway; this proves the view adds nothing:
+    // a made-up record whose originals are a sentinel shows it only in the tooltip.
+    const sentinel = 'ORIGINAL-SENTINEL';
+    supplied.alter = (data) => ({
+      ...data,
+      spans: data.spans.map((span) => ({ ...span, original: sentinel })),
+    });
+    check.shown(email, []);
+    await prepare();
+    click('show');
+    const [mark] = marks() as [HTMLElement];
+    mark.focus();
+    expect(struck()).toBe(sentinel);
+    expect(text('data')).not.toContain(sentinel);
+    click('send');
+    expect(runs[0]?.prompt).not.toContain(sentinel);
+  });
+
   it("marks nothing an attacker wrote to look like a placeholder: only the filter's record counts", async () => {
     const literal = 'Hi [name] and [email]@x.example, see [link: a.example]';
     check.shown({ ...email, bodyText: literal }, []);
@@ -1085,6 +1104,15 @@ describe('the tooltip', () => {
     key(mark as HTMLElement, 'Escape');
     expect(get('tip').hidden).toBe(true);
     expect(mark?.hasAttribute('aria-describedby')).toBe(false);
+    // Escape holds: the pointer passing over another mark and leaving again does not bring the
+    // focused mark's tooltip back (review round 2).
+    const [passing] = marksOf('name') as [HTMLElement];
+    mouse(passing, 'mouseover');
+    await vi.advanceTimersByTimeAsync(TIP_DELAY_MS);
+    expect(struck()).toBe(ORIGINALS.name);
+    mouse(passing, 'mouseout');
+    await vi.advanceTimersByTimeAsync(TIP_HIDE_MS);
+    expect(get('tip').hidden).toBe(true);
     (mark as HTMLElement).blur();
     (mark as HTMLElement).focus();
     expect(get('tip').hidden).toBe(false);

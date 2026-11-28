@@ -566,7 +566,7 @@ export interface RedactedSpan {
   start: number;
   end: number;
   kind: RedactedKind;
-  /** The text that stood there (normalized). Never sent. */
+  /** The text that stood there, as the field held it (text fields are normalized). Never sent. */
   original: string;
 }
 

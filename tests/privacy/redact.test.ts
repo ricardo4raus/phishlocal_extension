@@ -741,6 +741,38 @@ describe('cloudData spans', () => {
     ]);
   });
 
+  it('keeps the names the text pass replaced inside a host that URL rewrote', () => {
+    // Review round 2: with "%41" in the written host, URL rewrites it, so no offset maps the
+    // stand-in the text pass left ("muster"); it is mapped by order (same count) instead of lost.
+    const data = cloudData(
+      email({ sender: { name: '', address: '' }, bodyText: 'See https://%41nna-muster.example/x' }),
+      [],
+      ['Anna Muster'],
+    );
+    wellFormed(data);
+    expect(JSON.parse(data.json)).toMatchObject({
+      email: { body: 'See [link: [name]-[name].example]' },
+    });
+    expect(spansOf(data, 'name')).toEqual([
+      ['[name]', 'anna'],
+      ['[name]', 'muster'],
+    ]);
+    expect(data.removed.names).toBe(2);
+  });
+
+  it('maps no name by order when the rewritten host kept fewer stand-ins than names', () => {
+    // The written host is cut at the underscore, so one stand-in survives for two names: which
+    // one cannot be known, and a wrong original would be worse than none (a known limit).
+    const data = cloudData(
+      email({ sender: { name: '', address: '' }, bodyText: 'See https://anna_muster.example/x' }),
+      [],
+      ['Anna Muster'],
+    );
+    wellFormed(data);
+    expect(JSON.parse(data.json)).toMatchObject({ email: { body: 'See [link: [name]]' } });
+    expect(spansOf(data, 'name')).toEqual([]);
+  });
+
   it('gives a placeholder that a later match cut into no span of its own', () => {
     // Found by the monkey test: "www.compte" becomes "[link: www.compte]" first, then the bare
     // link pattern reads "67.co.uk?[link:" up to the space. The text is as before; only the

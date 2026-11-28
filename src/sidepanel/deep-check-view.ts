@@ -325,6 +325,8 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
   let current: Partial<Record<RedactedKind, number>> = {};
   /** The mark whose original the tooltip shows, while it shows. */
   let tipFor: Mark | undefined;
+  /** A focused mark whose tooltip Escape closed: not shown again until the focus moves. */
+  let dismissed: Mark | undefined;
   /** Waits before a hovered mark's tooltip shows. */
   let tipTimer: ReturnType<typeof setTimeout> | undefined;
   /** Waits after the pointer left a mark before the tooltip goes (it may land on the tooltip). */
@@ -562,6 +564,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     hideTip();
     clearTipTimers();
     warm = false;
+    dismissed = undefined;
     marks = [];
     current = {};
     elements.data.replaceChildren();
@@ -819,6 +822,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
   // between the marks (the data's own scrolling by arrow keys stays when no mark is focused).
   elements.data.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
+      dismissed = tipFor;
       hideTip();
       return;
     }
@@ -861,7 +865,7 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     tipTimer = undefined;
     hideTimer = setTimeout(() => {
       const focused = markAt(document.activeElement);
-      if (focused) showTip(focused);
+      if (focused && focused !== dismissed) showTip(focused);
       else hideTip();
     }, TIP_HIDE_MS);
   };
@@ -877,10 +881,12 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     if (!markAt(event.relatedTarget)) leaveTip();
   });
   elements.data.addEventListener('focusin', (event) => {
+    dismissed = undefined;
     const mark = markAt(event.target);
     if (mark) showTip(mark);
   });
   elements.data.addEventListener('focusout', (event) => {
+    dismissed = undefined;
     if (markAt(event.target)) hideTip();
   });
   // The data scrolled: a hovered mark's tooltip goes (the pointer is over something else now); a

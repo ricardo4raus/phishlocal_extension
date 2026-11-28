@@ -337,6 +337,10 @@ the server. Builds without a Firebase project say the deep check is not availabl
   than it is read) is found only when it is a whole label ("xn--mller-kva.example"), not inside
   a longer one ("müller-family" in punycode).
 - Amounts written with spaces that reach 9 characters ("4 500 000.00") become "[number]".
+- The highlights in the consent card: a name inside a link's host that `URL` reads differently
+  than it is written gets its mark by order; when the host read keeps fewer name stand-ins than
+  the text had ("anna_muster.example" is cut at the underscore), those "[name]"s get no mark
+  and no count, because a wrong original would be worse than none.
 - A single-word name in lower case ("anna" alone, outside an address) stays: matching single
   words in any case would remove ordinary words. The other way round, a short name part also
   removes the same word written with a capital ("Al" in "Al hacer clic").

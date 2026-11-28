@@ -376,8 +376,8 @@ The ready pill uses the safe tint, text and border.
 ## Decisions (22 Nov 2026)
 
 1. **The exact data is folded, what was removed is not.** The user sees the chips and the
-   "Never sent" line before consenting (that line removed 28 Nov 2026: the level cards say what
-   is removed); the JSON is one click away. `CLAUDE.md`,
+   "Never sent" line before consenting (since 28 Nov 2026: the list of what was removed, see
+   decision 14; the "Never sent" line is gone, the level cards say what is removed); the JSON is one click away. `CLAUDE.md`,
    `docs/ai-check.md` and `JOURNEY.md` say so.
 2. **Sample emails** only in dev and judges builds. Changed 26 Nov 2026: in every build, because
    judges get a public release build.

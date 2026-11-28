@@ -182,6 +182,8 @@ export class Tracker {
     // link's host, an address's domain), they become children with their original.
     const own = [...(replacement.spans ?? [])];
     const children = [...own];
+    /** Covered names the replacement gave no place for (a rewritten host, a gone local part). */
+    const unplaced: string[] = [];
     for (let index = a; index <= b; index++) {
       const segment = this.segments[index];
       const segmentStart = starts[index] ?? 0;
@@ -196,8 +198,9 @@ export class Tracker {
       if (
         slot === undefined ||
         !replacement.text.startsWith(segment.text, slot) ||
-        own.some((span) => span.start < slot + segment.text.length && span.end > slot)
+        children.some((span) => span.start < slot + segment.text.length && span.end > slot)
       ) {
+        unplaced.push(segment.placeholder.original);
         continue;
       }
       children.push({
@@ -206,6 +209,30 @@ export class Tracker {
         kind: 'name',
         original: segment.placeholder.original,
       });
+    }
+    // Stand-ins the replacement still holds without a known place (URL rewrote the host, so no
+    // offset maps): by order, when their number is exactly the number of names without a place.
+    // Otherwise none: a wrong original is worse than no tooltip (review round 2).
+    const unclaimed: number[] = [];
+    for (
+      let at = replacement.text.indexOf(NAME_STAND_IN);
+      at >= 0;
+      at = replacement.text.indexOf(NAME_STAND_IN, at + NAME_STAND_IN.length)
+    ) {
+      const taken = children.some(
+        (span) => span.start < at + NAME_STAND_IN.length && span.end > at,
+      );
+      if (!taken) unclaimed.push(at);
+    }
+    if (unplaced.length > 0 && unclaimed.length === unplaced.length) {
+      children.push(
+        ...unclaimed.map((at, index) => ({
+          start: at,
+          end: at + NAME_STAND_IN.length,
+          kind: 'name' as const,
+          original: unplaced[index] ?? '',
+        })),
+      );
     }
     const segment: Segment = {
       text: replacement.text,
