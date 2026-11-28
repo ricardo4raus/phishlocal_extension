@@ -1214,4 +1214,10 @@ _To fill in near the submission._
   highlights, never other data). The random monkeys found two things on the first run: a bare
   link that read into an earlier "[link:" placeholder (the cut piece had kept a span), fixed, and
   a phone number that the AI answer reader lets through in one shape, which is older than this
-  change and still open.
+  change and still open. Four review rounds by an agent followed (a plan review before coding,
+  then the code): a tooltip showing another name's original when lower-casing lengthens a host
+  ("İ"), a keyboard user's tooltip taken away by a passing pointer, a list click scrolling the
+  whole panel, view tests that fabricated the spans by searching the JSON, and, twice narrowed,
+  a crafted host that spells the filter's own stand-in marker and could borrow a real name's
+  original. The last fix gives up a few correct highlights (a host the host rule cuts) rather
+  than ever show a wrong original.
