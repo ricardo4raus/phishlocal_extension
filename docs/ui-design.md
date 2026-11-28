@@ -64,7 +64,7 @@ mockup artboard where one exists.
 | Not checked by AI          | Not checked by AI. The basic checks alone can miss a well-written scam. |
 | Deep check offered         | `Dangerous`                                                             | Button "Deep check in the cloud…", under it one line only when it is recommended or unavailable                                                                                |
 | Consent, preparing         | –                                                                       | "Looking for names on this device…" with elapsed time and Stop; Send is not shown yet                                                                                          |
-| Consent, preview           | `Consent`                                                               | Level cards, chips of what was removed, fold "Show what will be sent", Send, Cancel                                                                                            |
+| Consent, preview           | `Consent`                                                               | Level cards, the list "Found in this email and removed before sending", fold "Show what will be sent" with the placeholders marked, Send, Cancel                               |
 | Consent, names unchecked   | –                                                                       | Same, plus the warning "Some names may still be in the text: read it before you send."                                                                                         |
 | Sending                    | –                                                                       | "Checking in the cloud…" with elapsed time and Stop                                                                                                                            |
 | Cloud result               | –                                                                       | A second band "Deep check: Dangerous / Suspicious / Looks safe" with reasons and advice; no status line                                                                        |
@@ -162,13 +162,30 @@ without sideways scrolling.
   - Default Standard, remembered in the browser. Changing the level rebuilds the data at once;
     at High that starts the name search.
 - **While preparing** (High only): the status line "Waiting for the on-device AI…" and then
-  "Looking for names on this device…", the elapsed time next to it and a Stop button; the chips,
+  "Looking for names on this device…", the elapsed time next to it and a Stop button; the list,
   the fold and Send are not shown. Standard needs no search: its data shows at once.
-- **Preview:** chips "1 name", "2 email addresses", "1 number", "1 link path" (or "No personal
-  data found"), when names could not be checked the warning "Some names may still be in the text: read it before
-  you send.", then the fold **"Show what will be sent"** (a button with `aria-expanded`, closed
-  by default) with the JSON, monospace, scrollable, exactly the text that is sent, no
-  highlighting (a highlight built from the text could mark an attacker's own "[name]" as removed).
+- **Preview** (28 Nov 2026, replacing the chips): the heading **"Found in this email and removed
+  before sending:"** and a list with one item per kind, "2 names", "1 email address",
+  "1 number", "1 IBAN", "1 link path (the website's name stays)"; counts are places, not people
+  ("5 names" can be one person greeted five times). With nothing removed, the heading alone says
+  "Nothing found to remove: no email addresses, numbers, IBANs or link paths." (at High also
+  "names"). No line about names being kept: the level cards say that. When names could not be
+  checked, the warning "Some names may still be in the text: read it before you send." Then the
+  fold **"Show what will be sent"** (a button with `aria-expanded`, closed by default) with the
+  JSON, monospace, scrollable, exactly the text that is sent.
+- **Highlights:** every placeholder the filter wrote is a mark in the JSON, from the filter's own
+  record of its replacements (`CloudData.spans`), never from a search of the text (an email can
+  contain "[name]" itself). Marks are blue (accent tint and text); after a click on a list item
+  that kind is yellow with an underline (`--color-highlight`, never the warning yellow, which
+  means "suspicious") and the item shows `aria-current`. Each list item is a button: a click
+  opens the fold if needed and scrolls to the first mark of its kind, a repeat click to the next;
+  activated by keyboard, it also moves the focus there. Inside the JSON one mark at a time is in
+  the tab order (roving tabindex); the arrow keys, Home and End move between marks.
+- **Tooltip:** hovering or focusing a mark shows what stood there, struck through, nothing else
+  (at most 300 characters). The first tooltip appears after 500 ms; while one was shown in the
+  last second, the next appears at once, so reading along is smooth but a pass of the mouse
+  does not pop up tooltips everywhere. It stays while the pointer is on it, goes on mouse-out,
+  blur, Escape and scrolling, and never leaves the device (the spans are not sent).
 - Buttons: **"Send to the cloud"** (filled, cloud icon), **"Cancel"** (outlined), full width.
   Nothing below them (28 Nov 2026: the "Sent once…" and "Never sent…" lines were removed; the
   level cards already say what is removed, and the data fold shows what is sent).
@@ -312,6 +329,8 @@ Portugal (our Portuguese is European Portuguese), without coats of arms.
 | pending        | `#6B737D` | `#8A939D` | "Checking…" and "unchecked" symbol    |
 | pending-tint   | `#F0F2F5` | `#232930` | "Checking…" band, loading pill, chips |
 | tip            | `#D19A00` | `#F5C542` | advice bulb (decorative)              |
+| highlight      | `#FDE68A` | `#6B5410` | the chosen kind in the cloud data     |
+| highlight-text | text      | `#FFE8A3` | text on it (14:1 light, 5.3:1 dark)   |
 
 Every pair is measured before use (text 4.5:1, symbols and meaningful borders 3:1); the
 measurements live as comments in `style.css`. The bulb is a decorative mark next to the words that
@@ -386,6 +405,12 @@ The ready pill uses the safe tint, text and border.
     on, while the band said the AI was loading.
 13. **A ready model turns the pill green** (26 Nov 2026): the whole pill, not a dot inside a
     grey one. The word "ready" says what is green, so it is not read as a verdict.
+14. **The consent card lists what was removed and shows where** (28 Nov 2026): a list "Found in
+    this email and removed before sending" instead of chips, clickable to highlight that kind in
+    the data (yellow with underline; other kinds blue), with the original on hover or focus,
+    struck through. Highlights come only from the filter's recorded positions; the text is never
+    searched for placeholders. The "Sent once" and "Never sent" lines are gone: the level cards
+    say what is removed, the data shows what is sent.
 
 ## Mockup review
 

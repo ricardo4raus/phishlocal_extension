@@ -1205,3 +1205,13 @@ _To fill in near the submission._
 - Removed the consent card's lines "Sent once, for this check only, to Gemini…" (it read as if
   the data had already gone) and "Never sent: your address, the raw headers…": the level cards
   already list what is removed, and "Show what will be sent" shows the exact data.
+- Consent card rebuilt around one question, "what does the cloud get from this email?": a list
+  "Found in this email and removed before sending" with one item per kind, clickable to highlight
+  that kind in the data (yellow with underline, other kinds blue), and the original on hover or
+  focus, struck through. The highlights come from the privacy filter itself: it now runs its
+  passes through a tracker that records where every placeholder went, and the JSON is assembled
+  so that it stays byte for byte what `JSON.stringify` gives (checked on every build; else no
+  highlights, never other data). The random monkeys found two things on the first run: a bare
+  link that read into an earlier "[link:" placeholder (the cut piece had kept a span), fixed, and
+  a phone number that the AI answer reader lets through in one shape, which is older than this
+  change and still open.
