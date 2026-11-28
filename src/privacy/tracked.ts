@@ -19,13 +19,14 @@ import type { RedactedKind, RedactedSpan } from './redact';
  * A replacement for one match: the text to write, its kind, and spans inside that text.
  * `slotFor` says where a character at `offsetInMatch` ended up in `text`, for the parts of the
  * match the replacement kept (a link's host, an address's domain), so a name stand-in there keeps
- * its original; undefined for a part that is gone.
+ * its original: undefined for a part that is gone (a link's user name, path and query), null for
+ * a part that is kept but rewritten, so the place is unknown (a host `URL` read differently).
  */
 export interface Replacement {
   text: string;
   kind: RedactedKind;
   spans?: readonly RedactedSpan[];
-  slotFor?: (offsetInMatch: number) => number | undefined;
+  slotFor?: (offsetInMatch: number) => number | null | undefined;
 }
 
 /** Decides what a match becomes; `undefined` keeps the match as it is. */
@@ -182,7 +183,7 @@ export class Tracker {
     // link's host, an address's domain), they become children with their original.
     const own = [...(replacement.spans ?? [])];
     const children = [...own];
-    /** Covered names the replacement gave no place for (a rewritten host, a gone local part). */
+    /** Covered names the replacement kept without a known place (a rewritten host). */
     const unplaced: string[] = [];
     for (let index = a; index <= b; index++) {
       const segment = this.segments[index];
@@ -195,8 +196,10 @@ export class Tracker {
         continue;
       }
       const slot = replacement.slotFor?.(segmentStart - start);
+      // Gone with the replaced text (a link's path): no place, and none to look for.
+      if (slot === undefined) continue;
       if (
-        slot === undefined ||
+        slot === null ||
         !replacement.text.startsWith(segment.text, slot) ||
         children.some((span) => span.start < slot + segment.text.length && span.end > slot)
       ) {
@@ -211,8 +214,10 @@ export class Tracker {
       });
     }
     // Stand-ins the replacement still holds without a known place (URL rewrote the host, so no
-    // offset maps): by order, when their number is exactly the number of names without a place.
-    // Otherwise none: a wrong original is worse than no tooltip (review round 2).
+    // offset maps): by order, when their number is exactly the number of names kept without a
+    // place. Otherwise none: a wrong original is worse than no tooltip (review round 2). Only
+    // names from the kept part count, so a name from a link's path cannot be borrowed by a host
+    // that spells the stand-in's marker itself (review round 3).
     const unclaimed: number[] = [];
     for (
       let at = replacement.text.indexOf(NAME_STAND_IN);

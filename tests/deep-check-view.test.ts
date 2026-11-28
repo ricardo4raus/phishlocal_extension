@@ -934,7 +934,9 @@ describe('the marks in the data', () => {
     const [mark] = marks() as [HTMLElement];
     mark.focus();
     expect(struck()).toBe(sentinel);
+    // Not in the data's text, and not in any attribute of its markup either.
     expect(text('data')).not.toContain(sentinel);
+    expect(get('data').outerHTML).not.toContain(sentinel);
     click('send');
     expect(runs[0]?.prompt).not.toContain(sentinel);
   });
@@ -1105,11 +1107,16 @@ describe('the tooltip', () => {
     expect(get('tip').hidden).toBe(true);
     expect(mark?.hasAttribute('aria-describedby')).toBe(false);
     // Escape holds: the pointer passing over another mark and leaving again does not bring the
-    // focused mark's tooltip back (review round 2).
+    // focused mark's tooltip back (review round 2), not even after a second Escape on the
+    // hovered mark's tooltip (review round 3).
     const [passing] = marksOf('name') as [HTMLElement];
     mouse(passing, 'mouseover');
     await vi.advanceTimersByTimeAsync(TIP_DELAY_MS);
     expect(struck()).toBe(ORIGINALS.name);
+    key(mark as HTMLElement, 'Escape');
+    expect(get('tip').hidden).toBe(true);
+    mouse(passing, 'mouseover');
+    await vi.advanceTimersByTimeAsync(TIP_DELAY_MS);
     mouse(passing, 'mouseout');
     await vi.advanceTimersByTimeAsync(TIP_HIDE_MS);
     expect(get('tip').hidden).toBe(true);

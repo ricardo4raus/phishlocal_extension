@@ -822,7 +822,9 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
   // between the marks (the data's own scrolling by arrow keys stays when no mark is focused).
   elements.data.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
-      dismissed = tipFor;
+      // The focused mark is the only one a leaving pointer could bring back (review round 3:
+      // a second Escape on a hovered mark's tooltip must not undo the first).
+      dismissed = markAt(document.activeElement) ?? dismissed;
       hideTip();
       return;
     }

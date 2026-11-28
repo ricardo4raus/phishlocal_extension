@@ -315,7 +315,7 @@ const COUNTED: Record<RedactedKind, keyof Removed> = {
  */
 function linkPlaceholder(match: string, names: readonly string[], bare = false): Replacement {
   const link = bare || /^www\./iu.test(match) ? `https://${match}` : match;
-  const { host, at } = trueHostAt(link);
+  const { host, at, end, written } = trueHostAt(link);
   if (!host) return { kind: 'link', text: '[link]' };
   // An IP address would be read as a number by the next step and turn into "[number]".
   if (IP_ADDRESS.test(host)) return { kind: 'link', text: '[link: IP address]' };
@@ -325,12 +325,14 @@ function linkPlaceholder(match: string, names: readonly string[], bare = false):
   return {
     kind: 'link',
     ...concat(prefix, inner, ']'),
-    // A character of the written host: where it stands in the cleaned host (undefined when URL
-    // rewrote the host, or for the scheme, user name, path and query, which are gone). The host
-    // is the link's slice in lower case, which can be longer ("İ" becomes two units; review).
+    // A character of the written host: where it stands in the cleaned host; null when URL
+    // rewrote the host (kept, place unknown); undefined for the scheme, user name, path and
+    // query, which are gone. The host is the link's slice in lower case, which can be longer
+    // ("İ" becomes two units; review).
     slotFor: (offset) => {
       const inLink = offset + shift;
-      if (at === undefined || inLink < at) return undefined;
+      if (inLink < at || inLink >= end) return undefined;
+      if (!written) return null;
       const inHost = offsetOf(inner, link.slice(at, inLink).toLowerCase().length);
       return inHost === undefined ? undefined : prefix.length + inHost;
     },
@@ -350,7 +352,7 @@ export function linkHost(link: string): string {
 }
 
 /** {@link linkHost}, and where the host starts in the link. */
-function linkHostAt(link: string): { host: string; at: number } {
+function linkHostAt(link: string): { host: string; at: number; end: number } {
   const scheme = /^[a-z][a-z\d+.-]*:\/\//iu.exec(link)?.[0].length ?? 0;
   const authority = link.slice(scheme).split(/[/?#\\\s]/u)[0] ?? '';
   const userEnd = authority.lastIndexOf('@') + 1;
@@ -358,7 +360,10 @@ function linkHostAt(link: string): { host: string; at: number } {
   const host = hostAndPort.startsWith('[')
     ? (/^\[[\da-f:.]+\]/iu.exec(hostAndPort)?.[0] ?? '')
     : (/^[\p{L}\p{N}.-]*/u.exec(hostAndPort)?.[0] ?? '').replace(/\.+$/u, '');
-  return { host: host.toLowerCase(), at: scheme + userEnd };
+  const at = scheme + userEnd;
+  // `end`: where the host part ends as written, before the path. URL can read more of it as the
+  // host than the strict rule above ("%41nna.example"), so a name up to there counts as kept.
+  return { host: host.toLowerCase(), at, end: at + hostAndPort.length };
 }
 
 /**
@@ -373,17 +378,24 @@ export function trueHost(link: string): string {
 }
 
 /**
- * {@link trueHost}, and where the host starts in the link when it is the written one (so a name
- * stand-in in it keeps its original); undefined when `URL` rewrote it.
+ * {@link trueHost}, with where the written host stands in the link (`at`..`end`) and whether
+ * that written host is the one used (`written`; else `URL` rewrote it, so no offset in it maps).
  */
-function trueHostAt(link: string): { host: string; at?: number } {
-  const { host: written, at } = linkHostAt(link);
+function trueHostAt(link: string): { host: string; at: number; end: number; written: boolean } {
+  const { host: asWritten, at, end } = linkHostAt(link);
   // A trailing dot is the same host ("müller.example." at the end of a sentence; review round 7).
   const parsed = (parseUrl(plain(link))?.hostname ?? '').replace(/\.+$/u, '');
-  if (!parsed) return { host: written, at };
-  if (parseUrl(`https://${plain(written)}`)?.hostname === parsed) return { host: written, at };
+  if (!parsed) return { host: asWritten, at, end, written: true };
+  if (parseUrl(`https://${plain(asWritten)}`)?.hostname === parsed) {
+    return { host: asWritten, at, end, written: true };
+  }
   // `URL` also takes punctuation into a host ("evil.example)."): only the host characters count.
-  return { host: linkHost(`https://${parsed}`).replaceAll(STAND_IN_MARK, NAME_STAND_IN) };
+  return {
+    host: linkHost(`https://${parsed}`).replaceAll(STAND_IN_MARK, NAME_STAND_IN),
+    at,
+    end,
+    written: false,
+  };
 }
 
 /**

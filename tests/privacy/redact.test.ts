@@ -760,6 +760,37 @@ describe('cloudData spans', () => {
     expect(data.removed.names).toBe(2);
   });
 
+  it('never lends a name from the link path to a host that spells the stand-in marker', () => {
+    // Review round 3: the marker that stands for a name while URL reads the link is a public
+    // word; a host spelling it (percent-encoded) gets a "[name]" that stood for nothing. The
+    // name in the path is gone with the path and must not become that "[name]"'s original.
+    const data = cloudData(
+      email({
+        sender: { name: '', address: '' },
+        bodyText: 'See https://%7Aqname%7Aq.example/hans',
+      }),
+      [],
+      ['Hans Beispiel'],
+    );
+    wellFormed(data);
+    expect(JSON.parse(data.json)).toMatchObject({ email: { body: 'See [link: [name].example]' } });
+    expect(spansOf(data, 'name')).toEqual([]);
+    // A name in the user name is gone too, so the host's own names still map.
+    const withUser = cloudData(
+      email({
+        sender: { name: '', address: '' },
+        bodyText: 'See https://hans@%41nna-muster.example/x',
+      }),
+      [],
+      ['Hans Beispiel', 'Anna Muster'],
+    );
+    wellFormed(withUser);
+    expect(spansOf(withUser, 'name')).toEqual([
+      ['[name]', 'anna'],
+      ['[name]', 'muster'],
+    ]);
+  });
+
   it('maps no name by order when the rewritten host kept fewer stand-ins than names', () => {
     // The written host is cut at the underscore, so one stand-in survives for two names: which
     // one cannot be known, and a wrong original would be worse than none (a known limit).
