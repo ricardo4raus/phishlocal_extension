@@ -14,11 +14,21 @@
  * Raw headers never go: they hold the user's address and server IP addresses. Of the headers,
  * only the sender check results (pass/fail and signing domains) and the Reply-To domains go.
  */
-import { FULL_URL, normalizeText, replacePhoneNumbers } from '../ai/patterns';
-import { PROMPT_LIMITS } from '../ai/prompt';
+import { FULL_URL, isPhoneNumber, normalizeText, PHONE_NUMBER } from '../ai/patterns';
+import { PROMPT_LIMITS, randomMarker } from '../ai/prompt';
 import { type Email, FIELD_LIMITS, MAX_BODY_CHARS } from '../email';
 import type { Finding } from '../rules';
 import { hostOfAddress, parseUrl } from '../rules/domains';
+import {
+  concat,
+  NAME_STAND_IN,
+  offsetOf,
+  type Replacement,
+  sortSpans,
+  type Tracked,
+  Tracker,
+  untouched,
+} from './tracked';
 
 export const PLACEHOLDER = {
   name: '[name]',
@@ -285,19 +295,44 @@ export function nameVariants(names: readonly string[]): string[] {
   return [...variants].toSorted((a, b) => b.length - a.length);
 }
 
-const count = (text: string, placeholder: string): number => text.split(placeholder).length - 1;
+/** Adds the spans of a tracked text to the counts. */
+function countSpans(removed: Removed, tracked: Tracked): void {
+  for (const span of tracked.spans) removed[COUNTED[span.kind]]++;
+}
+
+const COUNTED: Record<RedactedKind, keyof Removed> = {
+  name: 'names',
+  email: 'emails',
+  number: 'numbers',
+  iban: 'ibans',
+  link: 'links',
+};
 
 /**
  * A link in the text as its host only (see {@link trueHost}). The host goes through the name and
  * number filter too: the host `URL` reads can hold a name the text hid ("%41nna.example").
+ * `bare`: the match has no scheme (BARE_LINK); it is read with "https://" in front.
  */
-function linkPlaceholder(link: string, names: readonly string[], removed: Removed): string {
-  const host = trueHost(/^www\./iu.test(link) ? `https://${link}` : link);
-  if (!host) return '[link]';
+function linkPlaceholder(match: string, names: readonly string[], bare = false): Replacement {
+  const link = bare || /^www\./iu.test(match) ? `https://${match}` : match;
+  const { host, at } = trueHostAt(link);
+  if (!host) return { kind: 'link', text: '[link]' };
   // An IP address would be read as a number by the next step and turn into "[number]".
-  return IP_ADDRESS.test(host)
-    ? '[link: IP address]'
-    : `[link: ${redactHost(host, names, removed, { fromText: true })}]`;
+  if (IP_ADDRESS.test(host)) return { kind: 'link', text: '[link: IP address]' };
+  const inner = redactHostTracked(host, names, { fromText: true });
+  const prefix = '[link: ';
+  const shift = link.length - match.length;
+  return {
+    kind: 'link',
+    ...concat(prefix, inner, ']'),
+    // A character of the written host: where it stands in the cleaned host (undefined when URL
+    // rewrote the host, or for the scheme, user name, path and query, which are gone).
+    slotFor: (offset) => {
+      if (at === undefined) return undefined;
+      const inHost = offsetOf(inner, offset + shift - at);
+      return inHost === undefined ? undefined : prefix.length + inHost;
+    },
+  };
 }
 
 /** An IPv4 address, or an IPv6 address in brackets, as a link's host. */
@@ -309,12 +344,19 @@ const IP_ADDRESS = /^(?:[\d.]+|\[[\da-f:.]+\])$/iu;
  * or trailing punctuation does not ride along ("evil.example%2Fuid%3D1", "evil.example).").
  */
 export function linkHost(link: string): string {
-  const authority = link.replace(/^[a-z][a-z\d+.-]*:\/\//iu, '').split(/[/?#\\\s]/u)[0] ?? '';
-  const hostAndPort = authority.slice(authority.lastIndexOf('@') + 1);
+  return linkHostAt(link).host;
+}
+
+/** {@link linkHost}, and where the host starts in the link. */
+function linkHostAt(link: string): { host: string; at: number } {
+  const scheme = /^[a-z][a-z\d+.-]*:\/\//iu.exec(link)?.[0].length ?? 0;
+  const authority = link.slice(scheme).split(/[/?#\\\s]/u)[0] ?? '';
+  const userEnd = authority.lastIndexOf('@') + 1;
+  const hostAndPort = authority.slice(userEnd);
   const host = hostAndPort.startsWith('[')
     ? (/^\[[\da-f:.]+\]/iu.exec(hostAndPort)?.[0] ?? '')
     : (/^[\p{L}\p{N}.-]*/u.exec(hostAndPort)?.[0] ?? '').replace(/\.+$/u, '');
-  return host.toLowerCase();
+  return { host: host.toLowerCase(), at: scheme + userEnd };
 }
 
 /**
@@ -325,13 +367,21 @@ export function linkHost(link: string): string {
  * `URL` would fold, so it is compared as a plain letter.
  */
 export function trueHost(link: string): string {
-  const written = linkHost(link);
+  return trueHostAt(link).host;
+}
+
+/**
+ * {@link trueHost}, and where the host starts in the link when it is the written one (so a name
+ * stand-in in it keeps its original); undefined when `URL` rewrote it.
+ */
+function trueHostAt(link: string): { host: string; at?: number } {
+  const { host: written, at } = linkHostAt(link);
   // A trailing dot is the same host ("müller.example." at the end of a sentence; review round 7).
   const parsed = (parseUrl(plain(link))?.hostname ?? '').replace(/\.+$/u, '');
-  if (!parsed) return written;
-  if (parseUrl(`https://${plain(written)}`)?.hostname === parsed) return written;
+  if (!parsed) return { host: written, at };
+  if (parseUrl(`https://${plain(written)}`)?.hostname === parsed) return { host: written, at };
   // `URL` also takes punctuation into a host ("evil.example)."): only the host characters count.
-  return linkHost(`https://${parsed}`).replaceAll(STAND_IN_MARK, NAME_STAND_IN);
+  return { host: linkHost(`https://${parsed}`).replaceAll(STAND_IN_MARK, NAME_STAND_IN) };
 }
 
 /**
@@ -354,42 +404,52 @@ export function addressPlaceholder(address: string): string {
  * the variants from {@link nameVariants}.
  */
 export function redactText(text: string, names: readonly string[], removed: Removed): string {
+  const tracked = redactTextTracked(text, names);
+  countSpans(removed, tracked);
+  return tracked.text;
+}
+
+/** {@link redactText} with the position and the original of every placeholder. */
+export function redactTextTracked(text: string, names: readonly string[]): Tracked {
+  const tracker = new Tracker(normalizeText(text));
   // Names first, before any placeholder exists: a placeholder can then neither hide a name nor be
   // changed by one, and a name inside a link or an address goes with it (found in review round 3:
   // shielding placeholders afterwards let "[link: " in an email shield the names behind it).
-  // Until the end, a name stands as one letter that normalized text cannot hold, so the link and
-  // address patterns still see a whole word ("hans.<name>@mail.example"; a "[name]" there broke
-  // them and the rest of the address went out; found in review round 4).
-  let clean = replaceNames(normalizeText(text), names, removed).replaceAll(FULL_URL, (link) => {
-    removed.links++;
-    return linkPlaceholder(link, names, removed);
-  });
+  // Until the end, a name stands as one letter that normalized text cannot hold (NAME_STAND_IN,
+  // U+1D40D, a mathematical bold capital N, which NFKC folds away), so the link and address
+  // patterns still see a whole word ("hans.<name>@mail.example"; a "[name]" there broke them and
+  // the rest of the address went out; found in review round 4).
+  replaceNames(tracker, names);
+  tracker.pass(FULL_URL, (link) => linkPlaceholder(link, names));
   // Before the addresses: "anna:pw@host.example/x" is a link with a user name, not an address.
-  clean = clean.replaceAll(BARE_LINK, (link) => {
-    removed.links++;
-    return linkPlaceholder(`https://${link}`, names, removed);
+  tracker.pass(BARE_LINK, (link) => linkPlaceholder(link, names, true));
+  tracker.pass(ANY_ADDRESS, (address) => {
+    const at = address.lastIndexOf('@');
+    const prefix = `${PLACEHOLDER.email}@`;
+    return {
+      kind: 'email',
+      text: addressPlaceholder(address),
+      // The domain is kept (lower case: it keeps a stand-in as it is), the local part is gone.
+      slotFor: (offset) => (offset > at ? prefix.length + offset - at - 1 : undefined),
+    };
   });
-  clean = clean.replaceAll(ANY_ADDRESS, (address) => {
-    removed.emails++;
-    return addressPlaceholder(address);
-  });
-  clean = clean.replaceAll(IBAN, (iban) => {
-    if ((iban.match(/\d/g)?.length ?? 0) < MIN_IBAN_DIGITS) return iban;
-    removed.ibans++;
-    return PLACEHOLDER.iban;
-  });
-  const before = count(clean, PLACEHOLDER.number);
-  clean = replacePhoneNumbers(clean, PLACEHOLDER.number);
-  removed.numbers += count(clean, PLACEHOLDER.number) - before;
-  return clean.replaceAll(NAME_STAND_IN, PLACEHOLDER.name).trim();
+  tracker.pass(IBAN, (iban) =>
+    (iban.match(/\d/g)?.length ?? 0) < MIN_IBAN_DIGITS
+      ? undefined
+      : { kind: 'iban', text: PLACEHOLDER.iban },
+  );
+  replaceNumbers(tracker);
+  tracker.swapNameStandIns();
+  tracker.trim();
+  return tracker.result();
 }
 
-/**
- * Stands for a removed name until the end of {@link redactText}: a letter (so the link and address
- * patterns take it as part of a word) that NFKC folds away, so normalized text never holds it
- * (U+1D40D, a mathematical bold capital N).
- */
-const NAME_STAND_IN = String.fromCodePoint(0x1d40d);
+/** Phone, card, account and customer numbers, but not dates. */
+function replaceNumbers(tracker: Tracker): void {
+  tracker.pass(PHONE_NUMBER, (match, offset, text) =>
+    isPhoneNumber(match, offset, text) ? { kind: 'number', text: PLACEHOLDER.number } : undefined,
+  );
+}
 
 /**
  * A host or domain on its own (a link target, an address domain, a DKIM domain): names and
@@ -400,19 +460,28 @@ export function redactHost(
   host: string,
   names: readonly string[],
   removed: Removed,
-  { fromText = false }: { fromText?: boolean } = {},
+  options: { fromText?: boolean } = {},
 ): string {
-  if (IP_ADDRESS.test(host)) return host;
-  const before = count(host, PLACEHOLDER.number);
+  const tracked = redactHostTracked(host, names, options);
+  countSpans(removed, tracked);
+  return tracked.text;
+}
+
+/** {@link redactHost} with the position and the original of every placeholder. */
+export function redactHostTracked(
+  host: string,
+  names: readonly string[],
+  { fromText = false }: { fromText?: boolean } = {},
+): Tracked {
+  if (IP_ADDRESS.test(host)) return untouched(host);
   // A host from the text is normalized already; normalizing it again would fold the stand-in.
   // Any other host is normalized (review round 7: full-width letters passed).
-  const normalized = fromText ? host : normalizeText(host);
-  const clean = replacePhoneNumbers(
-    replaceNames(normalized, hostNames(names), removed, { host: true }),
-    PLACEHOLDER.number,
-  );
-  removed.numbers += count(clean, PLACEHOLDER.number) - before;
-  return clean.replaceAll(NAME_STAND_IN, PLACEHOLDER.name).trim();
+  const tracker = new Tracker(fromText ? host : normalizeText(host));
+  replaceNames(tracker, hostNames(names), { host: true });
+  replaceNumbers(tracker);
+  tracker.swapNameStandIns();
+  tracker.trim();
+  return tracker.result();
 }
 
 /**
@@ -447,12 +516,11 @@ function inAddress(text: string, start: number, end: number): boolean {
  * letters on, so a part like "Li" does not take endings like "evil.li".
  */
 function replaceNames(
-  text: string,
+  tracker: Tracker,
   names: readonly string[],
-  removed: Removed,
   { host = false }: { host?: boolean } = {},
-): string {
-  if (names.length === 0) return text;
+): void {
+  if (names.length === 0) return;
   const exact = new Set(names);
   // In a host, digits next to a name do not hide it ("anna1985.example"; review round 7).
   const edge = host ? String.raw`\p{L}` : String.raw`\p{L}\p{N}`;
@@ -460,15 +528,13 @@ function replaceNames(
     String.raw`(?<![${edge}])(?:${names.map(escapeRegex).join('|')})(?![${edge}])`,
     'giu',
   );
-  return text.replaceAll(pattern, (match: string, offset: number) => {
+  tracker.pass(pattern, (match, offset, text) => {
     const lowerWord = !match.includes(' ') && match === match.toLowerCase();
     const counts =
       !lowerWord ||
       exact.has(match) ||
       (match.length >= 3 && (host || inAddress(text, offset, offset + match.length)));
-    if (!counts) return match;
-    removed.names++;
-    return NAME_STAND_IN;
+    return counts ? { kind: 'name', text: NAME_STAND_IN } : undefined;
   });
 }
 
@@ -615,7 +681,6 @@ export function cloudData(
   foundNames: readonly string[] | undefined,
   level: PrivacyLevel = 'high',
 ): CloudData {
-  const removed = none();
   const fields = cloudFields(email);
   const high = level === 'high';
   const fromModel = modelNames(high ? (foundNames ?? []) : []);
@@ -625,22 +690,47 @@ export function cloudData(
         ...withoutConfirmedBrand(fromModel.names, email),
       ])
     : [];
-  const clean = (text: string): string => redactText(text, names, removed);
+  const clean = (text: string): Tracked => redactTextTracked(text, names);
   // Hosts and domains go through the name and number filter too: "secure.anna-muster.example" is
   // a host, and a name in it is still a name (found in review round 5).
-  const cleanHost = (host: string): string => redactHost(host, names, removed);
+  const cleanHost = (host: string): Tracked => redactHostTracked(host, names);
   // Only the domain goes through it: "[email]" must stay (review round 7: "Dear Email User").
-  const cleanAddress = (address: string): string => {
+  // The whole result stands for the address (one removed email address) with the domain's own
+  // spans inside it; an empty address removes nothing.
+  const cleanAddress = (address: string): Tracked => {
     const placeholder = addressPlaceholder(address);
     const at = placeholder.indexOf('@');
-    return at < 0 ? placeholder : `${PLACEHOLDER.email}@${cleanHost(placeholder.slice(at + 1))}`;
+    const text =
+      at < 0
+        ? untouched(placeholder)
+        : concat(`${PLACEHOLDER.email}@`, cleanHost(placeholder.slice(at + 1)));
+    if (address === '') return text;
+    return {
+      ...text,
+      spans: sortSpans([
+        { start: 0, end: text.text.length, kind: 'email', original: address },
+        ...text.spans,
+      ]),
+    };
   };
   const auth = email.headers?.auth;
   let senderName = clean(fields.name);
-  if (high && !foundNames && senderName !== '') {
-    removed.names++;
-    senderName = PLACEHOLDER.name;
+  if (high && !foundNames && senderName.text !== '') {
+    senderName = {
+      text: PLACEHOLDER.name,
+      spans: [{ start: 0, end: PLACEHOLDER.name.length, kind: 'name', original: fields.name }],
+      kept: [],
+    };
   }
+  // Every text the filter touched goes into the data as a token and is written back, with its
+  // positions, by assemble(). The strings written as they are (rule names, result words, our own
+  // fixed texts) hold no attacker text: the header parser keeps only lowercase result words.
+  const tracked: Tracked[] = [];
+  const marker = randomMarker();
+  const token = (field: Tracked): string => {
+    tracked.push(field);
+    return `${TOKEN_MARK}${marker}${tracked.length - 1}${TOKEN_MARK}`;
+  };
   const data = {
     rule_findings: findings
       .slice(0, PROMPT_LIMITS.findings)
@@ -649,43 +739,125 @@ export function cloudData(
       .map(({ rule, severity, message }) => ({
         rule,
         severity,
-        message: FIXED_MESSAGES[rule] ?? clean(message),
+        message: FIXED_MESSAGES[rule] ?? token(clean(message)),
       })),
     sender_checks: auth
       ? {
           spf: auth.spf ?? 'none',
           dkim: auth.dkim.map((entry) =>
-            entry.domain ? `${entry.result} (${cleanHost(entry.domain)})` : entry.result,
+            entry.domain
+              ? token(concat(`${entry.result} (`, cleanHost(entry.domain), ')'))
+              : entry.result,
           ),
           dmarc: auth.dmarc ?? 'none',
           sender_domain_confirmed: auth.dmarc === 'pass',
         }
       : 'not available',
     email: {
-      from: { name: senderName, address: cleanAddress(email.sender.address) },
+      from: { name: token(senderName), address: token(cleanAddress(email.sender.address)) },
       ...(email.headers
         ? {
-            reply_to: email.headers.replyTo.map((box) => cleanAddress(box.address)),
+            reply_to: email.headers.replyTo.map((box) => token(cleanAddress(box.address))),
           }
         : {}),
-      subject: clean(fields.subject),
+      subject: token(clean(fields.subject)),
       links: email.links.slice(0, PROMPT_LIMITS.links).map((link, index) => ({
-        text: clean(fields.linkTexts[index] ?? ''),
+        text: token(clean(fields.linkTexts[index] ?? '')),
         // As written (not punycode), so a name in it is found.
         goes_to: parseUrl(link.href)?.hostname
-          ? cleanHost(trueHost(link.href) || '(no host)')
+          ? token(cleanHost(trueHost(link.href) || '(no host)'))
           : '(not a web link)',
       })),
-      body: clean(fields.body),
+      body: token(clean(fields.body)),
       body_cut: email.truncated || fields.body.length < normalizeText(email.bodyText).trim().length,
       sent_to_self: email.headers?.sentToSelf === true,
     },
   };
+  const removed = none();
+  for (const field of tracked) countSpans(removed, field);
+  const { json, spans } = assemble(data, marker, tracked);
   return {
-    json: JSON.stringify(data, null, 2),
+    json,
     removed,
-    spans: [],
+    spans,
     // At "standard" no name is meant to be removed, so none can remain by mistake.
     namesChecked: !high || (foundNames !== undefined && !fromModel.dropped),
   };
+}
+
+/** Marks a token in the data skeleton: a private-use character `JSON.stringify` writes as it is. */
+const TOKEN_MARK = '\uE000';
+
+/** A JSON value as `JSON.stringify(_, null, 2)` writes it: only these shapes occur in the data. */
+type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
+/** The data with the tokens replaced by the real texts. */
+function withTexts(value: Json, marker: string, tracked: readonly Tracked[]): Json {
+  if (typeof value === 'string') {
+    const found = new RegExp(`^${TOKEN_MARK}${marker}(\\d+)${TOKEN_MARK}$`, 'u').exec(value);
+    return found ? (tracked[Number(found[1])]?.text ?? value) : value;
+  }
+  if (Array.isArray(value)) return value.map((item) => withTexts(item, marker, tracked));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, withTexts(item, marker, tracked)]),
+    );
+  }
+  return value;
+}
+
+/**
+ * The JSON text with every token replaced by its field's text, escaped as JSON does, and the
+ * spans mapped into it. The result must equal `JSON.stringify` of the real data; if it does not
+ * (a bug, or a token shape in the data), the real JSON goes out without positions: the sent data
+ * never depends on the tracking.
+ */
+function assemble(
+  data: Json,
+  marker: string,
+  tracked: readonly Tracked[],
+): { json: string; spans: RedactedSpan[] } {
+  const canonical = JSON.stringify(withTexts(data, marker, tracked), null, 2);
+  const skeleton = JSON.stringify(data, null, 2);
+  const tokens = new RegExp(`${TOKEN_MARK}${marker}(\\d+)${TOKEN_MARK}`, 'gu');
+  const spans: RedactedSpan[] = [];
+  let json = '';
+  let last = 0;
+  for (const found of skeleton.matchAll(tokens)) {
+    const field = tracked[Number(found[1])];
+    if (!field) return { json: canonical, spans: [] };
+    json += skeleton.slice(last, found.index);
+    const { escaped, offsets } = escapeWithOffsets(field);
+    for (const span of field.spans) {
+      spans.push({
+        ...span,
+        start: json.length + (offsets.get(span.start) ?? 0),
+        end: json.length + (offsets.get(span.end) ?? 0),
+      });
+    }
+    json += escaped;
+    last = found.index + found[0].length;
+  }
+  json += skeleton.slice(last);
+  if (json !== canonical) return { json: canonical, spans: [] };
+  return { json, spans: sortSpans(spans) };
+}
+
+/**
+ * A field's text escaped as inside a JSON string, piece by piece between the span boundaries, so
+ * every boundary gets its offset in the escaped text.
+ */
+function escapeWithOffsets(field: Tracked): { escaped: string; offsets: Map<number, number> } {
+  const boundaries = [
+    ...new Set([0, field.text.length, ...field.spans.flatMap((span) => [span.start, span.end])]),
+  ].toSorted((a, b) => a - b);
+  const offsets = new Map<number, number>();
+  let escaped = '';
+  let from = 0;
+  for (const boundary of boundaries) {
+    escaped += JSON.stringify(field.text.slice(from, boundary)).slice(1, -1);
+    offsets.set(boundary, escaped.length);
+    from = boundary;
+  }
+  return { escaped, offsets };
 }

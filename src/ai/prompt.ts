@@ -110,7 +110,7 @@ export const PROMPT_LIMITS = {
   name: 100,
 } as const;
 
-function randomMarker(): string {
+export function randomMarker(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(8));
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
