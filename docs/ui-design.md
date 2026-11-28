@@ -185,7 +185,9 @@ without sideways scrolling.
   (at most 300 characters). The first tooltip appears after 500 ms; while one was shown in the
   last second, the next appears at once, so reading along is smooth but a pass of the mouse
   does not pop up tooltips everywhere. It stays while the pointer is on it, goes on mouse-out,
-  blur, Escape and scrolling, and never leaves the device (the spans are not sent).
+  blur and Escape, and when the data scrolls (a focused mark's tooltip moves with it instead,
+  since focusing a mark scrolls it into view). It never leaves the device (the spans are not
+  sent).
 - Buttons: **"Send to the cloud"** (filled, cloud icon), **"Cancel"** (outlined), full width.
   Nothing below them (28 Nov 2026: the "Sent once…" and "Never sent…" lines were removed; the
   level cards already say what is removed, and the data fold shows what is sent).
@@ -330,7 +332,7 @@ Portugal (our Portuguese is European Portuguese), without coats of arms.
 | pending-tint   | `#F0F2F5` | `#232930` | "Checking…" band, loading pill, chips |
 | tip            | `#D19A00` | `#F5C542` | advice bulb (decorative)              |
 | highlight      | `#FDE68A` | `#6B5410` | the chosen kind in the cloud data     |
-| highlight-text | text      | `#FFE8A3` | text on it (14:1 light, 5.3:1 dark)   |
+| highlight-text | text      | `#FFE8A3` | text on it (14:1 light, 6.0:1 dark)   |
 
 Every pair is measured before use (text 4.5:1, symbols and meaningful borders 3:1); the
 measurements live as comments in `style.css`. The bulb is a decorative mark next to the words that

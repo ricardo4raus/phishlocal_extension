@@ -326,10 +326,12 @@ function linkPlaceholder(match: string, names: readonly string[], bare = false):
     kind: 'link',
     ...concat(prefix, inner, ']'),
     // A character of the written host: where it stands in the cleaned host (undefined when URL
-    // rewrote the host, or for the scheme, user name, path and query, which are gone).
+    // rewrote the host, or for the scheme, user name, path and query, which are gone). The host
+    // is the link's slice in lower case, which can be longer ("İ" becomes two units; review).
     slotFor: (offset) => {
-      if (at === undefined) return undefined;
-      const inHost = offsetOf(inner, offset + shift - at);
+      const inLink = offset + shift;
+      if (at === undefined || inLink < at) return undefined;
+      const inHost = offsetOf(inner, link.slice(at, inLink).toLowerCase().length);
       return inHost === undefined ? undefined : prefix.length + inHost;
     },
   };
@@ -429,8 +431,12 @@ export function redactTextTracked(text: string, names: readonly string[]): Track
     return {
       kind: 'email',
       text: addressPlaceholder(address),
-      // The domain is kept (lower case: it keeps a stand-in as it is), the local part is gone.
-      slotFor: (offset) => (offset > at ? prefix.length + offset - at - 1 : undefined),
+      // The domain is kept, in lower case (which can be longer: "İ" becomes two units), the
+      // local part is gone.
+      slotFor: (offset) =>
+        offset > at
+          ? prefix.length + address.slice(at + 1, offset).toLowerCase().length
+          : undefined,
     };
   });
   tracker.pass(IBAN, (iban) =>

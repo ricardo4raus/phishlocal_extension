@@ -436,6 +436,10 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
    */
   function placeTip(mark: HTMLElement): void {
     const { tip } = elements;
+    // Measured from the panel's left edge: at its old place near the right edge the tooltip would
+    // measure narrow and tall (shrink-to-fit width ends at the panel's edge; found in review).
+    tip.style.top = '0px';
+    tip.style.left = '0px';
     const panel = elements.dataPanel.getBoundingClientRect();
     const place = mark.getBoundingClientRect();
     let top = place.top - panel.top - tip.offsetHeight;
@@ -451,7 +455,11 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     if (tipFor && tipFor !== mark) tipFor.element.removeAttribute('aria-describedby');
     tipFor = mark;
     const { original } = mark;
-    const cut = original.length > TIP_MAX_CHARS ? `${original.slice(0, TIP_MAX_CHARS)}…` : original;
+    // Cut between code points: a surrogate pair split at the limit would show as "\uFFFD".
+    const cut =
+      original.length > TIP_MAX_CHARS
+        ? `${original.slice(0, TIP_MAX_CHARS).replace(/[\uD800-\uDBFF]$/u, '')}…`
+        : original;
     // Email text: as text only, with direction overrides revealed.
     setText(elements.tip.querySelector<HTMLElement>('s') ?? elements.tip, cut);
     mark.element.setAttribute('aria-describedby', elements.tip.id);
@@ -829,11 +837,17 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     clearTimeout(tipTimer);
     tipTimer = setTimeout(() => showTip(mark), warm || tipFor ? TIP_QUICK_MS : TIP_DELAY_MS);
   });
+  // When the pointer leaves, a focused mark gets its tooltip back (the pointer passing over the
+  // data must not take a keyboard user's tooltip away; found in review); else the tooltip goes.
   const leaveTip = (): void => {
     clearTimeout(tipTimer);
     clearTimeout(hideTimer);
     tipTimer = undefined;
-    hideTimer = setTimeout(hideTip, TIP_HIDE_MS);
+    hideTimer = setTimeout(() => {
+      const focused = markAt(document.activeElement);
+      if (focused) showTip(focused);
+      else hideTip();
+    }, TIP_HIDE_MS);
   };
   elements.data.addEventListener('mouseout', (event) => {
     if (markAt(event.target)) leaveTip();

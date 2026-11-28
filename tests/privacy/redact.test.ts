@@ -720,6 +720,27 @@ describe('cloudData spans', () => {
     expect(spansOf(high, 'name')).toEqual([['[name]', 'Anna Muster']]);
   });
 
+  it('keeps the slots right when lower-casing the domain or host makes it longer', () => {
+    // "İ" (U+0130) becomes "i̇" (two units) in lower case: found in review, the second name's slot
+    // landed on the first name, so its tooltip would have shown the wrong original.
+    const data = cloudData(
+      email({
+        sender: { name: '', address: '' },
+        bodyText:
+          'x@\u0130\u0130\u0130-anna-muster.example https://\u0130\u0130-anna-muster.example/p',
+      }),
+      [],
+      ['Anna Muster'],
+    );
+    wellFormed(data);
+    expect(spansOf(data, 'name')).toEqual([
+      ['[name]', 'anna'],
+      ['[name]', 'muster'],
+      ['[name]', 'anna'],
+      ['[name]', 'muster'],
+    ]);
+  });
+
   it('gives a placeholder that a later match cut into no span of its own', () => {
     // Found by the monkey test: "www.compte" becomes "[link: www.compte]" first, then the bare
     // link pattern reads "67.co.uk?[link:" up to the space. The text is as before; only the
