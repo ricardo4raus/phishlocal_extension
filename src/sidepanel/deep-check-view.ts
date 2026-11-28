@@ -509,9 +509,25 @@ export function createDeepCheck(elements: DeepCheckElements, deps: DeepCheckDeps
     const mark = own[current[kind] ?? 0];
     if (!mark) return;
     setTabbable(mark.element);
-    // Not in jsdom (the tests), so optional.
-    mark.element.scrollIntoView?.({ block: 'nearest' });
-    if (byKeyboard) mark.element.focus();
+    scrollDataTo(mark.element);
+    // Not `focus()` alone: it would scroll every ancestor too (see scrollDataTo).
+    if (byKeyboard) mark.element.focus({ preventScroll: true });
+  }
+
+  /**
+   * Scrolls the data, and only the data, so that `mark` is in view (centred); nothing when it is
+   * already. `scrollIntoView()` would scroll every ancestor as well, so a click on a list item
+   * could move the whole panel and the list under the pointer (found in review).
+   */
+  function scrollDataTo(mark: HTMLElement): void {
+    const box = elements.data.getBoundingClientRect();
+    const place = mark.getBoundingClientRect();
+    if (place.top >= box.top && place.bottom <= box.bottom) return;
+    // Clamped at the top like the browser does, so the tests see the same value.
+    elements.data.scrollTop = Math.max(
+      0,
+      elements.data.scrollTop + place.top - box.top - (box.height - place.height) / 2,
+    );
   }
 
   /** Shows the list of what was removed, and the data with its marks. */

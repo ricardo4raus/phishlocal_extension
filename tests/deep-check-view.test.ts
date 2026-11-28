@@ -27,8 +27,9 @@ const NAMES_TIMEOUT_MS = DEFAULT_SETTINGS.namesTimeoutMs;
 const CLOUD_LIMIT_MS = DEFAULT_SETTINGS.cloudTimeoutMs + CLOUD_LIMIT_EXTRA_MS;
 
 /**
- * Spans supplied by the test until the filter records them: `alter` changes what the real
- * `cloudData()` returns (its positions are still empty), and `last` is the data the panel got.
+ * The real privacy filter, watched: `last` is the data the panel got (its JSON and its record of
+ * replaced places). `alter` changes that data for the few tests that need a made-up record (an
+ * original too long for the tooltip); every other test runs on the filter's own spans.
  */
 const supplied = vi.hoisted(() => ({
   alter: undefined as ((data: CloudData) => CloudData) | undefined,
@@ -47,49 +48,13 @@ vi.mock('../src/privacy/redact', async (importOriginal) => {
   };
 });
 
-/** A placeholder in the JSON, as the filter writes it; an address keeps its domain. */
-const PLACEHOLDERS = /\[email\](?:@[^\s"]+)?|\[link: [^\]]*\]|\[(?:name|number|iban)\]/g;
-const INNER = /\[(?:name|number|iban)\]/g;
-const KIND: Record<string, RedactedKind> = {
-  name: 'name',
-  email: 'email',
-  number: 'number',
-  iban: 'iban',
-  link: 'link',
+/** The personal data in the fixture email, as the filter records it (the tooltips show it). */
+const ORIGINALS = {
+  name: 'Anna Muster',
+  address: 'anna.muster@mail.example',
+  iban: 'CH93 0076 2011 6238 5295 7',
+  phone: '+41 79 123 45 67',
 };
-const kindOf = (placeholder: string): RedactedKind =>
-  KIND[/^\[(\w+)/.exec(placeholder)?.[1] ?? ''] ?? 'name';
-
-/**
- * Gives the real data spans for every placeholder in its JSON, as the filter will record them
- * (a placeholder inside an address or a link is a nested span), and counts from the spans. Only
- * for the test: the panel itself never searches the text.
- */
-function locateSpans(data: CloudData): CloudData {
-  const spans: RedactedSpan[] = [];
-  for (const match of data.json.matchAll(PLACEHOLDERS)) {
-    const start = match.index;
-    const kind = kindOf(match[0]);
-    spans.push({ start, end: start + match[0].length, kind, original: `was ${kind} ${start}` });
-    if (kind === 'email' || kind === 'link') {
-      for (const inner of match[0].matchAll(INNER)) {
-        const innerStart = start + inner.index;
-        const innerKind = kindOf(inner[0]);
-        spans.push({
-          start: innerStart,
-          end: innerStart + inner[0].length,
-          kind: innerKind,
-          original: `was ${innerKind} ${innerStart}`,
-        });
-      }
-    }
-  }
-  const removed = { names: 0, emails: 0, numbers: 0, ibans: 0, links: 0 };
-  for (const { kind } of spans) {
-    removed[`${kind}s`]++;
-  }
-  return { ...data, removed, spans: [...spans].sort((a, b) => a.start - b.start || b.end - a.end) };
-}
 
 const email: Email = {
   sender: { name: 'Anna Muster', address: 'anna.muster@mail.example' },
@@ -806,8 +771,8 @@ describe('removedItems', () => {
 });
 
 /* ------------------------------------------------------------------------------------------------
- * The list of what was removed, the marks in the data, and the tooltip. Spans supplied by the
- * test until the filter records them (`supplied.alter`).
+ * The list of what was removed, the marks in the data, and the tooltip, on the real filter's data
+ * and its record of the replaced places.
  * --------------------------------------------------------------------------------------------- */
 
 const marks = (): HTMLElement[] => [...get('data').querySelectorAll<HTMLElement>('.redacted')];
@@ -836,14 +801,41 @@ const key = (element: HTMLElement, name: string): void => {
   );
 };
 
-/** jsdom has no scrollIntoView: a stub records the elements scrolled to. */
-let scrolled: HTMLElement[];
+/**
+ * jsdom lays nothing out (every rectangle is 0 by 0): the data box and the marks get rectangles
+ * here. The box is 100 px tall at the top of the page; mark `n` is a 10 px line at `n * 60` px,
+ * so the first two marks are in view and the later ones below the box.
+ */
+const BOX = { top: 0, bottom: 100, height: 100 };
+const MARK_HEIGHT = 10;
+const markTop = (index: number): number => index * 60;
+const rect = (top: number, height: number): DOMRect =>
+  ({
+    top,
+    bottom: top + height,
+    height,
+    left: 0,
+    right: 300,
+    width: 300,
+    x: 0,
+    y: top,
+  }) as DOMRect;
+function layOut(): void {
+  Object.defineProperty(get('data'), 'getBoundingClientRect', {
+    configurable: true,
+    value: () => rect(BOX.top, BOX.height),
+  });
+  marks().forEach((mark, index) => {
+    Object.defineProperty(mark, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(markTop(index) - get('data').scrollTop, MARK_HEIGHT),
+    });
+  });
+}
+/** Where the data must scroll to centre mark `index` (the view's own formula). */
+const centred = (index: number): number => markTop(index) - (BOX.height - MARK_HEIGHT) / 2;
 
 describe('the list of what was removed', () => {
-  beforeEach(() => {
-    supplied.alter = locateSpans;
-  });
-
   it('shows one button per kind with its count, under the heading', async () => {
     check.shown(email, []);
     await prepare();
@@ -865,14 +857,17 @@ describe('the list of what was removed', () => {
   });
 
   it('says that nothing needed removing, by level, and hides the empty list', async () => {
-    // The filter found nothing: no spans, no counts.
-    supplied.alter = (data) => ({
-      ...data,
-      spans: [],
-      removed: { names: 0, emails: 0, numbers: 0, ibans: 0, links: 0 },
-    });
-    check.shown(email, []);
-    await prepare();
+    // An email with nothing personal in it: no sender address, no numbers, no links.
+    const bare: Email = {
+      sender: { name: '', address: '' },
+      subject: 'Hello',
+      bodyText: 'Hello there, see you tomorrow.',
+      links: [],
+      truncated: false,
+    };
+    check.shown(bare, []);
+    await prepare([]);
+    expect((supplied.last as CloudData).spans).toEqual([]);
     expect(text('removedHeading')).toBe(
       'Nothing found to remove: no names, email addresses, numbers, IBANs or link paths.',
     );
@@ -881,7 +876,7 @@ describe('the list of what was removed', () => {
     expect(marks()).toEqual([]);
 
     check = create({ savedLevel: () => 'standard' });
-    check.shown(email, []);
+    check.shown(bare, []);
     click('start');
     await vi.waitFor(() => expect(get('preview').hidden).toBe(false));
     expect(text('removedHeading')).toBe(
@@ -892,48 +887,57 @@ describe('the list of what was removed', () => {
 });
 
 describe('the marks in the data', () => {
-  beforeEach(() => {
-    supplied.alter = locateSpans;
-    scrolled = [];
-    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
-      configurable: true,
-      writable: true,
-      value(this: HTMLElement) {
-        scrolled.push(this);
-      },
-    });
-  });
-
-  afterEach(() => {
-    delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
-  });
-
   it('wraps exactly the recorded places, and the text stays the data', async () => {
     check.shown(email, []);
     await prepare();
     const data = supplied.last as CloudData;
-    expect(data.spans.length).toBeGreaterThan(3);
+    // The filter's record: the sender's name and address, then the name, IBAN and phone number
+    // in the text.
+    expect(data.spans.map((span) => [span.kind, span.original])).toEqual([
+      ['name', ORIGINALS.name],
+      ['email', ORIGINALS.address],
+      ['name', ORIGINALS.name],
+      ['iban', ORIGINALS.iban],
+      ['number', ORIGINALS.phone],
+    ]);
     expect(text('data')).toBe(data.json);
-    expect(marks().map((mark) => mark.textContent)).toEqual(
-      data.spans.map((span) => data.json.slice(span.start, span.end)),
-    );
+    expect(marks().map((mark) => mark.textContent)).toEqual([
+      '[name]',
+      '[email]@mail.example',
+      '[name]',
+      '[iban]',
+      '[number]',
+    ]);
     expect(marks().map((mark) => mark.dataset.kind)).toEqual(data.spans.map((span) => span.kind));
-    // Marks only in the data, none in the list; the record of positions is never sent.
+    // Marks only in the data, none in the list; the originals stay on the device: neither the
+    // data nor the prompt holds them.
     expect(get('removed').querySelector('.redacted')).toBeNull();
     click('send');
     expect(runs[0]?.prompt).toContain(data.json);
-    expect(runs[0]?.prompt).not.toContain('was name');
+    for (const original of Object.values(ORIGINALS)) {
+      expect(text('data')).not.toContain(original);
+      expect(runs[0]?.prompt).not.toContain(original);
+    }
   });
 
   it("marks nothing an attacker wrote to look like a placeholder: only the filter's record counts", async () => {
-    // The filter recorded no positions, whatever the text says.
-    supplied.alter = (data) => ({ ...data, spans: [] });
-    check.shown(
-      { ...email, bodyText: 'Hi [name] and [email]@x.example, see [link: a.example]' },
-      [],
-    );
+    const literal = 'Hi [name] and [email]@x.example, see [link: a.example]';
+    check.shown({ ...email, bodyText: literal }, []);
     await prepare();
-    expect(text('data')).toContain('[name] and [email]@x.example, see [link: a.example]');
+    // The filter replaced the sender's name and address, nothing in the text: two marks, and the
+    // text's own "[name]" stays plain text.
+    expect(marks().map((mark) => mark.textContent)).toEqual(['[name]', '[email]@mail.example']);
+    expect(text('data')).toContain(literal);
+    const plain = [...get('data').childNodes].filter(
+      (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.includes(literal),
+    );
+    expect(plain).toHaveLength(1);
+    // And with no record at all, no mark at all, whatever the text says.
+    supplied.alter = (data) => ({ ...data, spans: [] });
+    check.shown(other, []);
+    nameCalls = [];
+    await prepare();
+    expect(text('data')).toContain('[name]');
     expect(marks()).toEqual([]);
     expect(tabbable()).toEqual([]);
   });
@@ -978,33 +982,44 @@ describe('the marks in the data', () => {
     check.shown(email, []);
     await prepare();
     expect(get('dataPanel').hidden).toBe(true);
+    layOut();
+    const data = get('data');
+    // Marks 0 and 2 are the names (the sender's, then the one in the text), mark 1 the address.
     const names = marksOf('name');
-    expect(names).toHaveLength(2);
+    expect(names).toEqual([marks()[0], marks()[2]]);
 
     mouseClick(item('name'));
     expect(get('dataPanel').hidden).toBe(false);
     expect(get('show').getAttribute('aria-expanded')).toBe('true');
-    expect(get('data').dataset.selectedKind).toBe('name');
+    expect(data.dataset.selectedKind).toBe('name');
     expect(item('name').getAttribute('aria-current')).toBe('true');
     expect(item('email').hasAttribute('aria-current')).toBe(false);
-    expect(scrolled).toEqual([names[0]]);
+    // The first name is in view already: no scrolling.
+    expect(data.scrollTop).toBe(0);
     // The Tab stop follows the current mark; a mouse click leaves the focus where it is.
     expect(tabbable()).toEqual([names[0]]);
     expect(document.activeElement).not.toBe(names[0]);
 
-    // Again: the next mark of that kind; then round to the first.
+    // Again: the next mark of that kind, below the box, so the data (and only the data) scrolls
+    // to centre it; then round to the first, back at the top.
     mouseClick(item('name'));
-    expect(scrolled).toEqual([names[0], names[1]]);
+    expect(data.scrollTop).toBe(centred(2));
     expect(tabbable()).toEqual([names[1]]);
     mouseClick(item('name'));
-    expect(scrolled.at(-1)).toBe(names[0]);
+    expect(data.scrollTop).toBe(0);
+    expect(tabbable()).toEqual([names[0]]);
 
-    // Another kind: its first mark; the item marks move with it.
+    // Another kind: its first mark; the item marks move with it. The address (mark 1) is in
+    // view at the top: no scrolling.
     mouseClick(item('email'));
-    expect(get('data').dataset.selectedKind).toBe('email');
+    expect(data.dataset.selectedKind).toBe('email');
     expect(item('email').getAttribute('aria-current')).toBe('true');
     expect(item('name').hasAttribute('aria-current')).toBe(false);
-    expect(scrolled.at(-1)).toBe(marksOf('email')[0]);
+    expect(data.scrollTop).toBe(0);
+    expect(tabbable()).toEqual([marks()[1]]);
+    // The phone number (mark 4) is far below: centred too.
+    mouseClick(item('number'));
+    expect(data.scrollTop).toBe(centred(4));
     // The CSS colours the marks by the two attributes; nothing else changes on them.
     expect(marks().every((mark) => mark.classList.contains('redacted'))).toBe(true);
   });
@@ -1018,11 +1033,9 @@ describe('the marks in the data', () => {
     const [iban] = marksOf('iban');
     expect(document.activeElement).toBe(iban);
     expect(tabbable()).toEqual([iban]);
-    // The focused mark shows its tooltip at once.
+    // The focused mark shows its tooltip at once: the IBAN as it stood in the email.
     expect(get('tip').hidden).toBe(false);
-    expect(struck()).toBe(
-      `was iban ${(supplied.last as CloudData).spans.find((span) => span.kind === 'iban')?.start}`,
-    );
+    expect(struck()).toBe(ORIGINALS.iban);
   });
 
   it('closes the data without losing the focus or the tooltip state', async () => {
@@ -1055,23 +1068,20 @@ describe('the marks in the data', () => {
 });
 
 describe('the tooltip', () => {
-  beforeEach(() => {
-    supplied.alter = locateSpans;
-  });
-
   it('shows the original text, struck through, for a focused mark, and goes on blur or Escape', async () => {
     check.shown(email, []);
     await prepare();
     click('show');
     const [mark] = marksOf('email');
-    const span = (supplied.last as CloudData).spans.find((entry) => entry.kind === 'email');
     expect(get('tip').hidden).toBe(true);
     (mark as HTMLElement).focus();
     expect(get('tip').hidden).toBe(false);
-    expect(struck()).toBe(span?.original);
+    expect(struck()).toBe(ORIGINALS.address);
     expect(mark?.getAttribute('aria-describedby')).toBe('tip');
     // Only the original, struck through: no label around it.
-    expect(text('tip')).toBe(span?.original);
+    expect(text('tip')).toBe(ORIGINALS.address);
+    // The original is shown on the device and nowhere else.
+    expect(text('data')).not.toContain(ORIGINALS.address);
     key(mark as HTMLElement, 'Escape');
     expect(get('tip').hidden).toBe(true);
     expect(mark?.hasAttribute('aria-describedby')).toBe(false);
@@ -1120,16 +1130,12 @@ describe('the tooltip', () => {
   });
 
   it('stays while the pointer is on it, and caps a long original', async () => {
+    // A made-up record: the first place stood for a text longer than the tooltip shows.
     const long = 'x'.repeat(TIP_MAX_CHARS + 50);
-    supplied.alter = (data) => {
-      const located = locateSpans(data);
-      return {
-        ...located,
-        spans: located.spans.map((span, index) =>
-          index === 0 ? { ...span, original: long } : span,
-        ),
-      };
-    };
+    supplied.alter = (data) => ({
+      ...data,
+      spans: data.spans.map((span, index) => (index === 0 ? { ...span, original: long } : span)),
+    });
     check.shown(email, []);
     await prepare();
     click('show');
