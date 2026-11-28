@@ -482,11 +482,32 @@ export const PRIVACY_LEVELS: readonly PrivacyLevel[] = ['standard', 'high'];
 
 export const DEFAULT_PRIVACY_LEVEL: PrivacyLevel = 'standard';
 
+/** The kinds of personal data the filter replaces. */
+export type RedactedKind = 'name' | 'email' | 'number' | 'iban' | 'link';
+
+/**
+ * One replacement in {@link CloudData.json}: `json.slice(start, end)` is the placeholder the
+ * filter wrote. The panel highlights these places and shows `original` on the device only.
+ */
+export interface RedactedSpan {
+  /** UTF-16 offsets into the JSON text. */
+  start: number;
+  end: number;
+  kind: RedactedKind;
+  /** The text that stood there (normalized). Never sent. */
+  original: string;
+}
+
 /** What the user sees and, after agreeing, sends to the cloud. */
 export interface CloudData {
   /** The data block, exactly as it is shown and sent. */
   json: string;
   removed: Removed;
+  /**
+   * Every replacement in `json`, sorted by `start`; a span can lie inside another (a name in a
+   * link's host). Empty when the positions could not be mapped; the counts still hold.
+   */
+  spans: RedactedSpan[];
   /**
    * True if Gemini Nano looked for names and every name it found could be used; otherwise names
    * may remain.
@@ -663,6 +684,7 @@ export function cloudData(
   return {
     json: JSON.stringify(data, null, 2),
     removed,
+    spans: [],
     // At "standard" no name is meant to be removed, so none can remain by mistake.
     namesChecked: !high || (foundNames !== undefined && !fromModel.dropped),
   };
